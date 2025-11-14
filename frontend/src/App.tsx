@@ -63,6 +63,22 @@ import iogarLogo from './image/iogar_logo.png';
 import LimpezaDados from './components/LimpezaDados';
 import ImportacaoInsumos from './components/ImportacaoInsumos';
 
+
+// ===================================================================================================
+// ESTILOS CUSTOMIZADOS
+// Remove as setas de incremento e decremento dos campos de input do tipo number
+// ===================================================================================================
+const customStyles = `
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+`;
+
 // ============================================================================
 // INTERFACES E TIPOS DE DADOS
 // ============================================================================
@@ -230,10 +246,10 @@ const [formData, setFormData] = useState(() => {
   const initialData = {
     nome: editingInsumo?.nome || '',
     unidade: editingInsumo?.unidade || 'kg',
-    // Campo fator removido - não é mais necessário
     quantidade: editingInsumo?.quantidade || 1,
-    grupo: editingInsumo?.grupo || '',
+    fator: editingInsumo?.fator || 1.0,
     subgrupo: editingInsumo?.subgrupo || '',
+    grupo: editingInsumo?.grupo || '',
     descricao: editingInsumo?.descricao || '',
     preco_compra_total: editingInsumo?.preco_compra_total || 
                         (editingInsumo?.preco_compra_real && editingInsumo?.quantidade ? 
@@ -361,8 +377,8 @@ const resetForm = useCallback(() => {
     nome: '',
     codigo: '',
     unidade: 'kg',
-    // Campo fator removido - não é mais necessário
     quantidade: 1, // Padrão 1 para evitar divisão por zero
+    fator: 1.0,
     grupo: '',
     subgrupo: '',
     descricao: '',
@@ -767,6 +783,25 @@ const resetForm = useCallback(() => {
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-white text-gray-900"
                     placeholder="0"
                   />
+                </div>
+
+                {/* Campo Fator */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Fator
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={formData.fator || 1.0}
+                    onChange={(e) => setFormData({...formData, fator: parseFloat(e.target.value) || 1.0})}
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none transition-colors bg-white"
+                    placeholder="1.0"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Padrão: 1.0. Usado para cálculo de preço unitário.
+                  </p>
                 </div>
 
                 {/* Preço de Compra Total */}
@@ -4111,8 +4146,9 @@ const fetchInsumos = async () => {
           }
         };
 
-        console.log('✅ Adicionando ao array:', novoInsumo);
-        setReceitaInsumos(prev => [...prev, novoInsumo]);
+        console.log('✅ Adicionando ao array (no topo):', novoInsumo);
+        // Adiciona no início do array ao invés do fim
+        setReceitaInsumos(prev => [novoInsumo, ...prev]);
         setBuscaInsumo('');
       };
 
@@ -4460,57 +4496,59 @@ const fetchInsumos = async () => {
         
         console.log('✅ Insumos VÁLIDOS após filtro:', insumosValidos);
         
-       // Verificar insumos e mostrar modal customizado se necessário
-        if (insumosValidos.length === 0) {
-          // Detectar o problema específico
+        // ===================================================================================================
+        // PERMITIR CRIAÇÃO DE RECEITA SEM INSUMOS
+        // Descrição: Remove validação que impedia criar receitas sem insumos
+        // Mantém apenas validação de quantidade zero nos insumos existentes
+        // ===================================================================================================
+        if (insumosValidos.length === 0 && receitaInsumos.length > 0) {
+          // Só mostrar alerta se houver insumos adicionados mas com quantidade zero
           const temInsumosComQuantidadeZero = receitaInsumos.some(insumo => 
             insumo.insumo_id > 0 && (!insumo.quantidade || insumo.quantidade <= 0)
           );
           
-          const titulo = temInsumosComQuantidadeZero 
-            ? 'Insumos sem Quantidade' 
-            : 'Receita sem Insumos';
+          if (temInsumosComQuantidadeZero) {
+            const titulo = 'Insumos sem Quantidade';
+            const mensagem = 'Alguns insumos estão sem quantidade definida. Deseja continuar mesmo assim?';
             
-          const mensagem = temInsumosComQuantidadeZero
-            ? 'Alguns insumos estão sem quantidade definida. Deseja continuar mesmo assim?'
-            : 'Esta receita não possui insumos. Deseja continuar mesmo assim?';
-          
-          // Mostrar modal customizado
-          setConfirmDialogData({
-            title: titulo,
-            message: mensagem,
-            onConfirm: () => {
-              setShowConfirmDialog(false);              
+            // Mostrar modal customizado
+            setConfirmDialogData({
+              title: titulo,
+              message: mensagem,
+              onConfirm: () => {
+                setShowConfirmDialog(false);              
 
-              // CÓDIGO DE SALVAMENTO INLINE (copiar do final da função)
-              const dadosBackend = {
-                ...(editingReceita && editingReceita.id && { id: editingReceita.id }),
-                codigo: String(formData.codigo || '').trim(),
-                nome: String(formData.nome || '').trim(),
-                descricao: String(formData.descricao || '').trim(),
-                sugestao_valor: parseFloat(formData.sugestao_valor) || 0,
-                grupo: String(formData.categoria || 'Lanches').trim(),
-                subgrupo: String(formData.categoria || 'Lanches').trim(),
-                rendimento_porcoes: parseFloat(formData.quantidade_porcao) || 1,
-                tempo_preparo_minutos: parseInt(formData.tempo_preparo) || 15,
-                ativo: true,
-                restaurante_id: parseInt(selectedRestaurante.id),
-                insumos: insumosValidos.map(insumo => {
-                  // Buscar insumo para garantir que temos a unidade
-                  const insumoCompleto = insumos.find(i => i.id === insumo.insumo_id);
-                  return {
-                    insumo_id: parseInt(insumo.insumo_id),
-                    quantidade: parseFloat(insumo.quantidade),
-                    unidade_medida: insumo.unidade_medida || insumoCompleto?.unidade || 'un'
-                  };
-                })
-              };
-              onSave(dadosBackend);
-            }
-          });
-          setShowConfirmDialog(true);
-          return;
-        }
+                // CÓDIGO DE SALVAMENTO INLINE (copiar do final da função)
+                const dadosBackend = {
+                  ...(editingReceita && editingReceita.id && { id: editingReceita.id }),
+                  codigo: String(formData.codigo || '').trim(),
+                  nome: String(formData.nome || '').trim(),
+                  descricao: String(formData.descricao || '').trim(),
+                  sugestao_valor: parseFloat(formData.sugestao_valor) || 0,
+                  grupo: String(formData.categoria || 'Lanches').trim(),
+                  subgrupo: String(formData.categoria || 'Lanches').trim(),
+                  rendimento_porcoes: parseFloat(formData.quantidade_porcao) || 1,
+                  tempo_preparo_minutos: parseInt(formData.tempo_preparo) || 15,
+                  ativo: true,
+                  restaurante_id: parseInt(selectedRestaurante.id),
+                  insumos: insumosValidos.map(insumo => {
+                    // Buscar insumo para garantir que temos a unidade
+                    const insumoCompleto = insumos.find(i => i.id === insumo.insumo_id);
+                    return {
+                      insumo_id: parseInt(insumo.insumo_id),
+                      quantidade: parseFloat(insumo.quantidade),
+                      unidade_medida: insumo.unidade_medida || insumoCompleto?.unidade || 'un'
+                    };
+                  })
+                };
+                onSave(dadosBackend);
+              }
+            });
+            setShowConfirmDialog(true);
+            return;
+          }  // ← FECHAR if (temInsumosComQuantidadeZero)
+        }    // ← FECHAR if (insumosValidos.length === 0 && receitaInsumos.length > 0)
+
         // Se chegou aqui, pode salvar normalmente
         proceedWithSave(insumosValidos);
       };
@@ -4684,15 +4722,22 @@ const fetchInsumos = async () => {
                         type="number"
                         step="0.001"
                         min="0.001"
-                        value={formData.quantidade_porcao || 1}
+                        value={formData.quantidade_porcao || ''}
+                        onFocus={(e) => {
+                          // Ao focar no campo, se o valor for 1, seleciona para facilitar digitação
+                          if (e.target.value === '1') {
+                            e.target.select();
+                          }
+                        }}
                         onChange={(e) => {
                           const valor = e.target.value;
+                          // Permite campo vazio ou converte para número
                           const valorNumerico = valor === '' ? '' : parseFloat(valor);
                           
-                          setFormData(prev => {
-                            const novoEstado = { ...prev, quantidade_porcao: valor };
-                            return novoEstado;
-                          });
+                          setFormData(prev => ({
+                            ...prev,
+                            quantidade_porcao: valorNumerico
+                          }));
                         }}
                         className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-white text-gray-900"
                         placeholder="1"
@@ -4707,8 +4752,18 @@ const fetchInsumos = async () => {
                       <input
                         type="number"
                         min="0"
-                        value={formData.tempo_preparo || 0}
-                        onChange={(e) => handleChange('tempo_preparo', parseInt(e.target.value) || 0)}
+                        value={formData.tempo_preparo || ''}
+                        onFocus={(e) => {
+                          // Ao focar no campo, se o valor for 0, limpa para facilitar digitação
+                          if (e.target.value === '0') {
+                            e.target.select();
+                          }
+                        }}
+                        onChange={(e) => {
+                          const valor = e.target.value;
+                          // Permite campo vazio ou converte para número
+                          handleChange('tempo_preparo', valor === '' ? 0 : parseInt(valor));
+                        }}
                         className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-white text-gray-900"
                         placeholder="0"
                       />
@@ -5115,7 +5170,17 @@ const fetchInsumos = async () => {
                                 min="0"
                                 value={receitaInsumo.quantidade || 0}
                                 onChange={(e) => updateReceitaInsumo(index, 'quantidade', parseFloat(e.target.value))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white text-gray-900"
+                                onFocus={(e) => {
+                                  // ===================================================================================================
+                                  // SELECAO AUTOMATICA DO VALOR ZERO
+                                  // Quando o usuario clicar no campo e o valor for 0, seleciona automaticamente
+                                  // para facilitar a digitacao de um novo valor
+                                  // ===================================================================================================
+                                  if (e.target.value === '0') {
+                                    e.target.select();
+                                  }
+                                }}
+                                className="w-full px-3 py-2 bg-white border-2 border-green-500 rounded focus:ring-2 focus:ring-green-500 focus:border-green-500"
                                 placeholder="Qtd"
                               />
                             </div>
@@ -5305,22 +5370,24 @@ const fetchInsumos = async () => {
                     </div>
 
                     {/* Sugestão de Valor */}
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-900">Sugestão de Preço de Venda</label>
-                      <div className="relative">
-                        <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500">R$</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={formData.sugestao_valor}
-                          onChange={(e) => handleChange('sugestao_valor', e.target.value)}
-                          className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-white text-gray-900"
-                          placeholder="0,00"
-                        />
+                    {!formData.processada && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-900">Sugestão de Preço de Venda</label>
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500">R$</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={formData.sugestao_valor}
+                            onChange={(e) => handleChange('sugestao_valor', e.target.value)}
+                            className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-white text-gray-900"
+                            placeholder="0,00"
+                          />
+                        </div>
+                        <p className="text-xs text-gray-600">Valor opcional para venda</p>
                       </div>
-                      <p className="text-xs text-gray-600">Valor opcional para venda</p>
-                    </div>
+                    )}
 
                   </div>
                 </div>
@@ -5410,7 +5477,7 @@ const fetchInsumos = async () => {
                   disabled={loading} 
                   className="flex-1 py-3 bg-gradient-to-r from-green-500 to-pink-500 text-white rounded-lg hover:from-green-600 hover:to-pink-600 disabled:opacity-50 transition-all"
                 >
-                  {loading ? 'Criando...' : 'Criar Receita'}
+                  {loading ? 'Salvando...' : (editingReceita ? 'Atualizar Receita' : 'Criar Receita')}
                 </button>
               </div>
             </div>
@@ -5608,22 +5675,11 @@ const fetchInsumos = async () => {
             );
           }
 
-          // INTEGRAÇÃO COM SISTEMA DE IA - Mostrar popup de classificação
-          if (!editingInsumo && response.data) {
-            setInsumoRecemCriado({
-              id: response.data.id,
-              nome: response.data.nome
-            });
-            // Fechar formulário primeiro e aguardar um pouco antes de mostrar popup de classificação
-            setShowInsumoForm(false);
-            setTimeout(() => {
-              setShowClassificacaoPopup(true);
-            }, 200);
-          } else {
-            setShowInsumoForm(false);
-          }
-
-          // Limpar estados do formulário
+          // ===================================================================================================
+          // LIMPEZA DO FORMULARIO APENAS EM CASO DE SUCESSO
+          // Os dados do formulario sao limpos somente quando a operacao e bem-sucedida
+          // Em caso de erro, os dados sao mantidos para permitir correcao e nova tentativa
+          // ===================================================================================================
           setShowInsumoForm(false);
           setEditingInsumo(null);
           setEhFornecedorAnonimo(true);
@@ -5633,12 +5689,24 @@ const fetchInsumos = async () => {
           setNovoInsumo({
             nome: '',
             unidade: 'kg',
-            preco_compra_real: 0, // ✅ Usar apenas este campo
+            preco_compra_real: 0,
             fator: 1.0,
             quantidade: 1,
-            grupo: 'Geral', // ✅ Valor padrão obrigatório
-            subgrupo: 'Geral' // ✅ Valor padrão obrigatório
+            grupo: 'Geral',
+            subgrupo: 'Geral'
           });
+
+          // INTEGRAÇÃO COM SISTEMA DE IA - Mostrar popup de classificação
+          if (!editingInsumo && response.data) {
+            setInsumoRecemCriado({
+              id: response.data.id,
+              nome: response.data.nome
+            });
+            // Aguardar um pouco antes de mostrar popup de classificação
+            setTimeout(() => {
+              setShowClassificacaoPopup(true);
+            }, 200);
+          }
 
         } else {
           console.error('❌ Erro na resposta:', response.error);
@@ -7939,7 +8007,11 @@ const Receitas = React.memo(() => {
         await fetchReceitasByRestaurante(selectedRestaurante.id);
         console.log('✅ Receitas recarregadas!');
         
-        // Fechar formulário
+        // ===================================================================================================
+        // LIMPEZA DO FORMULARIO APENAS EM CASO DE SUCESSO
+        // Os dados do formulario sao limpos somente quando a operacao e bem-sucedida
+        // Em caso de erro, os dados sao mantidos para permitir correcao e nova tentativa
+        // ===================================================================================================
         setShowReceitaForm(false);
         setNovaReceita({ nome: '', descricao: '', categoria: '', porcoes: 1 });
         setReceitaInsumos([]);
@@ -8002,12 +8074,13 @@ const Receitas = React.memo(() => {
   // FUNÇÕES AUXILIARES PARA FORMULÁRIO (MANTIDAS DA VERSÃO ORIGINAL)
   // ===================================================================================================
   
-  // Função para adicionar insumo à receita
+  // Função para adicionar insumo à receita - ADICIONA NO TOPO
   const addInsumoToReceita = () => {
-    console.log('➕ Adicionando novo insumo à receita');
+    console.log('➕ Adicionando novo insumo à receita (no topo)');
     
     setReceitaInsumos(prev => {
-      const novo = [...prev, { insumo_id: 0, quantidade: 1 }];
+      // Adiciona no início do array ao invés do fim
+      const novo = [{ insumo_id: 0, quantidade: 1 }, ...prev];
       return novo;
     });
   };
@@ -8273,7 +8346,8 @@ Receitas.displayName = 'Receitas';
       descricao: '',
       unidade: 'kg',
       preco_compra_real: 0,
-      quantidade: 1
+      quantidade: 1,
+      fator: 1.0
     });
 
     const [showPopupFornecedor, setShowPopupFornecedor] = useState(false);
@@ -8423,7 +8497,8 @@ Receitas.displayName = 'Receitas';
         descricao: insumo.descricao || '',
         unidade: insumo.unidade || 'kg',
         preco_compra_real: insumo.preco_unitario || 0,
-        quantidade: insumo.quantidade || 1
+        quantidade: insumo.quantidade || 1,
+        fator: insumo.fator || 1.0
       });
       setShowPopupEditarInsumo(true);
     };
@@ -8640,7 +8715,8 @@ const cancelarExclusao = () => {
           unidade: String(novoInsumo.unidade || 'kg').trim(),
           preco_unitario: Number(novoInsumo.preco_compra_real) || 0,
           descricao: String(novoInsumo.descricao || '').trim(),
-          quantidade: Number(novoInsumo.quantidade) || 1
+          quantidade: Number(novoInsumo.quantidade) || 1,
+          fator: novoInsumo.fator || 1.0
         };
 
         console.log('🎯 Dados do insumo do fornecedor (sem código):', insumoData);
@@ -8665,7 +8741,8 @@ const cancelarExclusao = () => {
             descricao: '',
             unidade: 'kg',
             preco_compra_real: 0,
-            quantidade: 1
+            quantidade: 1,
+            fator: 1.0
           });
           setShowPopupInsumo(false);
           
@@ -9532,6 +9609,25 @@ const cancelarExclusao = () => {
                   </div>
                 </div>
 
+                {/* Campo Fator */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Fator
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={novoInsumo.fator || 1.0}
+                    onChange={(e) => setNovoInsumo({...novoInsumo, fator: parseFloat(e.target.value) || 1.0})}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:border-green-500 focus:outline-none transition-colors bg-white"
+                    placeholder="1.0"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Padrão: 1.0. Usado para cálculo de preço unitário.
+                  </p>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Preço (R$)</label>
                   <input
@@ -9729,6 +9825,26 @@ const cancelarExclusao = () => {
                     className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none transition-colors bg-white"
                     placeholder="1.000"
                   />
+
+                {/* Campo Fator */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Fator
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={novoInsumo.fator || 1.0}
+                    onChange={(e) => setNovoInsumo({...novoInsumo, fator: parseFloat(e.target.value) || 1.0})}
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none transition-colors bg-white"
+                    placeholder="1.0"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Padrão: 1.0. Usado para cálculo de preço unitário.
+                  </p>
+                </div>
+
                   <p className="text-xs text-gray-500 mt-1">
                     Quantas unidades estão sendo vendidas
                   </p>
@@ -9788,6 +9904,7 @@ return (  //RETORN DO COMPONENTE PRINCIPAL
     <>
       {/* Barra de Navegação Mobile - Visível apenas em mobile/tablet */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-green-500 to-pink-500 shadow-lg">
+        <style>{customStyles}</style>
         <div className="flex items-center justify-between px-4 py-3">
           {/* Logo IOGAR */}
           <div className="flex items-center gap-2">

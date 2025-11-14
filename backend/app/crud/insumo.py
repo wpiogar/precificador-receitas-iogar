@@ -46,7 +46,7 @@ def calcular_comparacao_precos(db: Session, insumo: Insumo) -> dict:
     }
     
     # ========================================================================
-    # CALCULAR PREÇO POR UNIDADE BASE DO SISTEMA (NORMALIZADO PELO FATOR)
+    # CALCULAR PREÇO POR UNIDADE BASE DO SISTEMA (COM FATOR)
     # ========================================================================
     if (hasattr(insumo, 'preco_compra') and insumo.preco_compra and 
         insumo.quantidade):
@@ -57,6 +57,13 @@ def calcular_comparacao_precos(db: Session, insumo: Insumo) -> dict:
         # Calcular preço por unidade da embalagem
         # Exemplo: R$ 14,22 ÷ 3 unidades = R$ 4,74 por unidade de 800ml
         preco_por_unidade_embalagem = preco_total_reais / insumo.quantidade
+        
+        # Aplicar fator se diferente de 1
+        # Se fator != 1: divide o preço unitário pelo fator
+        # Exemplo: Se fator = 0.75, preço_final = preco_unitario / 0.75
+        fator = getattr(insumo, 'fator', 1.0) or 1.0
+        if fator != 1.0:
+            preco_por_unidade_embalagem = preco_por_unidade_embalagem / fator
         
         resultado['preco_por_unidade'] = round(preco_por_unidade_embalagem, 2)
     
@@ -538,7 +545,7 @@ def create_insumo(db: Session, insumo: InsumoCreate) -> Insumo:
         codigo=insumo.codigo.upper() if insumo.codigo else None,
         nome=insumo.nome,
         quantidade=insumo.quantidade,
-        # Campo fator removido - não é mais necessário
+        fator=insumo.fator if hasattr(insumo, 'fator') else 1.0,
         unidade=insumo.unidade,
         preco_compra=preco_centavos,
         restaurante_id=insumo.restaurante_id,  # Campo obrigatório

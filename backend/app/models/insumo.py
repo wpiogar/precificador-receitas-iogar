@@ -15,10 +15,11 @@ class Insumo(BaseModel):
     
     Campos herdados do BaseModel:
     - grupo, subgrupo, codigo, nome
-    - quantidade, unidade, preco_compra
+    - quantidade, unidade, preco_compra, fator
     
-    NOTA: O campo 'fator' foi removido conforme nova regra de negócio.
-    Agora trabalhamos apenas com quantidade e unidade diretamente.
+    NOTA: O campo 'fator' foi re-implementado para cálculo de preço unitário.
+    Quando fator != 1, o preço unitário é dividido pelo fator.
+    Fórmula: preco_unitario = (preco_compra_total / quantidade) / fator
     """
     __tablename__ = "insumos"
 
@@ -31,6 +32,20 @@ class Insumo(BaseModel):
             'codigo',
             name='uq_insumo_restaurante_codigo'
         ),
+    )
+
+    # ========================================================================
+    # CAMPO FATOR - Multiplicador para cálculo de preço unitário
+    # ========================================================================
+    # Campo fator para conversão de unidades e cálculo de preço
+    # Valor padrão: 1.0 (sem conversão)
+    # Quando fator != 1: preco_unitario = (preco_compra_total / quantidade) / fator
+    # Exemplo: Se compra 750ml mas quer preço por litro, fator = 0.75
+    fator = Column(
+        Float,
+        default=1.0,
+        nullable=True,
+        comment="Fator multiplicador para cálculo de preço unitário (default: 1.0)"
     )
 
     #   ===================================================================================================

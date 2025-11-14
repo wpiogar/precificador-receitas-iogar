@@ -129,6 +129,17 @@ const SuperGridReceitas: React.FC<SuperGridReceitasProps> = ({
   onCreateReceita
 }) => {
 
+  // ===================================================================================================
+  // DEBUG: Verificar estrutura das receitas recebidas
+  // ===================================================================================================
+  console.log('🔍 RECEITAS RECEBIDAS NO GRID:', receitas);
+  console.log('🔍 PRIMEIRA RECEITA:', receitas[0]);
+  console.log('🔍 Campos da primeira receita:', {
+    total_insumos: receitas[0]?.total_insumos,
+    tem_insumos_sem_preco: receitas[0]?.tem_insumos_sem_preco,
+    status: receitas[0]?.status
+  });
+
   // TESTE - verificar dados
   console.log('RECEITAS:', receitas);
   
@@ -253,23 +264,43 @@ const SuperGridReceitas: React.FC<SuperGridReceitasProps> = ({
     }).format(valor);
   };
 
-  const getStatusBadge = (status: string, temInsumosSemPreco?: boolean) => {
-    // DEBUG: Ver o que está chegando
-    console.log('🐛 getStatusBadge chamado:', { status, temInsumosSemPreco });
 
-  // Se a receita tem insumos sem preço, forçar status pendente
-  const statusFinal = temInsumosSemPreco ? 'pendente' : status;
-  console.log('🐛 statusFinal:', statusFinal);
-  
-  const configs = {
-    ativo: { bg: 'bg-green-100', text: 'text-green-800', label: 'Ativo', icon: '✓' },
-    inativo: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Inativo', icon: '○' },
-    processado: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Processado', icon: '⚙' },
-    pendente: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Pendente', icon: '⚠' }
-  };
-  
-  const config = configs[statusFinal] || configs.ativo;
+  const getStatusBadge = (status: string, temInsumosSemPreco?: boolean, totalInsumos?: number) => {
+    // ===================================================================================================
+    // LÓGICA DE STATUS PENDENTE
+    // Descrição: Determina o status final baseado em:
+    // 1. Se receita existe (não undefined/null) E tem 0 insumos → PENDENTE
+    // 2. Se receita tem insumos sem preço → PENDENTE
+    // 3. Caso contrário → status original (ativo/inativo/processado)
+    // ===================================================================================================
+    console.log('🐛 getStatusBadge chamado:', { status, temInsumosSemPreco, totalInsumos });
+
+    let statusFinal = status;
     
+    // Verificação 1: Receita sem insumos (totalInsumos definido e igual a 0)
+    if (totalInsumos !== undefined && totalInsumos === 0) {
+      statusFinal = 'pendente';
+      console.log('→ Marcado como PENDENTE: receita sem insumos');
+    }
+    // Verificação 2: Receita com insumos sem preço
+    else if (temInsumosSemPreco === true) {
+      statusFinal = 'pendente';
+      console.log('→ Marcado como PENDENTE: insumos sem preço');
+    }
+    // Caso contrário: manter status original
+    else {
+      console.log('→ Status mantido:', status);
+    }
+    
+    const configs = {
+      ativo: { bg: 'bg-green-100', text: 'text-green-800', label: 'Ativo', icon: '✓' },
+      inativo: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Inativo', icon: '○' },
+      processado: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Processado', icon: '⚙' },
+      pendente: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Pendente', icon: '⚠' }
+    };
+    
+    const config = configs[statusFinal] || configs.ativo;
+      
     return (
       <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
         <span>{config.icon}</span>
@@ -282,21 +313,33 @@ const SuperGridReceitas: React.FC<SuperGridReceitasProps> = ({
   // COMPONENTE DE CARD PARA VIEW GRID
   // ===================================================================================================
 
-  const ReceitaCard = ({ receita }: { receita: Receita }) => (
-    <div
-      className={`relative bg-white rounded-xl border-2 transition-all duration-300 hover:shadow-lg cursor-pointer overflow-hidden transform hover:-translate-y-1 ease-in-out active:scale-98 ${
-        receitaSelecionada === receita.id
-          ? 'border-green-500 shadow-lg'
-          : 'border-gray-100 hover:border-green-300'
-      }`}
-      role="article"
-      aria-label={`Receita ${receita.nome}`}
-      onClick={() => {
-        if (onViewReceita) {
-          onViewReceita(receita);
-        }
-      }}
-    >
+  const ReceitaCard = ({ receita }: { receita: Receita }) => {
+    // ===================================================================================================
+    // DEBUG: Verificar dados da receita para status
+    // ===================================================================================================
+    console.log('=====================================');
+    console.log('📊 RECEITA:', receita.nome);
+    console.log('📊 status:', receita.status);
+    console.log('📊 tem_insumos_sem_preco:', receita.tem_insumos_sem_preco);
+    console.log('📊 total_insumos:', receita.total_insumos);
+    console.log('📊 tipo total_insumos:', typeof receita.total_insumos);
+    console.log('=====================================');
+
+    return (
+      <div
+        className={`relative bg-white rounded-xl border-2 transition-all duration-300 hover:shadow-lg cursor-pointer overflow-hidden transform hover:-translate-y-1 ease-in-out active:scale-98 ${
+          receitaSelecionada === receita.id
+            ? 'border-green-500 shadow-lg'
+            : 'border-gray-100 hover:border-green-300'
+        }`}
+        role="article"
+        aria-label={`Receita ${receita.nome}`}
+        onClick={() => {
+          if (onViewReceita) {
+            onViewReceita(receita);
+          }
+        }}
+      >
       {/* Marca d'água de fundo */}
       <div 
         className="absolute inset-0 flex items-center justify-center pointer-events-none"
@@ -423,7 +466,7 @@ const SuperGridReceitas: React.FC<SuperGridReceitasProps> = ({
         
         <div className="flex items-center justify-between">
           <span className="text-sm text-gray-500">{receita.categoria}</span>
-          {getStatusBadge(receita.status, receita.tem_insumos_sem_preco)}
+          {getStatusBadge(receita.status, receita.tem_insumos_sem_preco, receita.total_insumos)}
         </div>
 
         {/* Informacao do responsavel pela receita */}
@@ -491,13 +534,19 @@ const SuperGridReceitas: React.FC<SuperGridReceitasProps> = ({
       </div>
     </div>
   );
-
+};
   // ===================================================================================================
   // COMPONENTE DE LINHA PARA VIEW LIST
   // ===================================================================================================
 
-  const ReceitaRow = ({ receita }: { receita: Receita }) => (
-    <tr 
+  const ReceitaRow = ({ receita }: { receita: Receita }) => {
+  // ===================================================================================================
+  // DEBUG: Verificar dados da receita para status (VIEW LIST)
+  // ===================================================================================================
+  console.log('📋 LISTA - Receita:', receita.nome, 'total_insumos:', receita.total_insumos);
+
+  return (
+    <tr
       className={`hover:bg-gray-50 cursor-pointer transition-colors duration-200 ${
         receitaSelecionada === receita.id ? 'bg-green-50' : ''
       }`}
@@ -528,7 +577,7 @@ const SuperGridReceitas: React.FC<SuperGridReceitasProps> = ({
       </td>
       
       <td className="px-6 py-4 whitespace-nowrap">
-        {getStatusBadge(receita.status, receita.tem_insumos_sem_preco)}
+        {getStatusBadge(receita.status, receita.tem_insumos_sem_preco, receita.total_insumos)}
       </td>
       
      <td className="px-6 py-4 whitespace-nowrap">
@@ -660,6 +709,7 @@ const SuperGridReceitas: React.FC<SuperGridReceitasProps> = ({
       </td>
     </tr>
   );
+};
 
   // ===================================================================================================
   // FUNCOES DE EXPORTACAO

@@ -344,6 +344,40 @@ const calcularCustoPorPorcao = () => {
             </div>
           </div>
         )}
+
+        {/* ===================================================================================================
+            ALERTA - RECEITA SEM INSUMOS
+            =================================================================================================== */}
+        {receita.total_insumos === 0 && (
+          <div className="bg-orange-50 border-l-4 border-orange-400 rounded-lg p-5">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0">
+                <AlertTriangle className="w-6 h-6 text-orange-600" />
+              </div>
+              <div className="flex-1">
+                <h4 className="text-lg font-semibold text-orange-900 mb-2">
+                  ⚠️ Atenção: Esta receita não possui insumos cadastrados
+                </h4>
+                <p className="text-sm text-orange-800 mb-3">
+                  Para calcular corretamente o custo desta receita, você precisa adicionar os insumos necessários.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      if (onEdit) {
+                        onEdit(receita);
+                      }
+                    }}
+                    className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center gap-2"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                    Adicionar Insumos
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         
         {/* Informações Básicas */}
         <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-xl p-6 border border-green-100">
@@ -441,41 +475,45 @@ const calcularCustoPorPorcao = () => {
             </p>
           </div>
 
-          {/* Preço Sugerido */}
-          <div className="bg-green-50 rounded-xl p-6 border border-green-100">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="bg-green-100 p-2 rounded-lg">
-                <DollarSign className="w-6 h-6 text-green-600" />
+          {/* Preço Sugerido - NÃO MOSTRAR PARA RECEITAS PROCESSADAS */}
+          {!receita.processada && (
+            <div className="bg-green-50 rounded-xl p-6 border border-green-100">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="bg-green-100 p-2 rounded-lg">
+                  <DollarSign className="w-6 h-6 text-green-600" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-green-800">Preço Sugerido</h4>
+                  <p className="text-xs text-green-600">Margem 25%</p>
+                </div>
               </div>
-              <div>
-                <h4 className="font-semibold text-green-800">Preço Sugerido</h4>
-                <p className="text-xs text-green-600">Margem 25%</p>
-              </div>
+              <p className="text-2xl font-bold text-green-700">{formatarPreco(receita.preco_venda_sugerido)}</p>
+              <p className="text-sm text-green-600 mt-1">
+                Margem: {receita.margem_percentual.toFixed(1)}%
+              </p>
             </div>
-            <p className="text-2xl font-bold text-green-700">{formatarPreco(receita.preco_venda_sugerido)}</p>
-            <p className="text-sm text-green-600 mt-1">
-              Margem: {receita.margem_percentual.toFixed(1)}%
-            </p>
-          </div>
+          )}
 
-          {/* Lucro por Unidade */}
-          <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="bg-blue-100 p-2 rounded-lg">
-                <TrendingUp className="w-6 h-6 text-blue-600" />
+          {/* Lucro por Unidade - NÃO MOSTRAR PARA RECEITAS PROCESSADAS */}
+          {!receita.processada && (
+            <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="bg-blue-100 p-2 rounded-lg">
+                  <TrendingUp className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-blue-800">Lucro por Rendimento</h4>
+                  <p className="text-xs text-blue-600">Valor líquido</p>
+                </div>
               </div>
-              <div>
-                <h4 className="font-semibold text-blue-800">Lucro por Rendimento</h4>
-                <p className="text-xs text-blue-600">Valor líquido</p>
-              </div>
+              <p className="text-2xl font-bold text-blue-700">
+                {formatarPreco(receita.preco_venda_sugerido - receita.cmv_real)}
+              </p>
+              <p className="text-sm text-blue-600 mt-1">
+                Total receita: {formatarPreco((receita.preco_venda_sugerido - receita.cmv_real) * receita.porcoes)}
+              </p>
             </div>
-            <p className="text-2xl font-bold text-blue-700">
-              {formatarPreco(receita.preco_venda_sugerido - receita.cmv_real)}
-            </p>
-            <p className="text-sm text-blue-600 mt-1">
-              Total receita: {formatarPreco((receita.preco_venda_sugerido - receita.cmv_real) * receita.porcoes)}
-            </p>
-          </div>
+          )}
         </div>
 
         {/* Dados de Criação e Atualização */}
@@ -520,6 +558,37 @@ const calcularCustoPorPorcao = () => {
     console.log('📋 Estrutura completa:', receita.receita_insumos);
     // ===================================================================================================
 
+    // ===================================================================================================
+    // CALCULAR CUSTO TOTAL DOS INSUMOS NORMAIS + RECEITAS PROCESSADAS
+    // ===================================================================================================
+    const calcularCustoTotalInsumos = () => {
+      let custoTotal = 0;
+      
+      // Somar custo dos insumos normais
+      insumosNormais.forEach(insumo => {
+        const custoInsumo = insumo.custo_calculado || 
+          (insumo.quantidade_necessaria * (insumo.insumo?.preco_compra_real || 0));
+        custoTotal += custoInsumo;
+      });
+      
+      // Somar custo das receitas processadas
+      receitasProcessadas.forEach(item => {
+        const precoPorUnidade = item.receita_processada?.preco_compra_real || 
+                                item.insumo?.preco_compra_real || 
+                                0;
+        const custoReceitaProcessada = (item.quantidade_necessaria || 0) * precoPorUnidade;
+        custoTotal += custoReceitaProcessada;
+      });
+      
+      return custoTotal;
+    };
+    
+    const custoTotalCalculado = calcularCustoTotalInsumos();
+    
+    console.log('💰 Custo total calculado:', custoTotalCalculado);
+    console.log('💰 CMV da receita:', receita.cmv_real);
+    // ===================================================================================================
+
     return (
       <div className="space-y-6">
         {/* Seção de Insumos Normais */}
@@ -542,9 +611,16 @@ const calcularCustoPorPorcao = () => {
                       </h4>
                       <span className="text-sm font-medium text-green-600">
                         {(() => {
-                          const custoInsumo = insumo.custo_calculado || 
+                          // ===================================================================================================
+                          // CALCULO DO CUSTO PROPORCIONAL AO RENDIMENTO
+                          // Divide o custo do insumo pelo rendimento para mostrar o custo por unidade de rendimento
+                          // Exemplo: Custo total R$2,80 com rendimento 2kg = R$1,40 por kg
+                          // ===================================================================================================
+                          const custoTotal = insumo.custo_calculado || 
                             (insumo.quantidade_necessaria * (insumo.insumo?.preco_compra_real || 0));
-                          return formatarPreco(custoInsumo);
+                          const rendimento = receita.rendimento_porcoes || receita.porcoes || 1;
+                          const custoPorRendimento = rendimento > 0 ? custoTotal / rendimento : custoTotal;
+                          return formatarPreco(custoPorRendimento);
                         })()}
                       </span>
                     </div>
@@ -575,26 +651,61 @@ const calcularCustoPorPorcao = () => {
             
             <div className="p-6">
               <div className="space-y-4">
-                {receitasProcessadas.map((item, index) => (
+                {receitasProcessadas.map((item, index) => {
+                // ===================================================================================================
+                // CALCULAR CUSTO DA RECEITA PROCESSADA
+                // ===================================================================================================
+                const custoReceitaProcessada = (() => {
+                  // Buscar o custo da receita processada (cmv_real ou preco_compra_real)
+                  const precoPorUnidade = item.receita_processada?.preco_compra_real || 
+                                        item.insumo?.preco_compra_real || 
+                                        0;
+                  
+                  // Calcular custo baseado na quantidade necessária
+                  const custoTotal = (item.quantidade_necessaria || 0) * precoPorUnidade;
+                  
+                  return custoTotal;
+                })();
+
+                return (
                   <div key={index} className="bg-purple-50 rounded-lg p-4 border border-purple-200">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-medium text-gray-900">
                         {item.receita_processada?.nome || 'Receita Processada'}
                       </h4>
                       <span className="text-sm font-medium text-purple-600">
-                        {formatarPreco(item.custo_calculado || 0)}
+                        {(() => {
+                          // ===================================================================================================
+                          // CUSTO DA RECEITA PROCESSADA PROPORCIONAL AO RENDIMENTO
+                          // Usa o CMV unitario da receita processada multiplicado pela quantidade necessaria
+                          // Exemplo: Receita processada com CMV R$10 e rendimento 5L = R$2/L
+                          //          Ao usar 2L: 2 x R$2 = R$4 (e divide pelo rendimento da receita atual)
+                          // ===================================================================================================
+                          const custoTotal = item.custo_calculado || 0;
+                          const rendimento = receita.rendimento_porcoes || receita.porcoes || 1;
+                          const custoPorRendimento = custoTotal / rendimento;
+                          return formatarPreco(custoPorRendimento);
+                        })()}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-sm text-gray-600">
                       <span>
                         {(item.quantidade_necessaria || 0).toFixed(2)} {item.unidade_medida || 'un'}
                       </span>
-                      <span className="text-purple-600">
-                        Receita processada
+                      <span>
+                        {formatarPreco(item.receita_processada?.preco_compra_real || item.insumo?.preco_compra_real || 0)} / {item.receita_processada?.unidade || item.insumo?.unidade || 'un'}
                       </span>
                     </div>
+                    <div className="mt-2 pt-2 border-t border-purple-200">
+                      <div className="flex items-center gap-2">
+                        <span className="text-purple-600">
+                          Receita processada
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                ))}
+                );
+              })}
               </div>
             </div>
           </div>
@@ -612,18 +723,68 @@ const calcularCustoPorPorcao = () => {
         {/* Total Geral */}
         {(insumosNormais.length > 0 || receitasProcessadas.length > 0) && (
           <div className="bg-gradient-to-r from-green-50 to-purple-50 rounded-xl border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-gray-900">Total da Receita</span>
-              <span className="font-bold text-green-600 text-lg">
-                {formatarPreco(receita.cmv_real * receita.porcoes)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between mt-1">
-              <span className="text-sm text-gray-600">Custo por rendimento</span>
-              <span className="text-sm font-medium text-gray-900">
-                {formatarPreco(receita.cmv_real)}
-              </span>
-            </div>
+            {/* ===================================================================================================
+                USAR CUSTO TOTAL CALCULADO DOS INSUMOS
+                =================================================================================================== */}
+            {receita.processada && receita.rendimento_porcoes && receita.rendimento_porcoes !== 1 ? (
+              <>
+                {/* Para receita processada com rendimento diferente de 1: mostrar custo por rendimento primeiro */}
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-gray-900">Custo por Rendimento</span>
+                  <span className="font-bold text-green-600 text-lg">
+                    {formatarPreco(custoTotalCalculado / (receita.rendimento_porcoes || 1))}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-sm text-gray-600">Custo total ({receita.rendimento_porcoes} {receita.unidade || 'un'})</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {formatarPreco(custoTotalCalculado)}
+                  </span>
+                </div>
+              </>
+            ) : receita.processada ? (
+              <>
+                {/* Para receita processada com rendimento = 1 ou sem rendimento definido */}
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-gray-900">Custo por Rendimento</span>
+                  <span className="font-bold text-green-600 text-lg">
+                    {formatarPreco(custoTotalCalculado)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-sm text-gray-600">Rendimento: 1 {receita.unidade || 'un'}</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {formatarPreco(custoTotalCalculado)}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Para receitas normais: usar custo total calculado */}
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-gray-900">Total da Receita</span>
+                  <span className="font-bold text-green-600 text-lg">
+                    {formatarPreco(custoTotalCalculado)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-sm text-gray-600">
+                    Custo por rendimento
+                    {receita.rendimento_porcoes && receita.rendimento_porcoes > 1 && 
+                      ` (Rendimento: ${receita.rendimento_porcoes} ${receita.unidade || 'kg'})`
+                    }
+                  </span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {/* ===================================================================================================
+                        CUSTO POR UNIDADE DE RENDIMENTO - RECEITAS NORMAIS
+                        Divide o custo total calculado pelo rendimento_porcoes (ou porcoes como fallback)
+                        Exemplo: Custo total R$2,80 com rendimento 2kg = R$1,40 por kg
+                        =================================================================================================== */}
+                    {formatarPreco(custoTotalCalculado / (receita.rendimento_porcoes || receita.porcoes || 1))}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -637,17 +798,60 @@ const calcularCustoPorPorcao = () => {
     const cmv25 = receita.cmv_25_porcento || (receita.cmv_real * 4);
     const cmv30 = receita.cmv_30_porcento || (receita.cmv_real * 3.33);
 
+    // ===================================================================================================
+    // VERIFICAR SE É RECEITA PROCESSADA COM RENDIMENTO DIFERENTE DE 1
+    // ===================================================================================================
+    const isReceitaProcessadaComRendimento = (
+      receita.processada && 
+      receita.rendimento_porcoes && 
+      receita.rendimento_porcoes !== 1
+    );
+
     return (
       <div className="space-y-6">
         
-        {/* Análise de Preços Sugeridos */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
+        {/* ===================================================================================================
+            MOSTRAR APENAS CUSTO POR RENDIMENTO PARA RECEITAS PROCESSADAS
+            =================================================================================================== */}
+        {isReceitaProcessadaComRendimento ? (
+          <div className="bg-white rounded-xl border border-gray-100 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
+              <Calculator className="w-5 h-5 text-purple-600" />
+              Custo de Produção - Receita Processada
+            </h3>
+            
+            <div className="bg-purple-50 rounded-xl p-6 border-2 border-purple-200">
+              <div className="text-center">
+                <p className="text-sm text-purple-600 mb-2">Custo por Rendimento</p>
+                <p className="text-4xl font-bold text-purple-600 mb-4">
+                  {formatarPreco(receita.cmv_real)}
+                </p>
+                <p className="text-sm text-gray-600">
+                  Rendimento: {receita.rendimento_porcoes} {receita.unidade || 'un'}
+                </p>
+                <p className="text-sm text-gray-600 mt-1">
+                  Custo total: {formatarPreco(receita.cmv_real * receita.rendimento_porcoes)}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-800">
+                <strong>Nota:</strong> Esta é uma receita processada utilizada como insumo em outras receitas. 
+                O custo exibido é o custo de produção por unidade de rendimento.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Análise de Preços Sugeridos - APENAS PARA RECEITAS NÃO PROCESSADAS */}
+            <div className="bg-white rounded-xl border border-gray-100 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-green-600" />
             Análise de Preços Sugeridos
           </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className={`grid gap-6 ${receita.processada ? 'grid-cols-1 max-w-md mx-auto' : 'grid-cols-1 md:grid-cols-3'}`}>
             
             {/* CMV 20% */}
             <div className="bg-green-50 rounded-xl p-6 border-2 border-green-200">
@@ -820,12 +1024,74 @@ const calcularCustoPorPorcao = () => {
             </div>
           </div>
         )}
+          </>
+        )}
       </div>
     );
   };
 
   const TabAnalise = () => {
     if (!receita) return null;
+
+    // ===================================================================================================
+    // VERIFICAR SE É RECEITA PROCESSADA COM RENDIMENTO DIFERENTE DE 1
+    // ===================================================================================================
+    const isReceitaProcessadaComRendimento = (
+      receita.processada && 
+      receita.rendimento_porcoes && 
+      receita.rendimento_porcoes !== 1
+    );
+
+    // Se for receita processada, mostrar apenas informações básicas
+    if (isReceitaProcessadaComRendimento) {
+      return (
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl border border-gray-100 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <Calculator className="w-5 h-5 text-purple-600" />
+              Análise - Receita Processada
+            </h3>
+            
+            <div className="bg-purple-50 rounded-lg p-6 border border-purple-200">
+              <p className="text-sm text-gray-700 mb-4">
+                Esta é uma receita processada utilizada como insumo em outras receitas. 
+                As análises de margem e precificação não se aplicam, pois o foco é o custo de produção.
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white rounded-lg p-4">
+                  <p className="text-sm text-gray-600 mb-1">Custo por Rendimento</p>
+                  <p className="text-2xl font-bold text-purple-600">
+                    {formatarPreco(receita.cmv_real)}
+                  </p>
+                </div>
+                
+                <div className="bg-white rounded-lg p-4">
+                  <p className="text-sm text-gray-600 mb-1">Rendimento Total</p>
+                  <p className="text-2xl font-bold text-purple-600">
+                    {receita.rendimento_porcoes} {receita.unidade || 'un'}
+                  </p>
+                </div>
+                
+                <div className="bg-white rounded-lg p-4">
+                  <p className="text-sm text-gray-600 mb-1">Custo Total de Produção</p>
+                  <p className="text-2xl font-bold text-purple-600">
+                    {formatarPreco(receita.cmv_real * receita.rendimento_porcoes)}
+                  </p>
+                </div>
+                
+                <div className="bg-white rounded-lg p-4">
+                  <p className="text-sm text-gray-600 mb-1">Total de Insumos</p>
+                  <p className="text-2xl font-bold text-purple-600">
+                    {receita.total_insumos || 0}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="space-y-6">
@@ -1089,24 +1355,41 @@ const calcularCustoPorPorcao = () => {
           </div>
 
           {/* Métricas Rápidas no Header */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-            <div className="bg-white bg-opacity-20 rounded-lg p-3 text-center">
-              <p className="text-sm text-white text-opacity-80">Custo por Rendimento</p>
-              <p className="text-lg font-bold">{formatarPreco(receita.cmv_real)}</p>
+          {/* ===================================================================================================
+              PARA RECEITAS PROCESSADAS: MOSTRAR APENAS CUSTO POR RENDIMENTO
+              =================================================================================================== */}
+          {receita.processada ? (
+            <div className="grid grid-cols-1 gap-4 mt-6">
+              <div className="bg-white bg-opacity-20 rounded-lg p-4 text-center">
+                <p className="text-sm text-white text-opacity-80 mb-1">Custo por Rendimento</p>
+                <p className="text-3xl font-bold">{formatarPreco(receita.cmv_real)}</p>
+                {receita.rendimento_porcoes && receita.rendimento_porcoes > 1 && (
+                  <p className="text-sm text-white text-opacity-70 mt-2">
+                    Rendimento: {receita.rendimento_porcoes} {receita.unidade || 'un'}
+                  </p>
+                )}
+              </div>
             </div>
-            <div className="bg-white bg-opacity-20 rounded-lg p-3 text-center">
-              <p className="text-sm text-white text-opacity-80">Preço Sugerido</p>
-              <p className="text-lg font-bold">{formatarPreco(receita.preco_venda_sugerido)}</p>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+              <div className="bg-white bg-opacity-20 rounded-lg p-3 text-center">
+                <p className="text-sm text-white text-opacity-80">Custo por Rendimento</p>
+                <p className="text-lg font-bold">{formatarPreco(receita.cmv_real)}</p>
+              </div>
+              <div className="bg-white bg-opacity-20 rounded-lg p-3 text-center">
+                <p className="text-sm text-white text-opacity-80">Preço Sugerido</p>
+                <p className="text-lg font-bold">{formatarPreco(receita.preco_venda_sugerido)}</p>
+              </div>
+              <div className="bg-white bg-opacity-20 rounded-lg p-3 text-center">
+                <p className="text-sm text-white text-opacity-80">Margem</p>
+                <p className="text-lg font-bold">{receita.margem_percentual.toFixed(1)}%</p>
+              </div>
+              <div className="bg-white bg-opacity-20 rounded-lg p-3 text-center">
+                <p className="text-sm text-white text-opacity-80">Lucro/Rendimento</p>
+                <p className="text-lg font-bold">{formatarPreco(receita.preco_venda_sugerido - receita.cmv_real)}</p>
+              </div>
             </div>
-            <div className="bg-white bg-opacity-20 rounded-lg p-3 text-center">
-              <p className="text-sm text-white text-opacity-80">Margem</p>
-              <p className="text-lg font-bold">{receita.margem_percentual.toFixed(1)}%</p>
-            </div>
-            <div className="bg-white bg-opacity-20 rounded-lg p-3 text-center">
-              <p className="text-sm text-white text-opacity-80">Lucro/Rendimento</p>
-              <p className="text-lg font-bold">{formatarPreco(receita.preco_venda_sugerido - receita.cmv_real)}</p>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* ===================================================================================================
@@ -1119,7 +1402,8 @@ const calcularCustoPorPorcao = () => {
             {[
               { key: 'geral', label: 'Visão Geral', icon: FileText },
               { key: 'insumos', label: 'Insumos', icon: Package },
-              { key: 'custos', label: 'Análise de Custos', icon: Calculator },
+              // Ocultar aba "Análise de Custos" para receitas processadas
+              ...(!receita?.processada ? [{ key: 'custos', label: 'Análise de Custos', icon: Calculator }] : []),
               { key: 'analise', label: 'Performance', icon: BarChart3 }
             ].map(({ key, label, icon: Icon }) => (
               <button
@@ -1168,7 +1452,10 @@ const calcularCustoPorPorcao = () => {
             FOOTER COM AÇÕES PRINCIPAIS
             =================================================================================================== */}
 
-        {receita.porcoes > 1 && (
+        {/* ===================================================================================================
+            VALORES POR RENDIMENTO - NÃO MOSTRAR PARA RECEITAS PROCESSADAS
+            =================================================================================================== */}
+        {!receita.processada && receita.porcoes > 1 && (
           <div className="bg-blue-50 rounded-lg p-4 border border-blue-200 mt-4">
             <h4 className="font-semibold text-blue-900 mb-3">Valores por Rendimento</h4>
             <div className="grid grid-cols-2 gap-4">

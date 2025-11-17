@@ -455,10 +455,18 @@ const calcularCustoPorPorcao = () => {
           </div>
         )}
 
-        {/* Métricas Principais */}
+        {/* ===================================================================================================
+            MÉTRICAS PRINCIPAIS - 3 CARDS GRANDES
+            Card Vermelho: Custo de Produção (mantido)
+            Card Verde: Preço Sugerido pelo Restaurante + CMV Real (alterado)
+            Card Azul: Preço Sugerido com Margem 25% (alterado)
+            =================================================================================================== */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
-          {/* Custo de Produção */}
+          {/* ===================================================================================================
+              CARD VERMELHO: CUSTO DE PRODUÇÃO
+              Mantém o custo de produção por porção e custo total da receita
+              =================================================================================================== */}
           <div className="bg-red-50 rounded-xl p-6 border border-red-100">
             <div className="flex items-center gap-3 mb-3">
               <div className="bg-red-100 p-2 rounded-lg">
@@ -475,7 +483,11 @@ const calcularCustoPorPorcao = () => {
             </p>
           </div>
 
-          {/* Preço Sugerido - NÃO MOSTRAR PARA RECEITAS PROCESSADAS */}
+          {/* ===================================================================================================
+              CARD VERDE: PREÇO SUGERIDO PELO RESTAURANTE + CMV REAL
+              Alterado de "Preço Sugerido (Margem 25%)"
+              Mostra o preço que o restaurante decidiu cobrar e o CMV Real deste preço
+              =================================================================================================== */}
           {!receita.processada && (
             <div className="bg-green-50 rounded-xl p-6 border border-green-100">
               <div className="flex items-center gap-3 mb-3">
@@ -483,18 +495,26 @@ const calcularCustoPorPorcao = () => {
                   <DollarSign className="w-6 h-6 text-green-600" />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-green-800">Preço Sugerido</h4>
-                  <p className="text-xs text-green-600">Margem 25%</p>
+                  <h4 className="font-semibold text-green-800">Preço Sugerido pelo Restaurante</h4>
+                  <p className="text-xs text-green-600">Valor definido manualmente</p>
                 </div>
               </div>
-              <p className="text-2xl font-bold text-green-700">{formatarPreco(receita.preco_venda_sugerido)}</p>
+              <p className="text-2xl font-bold text-green-700">
+                {formatarPreco(receita.sugestao_valor || 0)}
+              </p>
               <p className="text-sm text-green-600 mt-1">
-                Margem: {receita.margem_percentual.toFixed(1)}%
+                CMV Real: {receita.sugestao_valor && receita.sugestao_valor > 0
+                  ? ((receita.cmv_real / receita.sugestao_valor) * 100).toFixed(1)
+                  : '0.0'}%
               </p>
             </div>
           )}
 
-          {/* Lucro por Unidade - NÃO MOSTRAR PARA RECEITAS PROCESSADAS */}
+          {/* ===================================================================================================
+              CARD AZUL: PREÇO SUGERIDO COM MARGEM 25%
+              Alterado de "Lucro por Unidade"
+              Mostra o preço calculado automaticamente pelo sistema com margem de 25%
+              =================================================================================================== */}
           {!receita.processada && (
             <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
               <div className="flex items-center gap-3 mb-3">
@@ -502,15 +522,13 @@ const calcularCustoPorPorcao = () => {
                   <TrendingUp className="w-6 h-6 text-blue-600" />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-blue-800">Lucro por Rendimento</h4>
-                  <p className="text-xs text-blue-600">Valor líquido</p>
+                  <h4 className="font-semibold text-blue-800">Preço Sugerido</h4>
+                  <p className="text-xs text-blue-600">Margem 25%</p>
                 </div>
               </div>
-              <p className="text-2xl font-bold text-blue-700">
-                {formatarPreco(receita.preco_venda_sugerido - receita.cmv_real)}
-              </p>
+              <p className="text-2xl font-bold text-blue-700">{formatarPreco(receita.preco_venda_sugerido)}</p>
               <p className="text-sm text-blue-600 mt-1">
-                Total receita: {formatarPreco((receita.preco_venda_sugerido - receita.cmv_real) * receita.porcoes)}
+                Calculado automaticamente
               </p>
             </div>
           )}
@@ -1371,21 +1389,46 @@ const calcularCustoPorPorcao = () => {
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+              {/* ===================================================================================================
+                  CARD 1: CUSTO POR RENDIMENTO
+                  Mantém o custo de produção por porção/rendimento
+                  =================================================================================================== */}
               <div className="bg-white bg-opacity-20 rounded-lg p-3 text-center">
                 <p className="text-sm text-white text-opacity-80">Custo por Rendimento</p>
                 <p className="text-lg font-bold">{formatarPreco(receita.cmv_real)}</p>
               </div>
+              
+              {/* ===================================================================================================
+                  CARD 2: PREÇO SUGERIDO PELO RESTAURANTE (alterado de "Preço Sugerido")
+                  Exibe o valor que o restaurante pretende cobrar pela receita
+                  =================================================================================================== */}
+              <div className="bg-white bg-opacity-20 rounded-lg p-3 text-center">
+                <p className="text-sm text-white text-opacity-80">Preço Sugerido pelo Restaurante</p>
+                <p className="text-lg font-bold">{formatarPreco(receita.sugestao_valor || 0)}</p>
+              </div>
+              
+              {/* ===================================================================================================
+                  CARD 3: CMV REAL (alterado de "Margem")
+                  Calcula o CMV percentual baseado no preço sugerido pelo restaurante
+                  Fórmula: (Custo / Preço Sugerido) × 100
+                  =================================================================================================== */}
+              <div className="bg-white bg-opacity-20 rounded-lg p-3 text-center">
+                <p className="text-sm text-white text-opacity-80">CMV Real</p>
+                <p className="text-lg font-bold">
+                  {receita.sugestao_valor && receita.sugestao_valor > 0
+                    ? ((receita.cmv_real / receita.sugestao_valor) * 100).toFixed(1)
+                    : '0.0'}%
+                </p>
+              </div>
+              
+              {/* ===================================================================================================
+                  CARD 4: PREÇO SUGERIDO (alterado de "Lucro/Rendimento")
+                  Exibe o preço sugerido calculado automaticamente com margem de 25%
+                  Este é o valor recomendado pelo sistema baseado no custo e na margem padrão
+                  =================================================================================================== */}
               <div className="bg-white bg-opacity-20 rounded-lg p-3 text-center">
                 <p className="text-sm text-white text-opacity-80">Preço Sugerido</p>
                 <p className="text-lg font-bold">{formatarPreco(receita.preco_venda_sugerido)}</p>
-              </div>
-              <div className="bg-white bg-opacity-20 rounded-lg p-3 text-center">
-                <p className="text-sm text-white text-opacity-80">Margem</p>
-                <p className="text-lg font-bold">{receita.margem_percentual.toFixed(1)}%</p>
-              </div>
-              <div className="bg-white bg-opacity-20 rounded-lg p-3 text-center">
-                <p className="text-sm text-white text-opacity-80">Lucro/Rendimento</p>
-                <p className="text-lg font-bold">{formatarPreco(receita.preco_venda_sugerido - receita.cmv_real)}</p>
               </div>
             </div>
           )}

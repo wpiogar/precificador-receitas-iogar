@@ -484,19 +484,68 @@ const SuperGridReceitas: React.FC<SuperGridReceitasProps> = ({
       <div className="p-4 space-y-3">
         <div className="grid grid-cols-2 gap-4">
           <div className="text-center">
+            {/* ===================================================================================================
+                CUSTO DO PRATO - Preco sugerido pelo restaurante
+                =================================================================================================== */}
             <div className="flex items-center justify-center gap-1 mb-1">
               <Utensils className="w-4 h-4 text-green-500" />
-              <span className="text-xs text-gray-500">Custo da Porção</span>
+              <span className="text-xs text-gray-500">Custo do Prato</span>
             </div>
-            <p className="font-semibold text-green-600">{formatarPreco(receita.cmv_real)}</p>
+            <p className="font-semibold text-green-600">
+              {receita.sugestao_valor && receita.sugestao_valor > 0 
+                ? formatarPreco(receita.sugestao_valor)
+                : formatarPreco(receita.cmv_real)
+              }
+            </p>
           </div>
           
           <div className="text-center">
+            {/* ===================================================================================================
+                CMV % - Percentual de custo sobre preco sugerido com cores dinamicas
+                Verde: ate 20% | Azul: 20-30% | Roxo: 30%+
+                =================================================================================================== */}
             <div className="flex items-center justify-center gap-1 mb-1">
-              <TrendingUp className="w-4 h-4 text-blue-500" />
-              <span className="text-xs text-gray-500">Margem</span>
+              {(() => {
+                if (!receita.sugestao_valor || receita.sugestao_valor <= 0) {
+                  return (
+                    <>
+                      <TrendingUp className="w-4 h-4 text-gray-400" />
+                      <span className="text-xs text-gray-500">CMV %</span>
+                    </>
+                  );
+                }
+                
+                const cmvPercentual = (receita.cmv_real / receita.sugestao_valor) * 100;
+                let corIcone = 'text-blue-500';
+                
+                if (cmvPercentual <= 20) {
+                  corIcone = 'text-green-500';
+                } else if (cmvPercentual <= 30) {
+                  corIcone = 'text-blue-500';
+                } else {
+                  corIcone = 'text-purple-500';
+                }
+                
+                return (
+                  <>
+                    <TrendingUp className={`w-4 h-4 ${corIcone}`} />
+                    <span className="text-xs text-gray-500">CMV %</span>
+                  </>
+                );
+              })()}
             </div>
-            <p className="font-semibold text-blue-600">25%</p>
+            <p className={`font-semibold ${(() => {
+              if (!receita.sugestao_valor || receita.sugestao_valor <= 0) return 'text-gray-400';
+              const cmvPercentual = (receita.cmv_real / receita.sugestao_valor) * 100;
+              if (cmvPercentual <= 20) return 'text-green-600';
+              if (cmvPercentual <= 30) return 'text-blue-600';
+              return 'text-purple-600';
+            })()}`}>
+              {receita.sugestao_valor && receita.sugestao_valor > 0 
+                ? `${((receita.cmv_real / receita.sugestao_valor) * 100).toFixed(1)}%`
+                : '-'
+              }
+            </p>
           </div>
         </div>
 
@@ -513,17 +562,33 @@ const SuperGridReceitas: React.FC<SuperGridReceitasProps> = ({
             </div>
           </div>
           
-          {/* Nova linha: Contadores de insumos */}
-          <div className="flex items-center justify-center gap-3 text-xs text-gray-500 pt-2">
-            <div className="flex items-center gap-1">
-              <Package className="w-3.5 h-3.5" />
-              <span>{receita.total_insumos} insumos</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <ChefHat className="w-3.5 h-3.5" />
-              <span>{receita.insumos_processados || 0} processados</span>
-            </div>
-          </div>
+          {/* ===================================================================================================
+              CONTADORES DE INSUMOS - Calcular separacao dinamicamente
+              Conta quantos itens tem receita_processada_id para determinar processados
+              =================================================================================================== */}
+          {(() => {
+            const totalInsumos = receita.total_insumos || 0;
+            
+            // Calcular quantos sao processados verificando receita_processada_id
+            const insumosProcessados = receita.receita_insumos?.filter(
+              ri => ri.receita_processada_id !== null && ri.receita_processada_id !== undefined
+            ).length || 0;
+            
+            const insumosNormais = totalInsumos - insumosProcessados;
+            
+            return (
+              <div className="flex items-center justify-center gap-3 text-xs text-gray-500 pt-2">
+                <div className="flex items-center gap-1">
+                  <Package className="w-3.5 h-3.5" />
+                  <span>{insumosNormais} insumos</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <ChefHat className="w-3.5 h-3.5" />
+                  <span>{insumosProcessados} processados</span>
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Preço sugerido */}

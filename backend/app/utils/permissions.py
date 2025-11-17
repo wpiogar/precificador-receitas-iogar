@@ -232,16 +232,28 @@ class PermissionChecker:
         Raises:
             HTTPException 403: Se não tiver permissão
         """
+
+        # DEBUG: Logs detalhados
+        print(f"🔐 === PERMISSION CHECKER ===")
+        print(f"👤 Usuário: {user.username} (ID: {user.id})")
+        print(f"🎭 Role: {user.role} (type: {type(user.role)})")
+        print(f"🎭 Role.value: {user.role.value}")
+        print(f"📦 Resource: {self.resource.value}")
+        print(f"⚡ Action: {self.action.value}")
+
         has_permission, data_scope = check_user_permission(
             user, self.resource, self.action, db
         )
+
+        print(f"✅ has_permission: {has_permission}")
+        print(f"📊 data_scope: {data_scope}")
         
         if not has_permission:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Você não tem permissão para {self.action.value} em {self.resource.value}"
             )
-        
+        print(f"✅ PERMISSÃO CONCEDIDA!")
         return data_scope
 
 

@@ -809,12 +809,12 @@ def update_receita(
     # Verificar se usuário tem acesso a esta receita
     created_by_id = getattr(db_receita, 'created_by', None)
 
-    # Se receita não tem created_by (receitas antigas), permitir apenas ADMIN ou escopo TODOS
+    # Se receita não tem created_by (receitas antigas), permitir com escopo TODOS
     if created_by_id is None:
-        if current_user.role != UserRole.ADMIN and data_scope != DataScope.TODOS:
+        if data_scope != DataScope.TODOS:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Apenas administradores podem deletar receitas sem proprietário definido"
+                detail="Receitas sem proprietário só podem ser deletadas com escopo TODOS"
             )
     else:
         # Receita tem proprietário, verificar permissão normal

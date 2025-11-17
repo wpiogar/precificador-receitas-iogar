@@ -15,8 +15,8 @@ from sqlalchemy import text
 from app.api.deps import get_db, get_current_user
 from app.models.receita import Receita, ReceitaInsumo
 from app.models.insumo import Insumo
-from app.models.user import User
-from app.models.permission import ResourceType, ActionType
+from app.models.user import User, UserRole
+from app.models.permission import ResourceType, ActionType, DataScope
 from app.utils.permissions import PermissionChecker, apply_data_scope_filter, can_access_resource
 
 from app.schemas.receita import (
@@ -808,18 +808,27 @@ def update_receita(
     
     # Verificar se usuário tem acesso a esta receita
     created_by_id = getattr(db_receita, 'created_by', None)
-    
-    if not can_access_resource(
-        user=current_user,
-        resource_owner_id=created_by_id or 0,
-        resource_restaurante_id=db_receita.restaurante_id,
-        data_scope=data_scope,
-        db=db
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Você não tem permissão para editar esta receita"
-        )
+
+    # Se receita não tem created_by (receitas antigas), permitir apenas ADMIN ou escopo TODOS
+    if created_by_id is None:
+        if current_user.role != UserRole.ADMIN and data_scope != DataScope.TODOS:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Apenas administradores podem deletar receitas sem proprietário definido"
+            )
+    else:
+        # Receita tem proprietário, verificar permissão normal
+        if not can_access_resource(
+            user=current_user,
+            resource_owner_id=created_by_id,
+            resource_restaurante_id=db_receita.restaurante_id,
+            data_scope=data_scope,
+            db=db
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Você não tem permissão para deletar esta receita"
+            )
     
     # Atualizar receita
     receita = crud_receita.update_receita(db, receita_id, receita_update)
@@ -1517,6 +1526,12 @@ def delete_receita(
       * REDE: só pode deletar receitas da sua rede
       * TODOS: pode deletar qualquer receita
     """
+    # DEBUG: Logs para entender o erro 403
+    print(f"🗑️ === TENTATIVA DE DELETAR RECEITA {receita_id} ===")
+    print(f"👤 Usuário: {current_user.username} (ID: {current_user.id})")
+    print(f"🎭 Role: {current_user.role}")
+    print(f"📊 Data Scope: {data_scope}")
+
     # Buscar receita antes de deletar para validar permissões
     db_receita = db.query(Receita).filter(Receita.id == receita_id).first()
     
@@ -1525,6 +1540,11 @@ def delete_receita(
     
     # Verificar se usuário tem acesso a esta receita
     created_by_id = getattr(db_receita, 'created_by', None)
+
+    print(f"📝 Receita: {db_receita.nome}")
+    print(f"🏪 Restaurante da receita: {db_receita.restaurante_id}")
+    print(f"👤 Criada por (created_by): {created_by_id}")
+    print(f"🏪 Restaurante do usuário: {current_user.restaurante_id}")
     
     if not can_access_resource(
         user=current_user,

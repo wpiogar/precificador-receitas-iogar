@@ -615,16 +615,10 @@ const calcularCustoPorPorcao = () => {
                       </h4>
                       <span className="text-sm font-medium text-green-600">
                         {(() => {
-                          // ===================================================================================================
-                          // CALCULO DO CUSTO PROPORCIONAL AO RENDIMENTO
-                          // Divide o custo do insumo pelo rendimento para mostrar o custo por unidade de rendimento
-                          // Exemplo: Custo total R$2,80 com rendimento 2kg = R$1,40 por kg
-                          // ===================================================================================================
-                          const custoTotal = insumo.custo_calculado || 
+                          // Calcular custo total do insumo (quantidade × preço unitário)
+                          const custoInsumo = insumo.custo_calculado || 
                             (insumo.quantidade_necessaria * (insumo.insumo?.preco_compra_real || 0));
-                          const rendimento = receita.rendimento_porcoes || receita.porcoes || 1;
-                          const custoPorRendimento = rendimento > 0 ? custoTotal / rendimento : custoTotal;
-                          return formatarPreco(custoPorRendimento);
+                          return formatarPreco(custoInsumo);
                         })()}
                       </span>
                     </div>
@@ -741,15 +735,19 @@ const calcularCustoPorPorcao = () => {
               </>
             ) : receita.processada ? (
               <>
-                {/* Para receita processada com rendimento = 1 ou sem rendimento definido */}
+                {/* ===================================================================================================
+                    RECEITA PROCESSADA - MOSTRAR CUSTO UNITARIO E CUSTO TOTAL
+                    Linha principal: Custo por unidade (R$1,40 = R$2,80 ÷ 2kg)
+                    Linha secundária: Custo total para o rendimento completo (R$2,80 para 2kg)
+                    =================================================================================================== */}
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-gray-900">Custo por Rendimento</span>
                   <span className="font-bold text-green-600 text-lg">
-                    {formatarPreco(custoTotalCalculado)}
+                    {formatarPreco(custoTotalCalculado / (receita.porcoes || 1))}
                   </span>
                 </div>
                 <div className="flex items-center justify-between mt-1">
-                  <span className="text-sm text-gray-600">Rendimento: 1 {receita.unidade || 'un'}</span>
+                  <span className="text-sm text-gray-600">Rendimento: {receita.porcoes || 1} {receita.unidade || 'kg'}</span>
                   <span className="text-sm font-medium text-gray-900">
                     {formatarPreco(custoTotalCalculado)}
                   </span>
@@ -1358,7 +1356,11 @@ const calcularCustoPorPorcao = () => {
           {receita.processada ? (
             <div className="grid grid-cols-1 gap-4 mt-6">
               <div className="bg-white bg-opacity-20 rounded-lg p-4 text-center">
-                <p className="text-sm text-white text-opacity-80 mb-1">Custo por Rendimento</p>
+                {/* ===================================================================================================
+                    LABEL DO CUSTO - Alterado para "Custo de 1" para maior clareza no card do topo
+                    Representa o custo unitário da receita processada por unidade de rendimento
+                    =================================================================================================== */}
+                <p className="text-sm text-white text-opacity-80 mb-1">Custo de 1</p>
                 <p className="text-3xl font-bold">{formatarPreco(receita.cmv_real)}</p>
                 {receita.rendimento_porcoes && receita.rendimento_porcoes > 1 && (
                   <p className="text-sm text-white text-opacity-70 mt-2">

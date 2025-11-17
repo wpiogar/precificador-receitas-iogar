@@ -134,6 +134,8 @@ def list_receitas(
             
             # Processar cada insumo
             for ri in insumos_query:
+                # DEBUG: Mostrar o que veio do banco
+                print(f"🔍 Item do banco - insumo_id: {ri.insumo_id}, receita_processada_id: {ri.receita_processada_id}")
                 # ===================================================================================================
                 # BUSCAR DADOS DO INSUMO OU RECEITA PROCESSADA
                 # ===================================================================================================
@@ -145,9 +147,17 @@ def list_receitas(
                     receita_proc = db.query(Receita).filter(Receita.id == ri.receita_processada_id).first()
                     
                     if receita_proc:
+                        # CALCULAR CUSTO POR RENDIMENTO PARA RECEITAS PROCESSADAS
+                        # ===================================================================================================
+                        # Se a receita processada tem rendimento, dividir o custo total pelo rendimento
+                        custo_por_rendimento = receita_proc.cmv_real or 0
+                        if receita_proc.rendimento_porcoes and receita_proc.rendimento_porcoes > 0:
+                            # Converter para float para evitar erro de divisão entre float e Decimal
+                            custo_por_rendimento = float(custo_por_rendimento) / float(receita_proc.rendimento_porcoes)
+                        
                         insumo_data = {
                             'insumo_id': None,  # ← NULL quando for receita processada
-                            'receita_processada_id': ri.receita_processada_id,  # ← ADICIONAR ESTE CAMPO
+                            'receita_processada_id': ri.receita_processada_id,
                             'quantidade_necessaria': ri.quantidade_necessaria,
                             'unidade_medida': ri.unidade_medida or 'un',
                             'custo_calculado': getattr(ri, 'custo_calculado', 0),
@@ -155,17 +165,19 @@ def list_receitas(
                                 'id': receita_proc.id,
                                 'nome': receita_proc.nome,
                                 'unidade': receita_proc.unidade or 'un',
-                                'preco_compra_real': receita_proc.cmv_real or 0
+                                'preco_compra_real': custo_por_rendimento  # ← USAR CUSTO POR RENDIMENTO
                             },
-                            'receita_processada': {  # ← ADICIONAR DADOS COMPLETOS DA RECEITA PROCESSADA
+                            'receita_processada': {
                                 'id': receita_proc.id,
                                 'nome': receita_proc.nome,
                                 'codigo': receita_proc.codigo,
-                                'unidade': receita_proc.unidade or 'un'
+                                'unidade': receita_proc.unidade or 'un',
+                                'rendimento_porcoes': receita_proc.rendimento_porcoes  # ← ADICIONAR RENDIMENTO PARA REFERÊNCIA
                             }
                         }
                         receita_insumos_data.append(insumo_data)
                         print(f"  📦 Receita Processada: {receita_proc.nome} - Qtd: {ri.quantidade_necessaria}")
+                        print(f"  🔍 DEBUG - insumo_data completo: {insumo_data}")
                         
                 elif ri.insumo_id:
                     # É um insumo normal
@@ -540,6 +552,11 @@ def create_receita_endpoint(
                                 quantidade_necessaria=float(quantidade),
                                 unidade_medida=unidade_medida
                             )
+                            print(f"  🔍 DEBUG - Objeto ReceitaInsumo criado:")
+                            print(f"    - receita_id: {receita_insumo.receita_id}")
+                            print(f"    - receita_processada_id: {receita_insumo.receita_processada_id}")
+                            print(f"    - insumo_id: {receita_insumo.insumo_id}")
+                            print(f"    - quantidade: {receita_insumo.quantidade_necessaria}")
                         else:
                             # É um insumo normal
                             print(f"  - Salvando Insumo {insumo_id}: {quantidade} {unidade_medida}")
@@ -553,10 +570,19 @@ def create_receita_endpoint(
                             )
                         
                         db.add(receita_insumo)
+                        print(f"  ✅ ReceitaInsumo adicionado ao db.session")
                 
                 # Commit das alterações de insumos
                 db.commit()
-                print(f"✅ Insumos da receita atualizados!")
+                print(f"  ✅ Commit realizado! Verificando se salvou...")
+
+                # Verificar se salvou
+                insumo_salvo = db.query(ReceitaInsumo).filter(
+                    ReceitaInsumo.receita_id == receita_id  
+                ).all()
+                print(f"  📊 Total de insumos salvos para esta receita: {len(insumo_salvo)}")
+                for ri in insumo_salvo:
+                    print(f"    - ID: {ri.id}, insumo_id: {ri.insumo_id}, receita_processada_id: {ri.receita_processada_id}")
             
             # Retornar receita atualizada
             resposta = {

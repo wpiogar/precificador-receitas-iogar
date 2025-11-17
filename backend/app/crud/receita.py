@@ -800,6 +800,11 @@ def get_insumos_disponiveis(db: Session, termo: Optional[str] = None) -> List[Di
     
     # Adicionar receitas processadas
     for receita in receitas_processadas:
+        # Calcular custo por rendimento
+        custo_por_rendimento = receita.cmv_real if receita.cmv_real else 0.0
+        if receita.rendimento_porcoes and receita.rendimento_porcoes > 0:
+            custo_por_rendimento = float(custo_por_rendimento) / float(receita.rendimento_porcoes)
+        
         resultados.append({
             'id': receita.id,
             'nome': f"{receita.nome} (Processado)",  # Indicador visual
@@ -808,7 +813,9 @@ def get_insumos_disponiveis(db: Session, termo: Optional[str] = None) -> List[Di
             'grupo': receita.grupo,
             'subgrupo': receita.subgrupo,
             'tipo': 'receita_processada',  # Identificador do tipo
-            'preco_compra_real': receita.cmv_real if receita.cmv_real else 0.0
+            'preco_compra_real': custo_por_rendimento,  # Custo por rendimento
+            'rendimento_porcoes': receita.rendimento_porcoes,  # Adicionar rendimento para exibição
+            'cmv_total': receita.cmv_real  # Custo total para referência
         })
     
     return resultados

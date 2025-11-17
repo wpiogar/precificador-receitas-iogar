@@ -4196,14 +4196,24 @@ const fetchInsumos = async () => {
           );
           
           if (receitaProcessada) {
+            // Calcular custo por rendimento para receitas processadas
+            const custoTotal = receitaProcessada.cmv_real || 0;
+            const rendimento = receitaProcessada.rendimento_porcoes || 1;
+            const custoPorRendimento = custoTotal / rendimento;
+            
             // Transformar receita processada em formato de insumo para cálculo
             insumoData = {
               id: receitaProcessada.id,
               nome: receitaProcessada.nome,
-              preco_compra_real: receitaProcessada.cmv_real || 0,
+              preco_compra_real: custoPorRendimento,  // Usar custo por rendimento
               preco_compra: receitaProcessada.preco_compra || 0
             };
-            console.log('✅ Calculando custo de receita processada:', insumoData.nome);
+            console.log('✅ Calculando custo de receita processada:', {
+              nome: insumoData.nome,
+              custoTotal,
+              rendimento,
+              custoPorRendimento
+            });
           }
         }
 
@@ -4945,6 +4955,11 @@ const fetchInsumos = async () => {
                               </div>
                               <p className="text-xs text-gray-500 mt-1">
                                 {insumo.grupo} • {insumo.unidade} • R$ {(insumo.preco_compra_real || 0).toFixed(2)}
+                                {insumo.tipo === 'receita_processada' && insumo.rendimento_porcoes && (
+                                  <span className="text-purple-600 font-medium">
+                                    {' '}• {insumo.rendimento_porcoes} {insumo.rendimento_porcoes === 1 ? 'porção' : 'porções'}
+                                  </span>
+                                )}
                               </p>
                             </div>
                             <Plus className={`w-4 h-4 ${
@@ -5143,16 +5158,22 @@ const fetchInsumos = async () => {
                                       ============================================================================ */}
                                   {receitas && receitas
                                     .filter(r => r.processada && r.restaurante_id === selectedRestaurante?.id)
-                                    .map(receita => (
-                                      <option 
-                                        key={`receita_${receita.id}`} 
-                                        value={`receita_${receita.id}`}
-                                        className="bg-purple-50"
-                                      >
-                                        🔄 {receita.codigo ? `${receita.codigo} - ` : ''}
-                                        {receita.nome} ({receita.unidade}) - R$ {(receita.cmv_real || 0).toFixed(2)}
-                                      </option>
-                                    ))
+                                    .map(receita => {
+                                      const custoTotal = receita.cmv_real || 0;
+                                      const rendimento = receita.rendimento_porcoes || 1;
+                                      
+                                      return (
+                                        <option 
+                                          key={`receita_${receita.id}`} 
+                                          value={`receita_${receita.id}`}
+                                          className="bg-purple-50"
+                                        >
+                                          🔄 {receita.codigo ? `${receita.codigo} - ` : ''}
+                                          {receita.nome} ({receita.unidade}) - R$ {custoTotal.toFixed(2)}
+                                          {rendimento > 1 ? ` (${rendimento} porções)` : ''}
+                                        </option>
+                                      );
+                                    })
                                   }
                                 </>
                               )}

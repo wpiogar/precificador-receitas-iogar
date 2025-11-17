@@ -41,12 +41,12 @@ class Insumo(BaseModel):
     # Valor padrão: 1.0 (sem conversão)
     # Quando fator != 1: preco_unitario = (preco_compra_total / quantidade) / fator
     # Exemplo: Se compra 750ml mas quer preço por litro, fator = 0.75
-    fator = Column(
-        Float,
-        default=1.0,
-        nullable=True,
-        comment="Fator multiplicador para cálculo de preço unitário (default: 1.0)"
-    )
+    # fator = Column(
+    #     Float,
+    #     default=1.0,
+    #     nullable=True,
+    #     comment="Fator multiplicador para cálculo de preço unitário (default: 1.0)"
+    # )
 
     #   ===================================================================================================
     #   VINCULAÇÃO COM RESTAURANTE - CAMPO OBRIGATÓRIO

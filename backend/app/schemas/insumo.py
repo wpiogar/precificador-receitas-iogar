@@ -25,7 +25,7 @@ class InsumoBase(BaseModel):
     codigo: Optional[str] = Field(default=None, description="Código único (gerado automaticamente se não fornecido)")
     nome: str = Field(..., min_length=1, max_length=255, description="Nome do produto")
     quantidade: int = Field(default=1, ge=1, description="Quantidade padrão")
-    fator: Optional[float] = Field(default=1.0, description="Fator multiplicador para cálculo de preço unitário")
+    # fator: Optional[float] = Field(default=1.0, description="Fator multiplicador para cálculo de preço unitário")
     unidade: str = Field(..., description="Unidade de medida")
     preco_compra_real: Optional[float] = Field(None, ge=0, description="Preço de compra em reais")
     valor_compra_por_kg: Optional[float] = Field(None, ge=0, description="Valor de compra por Kg", example=85.0)
@@ -176,7 +176,7 @@ class InsumoUpdate(BaseModel):
     codigo: Optional[str] = Field(None, min_length=1, max_length=50)
     nome: Optional[str] = Field(None, min_length=2, max_length=255)
     quantidade: Optional[int] = Field(None, ge=1)
-    fator: Optional[float] = Field(default=1.0, description="Fator multiplicador para cálculo de preço unitário")
+    # fator: Optional[float] = Field(default=1.0, description="Fator multiplicador para cálculo de preço unitário")
     unidade: Optional[str] = None
     preco_compra_real: Optional[float] = Field(None, ge=0)
     aguardando_classificacao: Optional[bool] = Field(default=None, description="Se está aguardando classificação")

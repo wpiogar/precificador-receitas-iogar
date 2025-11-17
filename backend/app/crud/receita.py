@@ -58,15 +58,12 @@ def converter_para_unidade_base(quantidade: float, unidade: str) -> float:
 
 def calcular_custo_insumo(insumo: Insumo, quantidade_necessaria: float, unidade_medida: str) -> float:
     """
-    Calcula o custo de um insumo na receita baseado no sistema de conversão por fator.
+    Calcula o custo de um insumo na receita (SEM FATOR).
     
-    Sistema corrigido:
-    - Fator sempre representa a quantidade real do produto
-    - 1kg bacon = fator 1.0
-    - 750ml maionese = fator 0.75
-    - 1 caixa com 20 pães = fator 20.0
+    HISTÓRICO: Sistema de fator desabilitado em 17/11/2025
+    NOVO CÁLCULO: Custo = Preço × Quantidade convertida (sem divisão por fator)
     
-    Fórmula: Custo = (Preço ÷ Fator) × Quantidade convertida
+    Fórmula: Custo = Preço × Quantidade convertida
     
     Args:
         insumo: Objeto do insumo
@@ -76,12 +73,20 @@ def calcular_custo_insumo(insumo: Insumo, quantidade_necessaria: float, unidade_
     Returns:
         float: Custo calculado em reais
         
-    Exemplos:
-        - Bacon 1kg (R$50,99, fator=1.0): 15g = (50,99÷1.0) × 0.015kg = R$0,765
-        - Maionese 750ml (R$7,50, fator=0.75): 10ml = (7,50÷0.75) × 0.01L = R$0,10
-        - Pão caixa 20un (R$12,50, fator=20.0): 1un = (12,50÷20.0) × 1 = R$0,625
+    Exemplos (sem fator):
+        - Bacon 1kg (R$50,99): 15g = 50,99 × 0.015kg = R$0,765
+        - Maionese 750ml (R$7,50): 10ml = 7,50 × 0.01L = R$0,075
+        - Pão caixa 20un (R$12,50): 1un = 12,50 × 1 = R$12,50
     """
-    if not insumo or not insumo.preco_compra or insumo.fator <= 0:
+    # ========================================================================
+    # VALIDAÇÃO COM FATOR - DESABILITADA (MANTIDA POR PRECAUÇÃO)
+    # ========================================================================
+    # CÓDIGO ORIGINAL COMENTADO:
+    # if not insumo or not insumo.preco_compra or insumo.fator <= 0:
+    #     return 0.0
+    
+    # NOVA VALIDAÇÃO (sem fator)
+    if not insumo or not insumo.preco_compra:
         return 0.0
     
     # Converter quantidade para unidade base
@@ -90,8 +95,15 @@ def calcular_custo_insumo(insumo: Insumo, quantidade_necessaria: float, unidade_
     # Preço em reais
     preco_reais = insumo.preco_compra / 100.0
     
-    # Cálculo: (Preço ÷ Fator) × Quantidade convertida
-    custo_calculado = (preco_reais / insumo.fator) * quantidade_convertida
+    # ========================================================================
+    # CÁLCULO COM FATOR - DESABILITADO (MANTIDO POR PRECAUÇÃO)
+    # ========================================================================
+    # CÓDIGO ORIGINAL COMENTADO:
+    # # Cálculo: (Preço ÷ Fator) × Quantidade convertida
+    # custo_calculado = (preco_reais / insumo.fator) * quantidade_convertida
+    
+    # NOVO CÁLCULO SIMPLIFICADO (sem fator)
+    custo_calculado = preco_reais * quantidade_convertida
     
     # Arredondar para 6 casas decimais para precisão
     return round(custo_calculado, 6)

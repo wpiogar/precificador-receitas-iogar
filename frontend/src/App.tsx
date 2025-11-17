@@ -89,7 +89,10 @@ interface Insumo {
   nome: string;
   unidade: string;
   preco_compra_real: number;
-  fator: number;
+  // ============================================================
+  // CAMPO FATOR - DESABILITADO (17/11/2025)
+  // ============================================================
+  // fator: number;
   codigo?: string;
   grupo?: string;     
   subgrupo?: string;  
@@ -247,7 +250,10 @@ const [formData, setFormData] = useState(() => {
     nome: editingInsumo?.nome || '',
     unidade: editingInsumo?.unidade || 'kg',
     quantidade: editingInsumo?.quantidade || 1,
-    fator: editingInsumo?.fator || 1.0,
+    // ============================================================
+    // CAMPO FATOR - DESABILITADO (17/11/2025)
+    // ============================================================
+    // fator: editingInsumo?.fator || 1.0,
     subgrupo: editingInsumo?.subgrupo || '',
     grupo: editingInsumo?.grupo || '',
     descricao: editingInsumo?.descricao || '',
@@ -378,7 +384,10 @@ const resetForm = useCallback(() => {
     codigo: '',
     unidade: 'kg',
     quantidade: 1, // Padrão 1 para evitar divisão por zero
-    fator: 1.0,
+    // ============================================================
+    // CAMPO FATOR - DESABILITADO (17/11/2025)
+    // ============================================================
+    // fator: 1.0,
     grupo: '',
     subgrupo: '',
     descricao: '',
@@ -786,7 +795,7 @@ const resetForm = useCallback(() => {
                 </div>
 
                 {/* Campo Fator */}
-                <div>
+                {/* <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Fator
                   </label>
@@ -802,7 +811,7 @@ const resetForm = useCallback(() => {
                   <p className="text-xs text-gray-500 mt-1">
                     Padrão: 1.0. Usado para cálculo de preço unitário.
                   </p>
-                </div>
+                </div> */}
 
                 {/* Preço de Compra Total */}
                 <div className="space-y-2">
@@ -953,12 +962,17 @@ const resetForm = useCallback(() => {
                           return '0.00';
                         }
                         
+                        // Cálculo simplificado (sem fator)
                         const precoUnidadeSistema = formData.preco_compra_total / formData.quantidade;
                         
-                        if (!ehFornecedorAnonimo && insumoFornecedorSelecionado && formData.fator && insumoFornecedorSelecionado.fator) {
-                          const precoConvertido = (insumoFornecedorSelecionado.fator * precoUnidadeSistema) / formData.fator;
-                          return precoConvertido.toFixed(2);
-                        }
+                        // ============================================================
+                        // CÁLCULO COM FATOR - DESABILITADO (17/11/2025)
+                        // ============================================================
+                        // CÓDIGO ORIGINAL COMENTADO:
+                        // if (!ehFornecedorAnonimo && insumoFornecedorSelecionado && formData.fator && insumoFornecedorSelecionado.fator) {
+                        //   const precoConvertido = (insumoFornecedorSelecionado.fator * precoUnidadeSistema) / formData.fator;
+                        //   return precoConvertido.toFixed(2);
+                        // }
                         
                         return precoUnidadeSistema.toFixed(2);
                       })()}
@@ -992,12 +1006,17 @@ const resetForm = useCallback(() => {
                               return 0;
                             }
                             
+                            // Cálculo simplificado (sem fator)
                             const precoUnidadeSistema = formData.preco_compra_total / formData.quantidade;
                             
-                            if (insumoFornecedorSelecionado && formData.fator && insumoFornecedorSelecionado.fator) {
-                              const X = (insumoFornecedorSelecionado.fator * precoUnidadeSistema) / formData.fator;
-                              return X;
-                            }
+                            // ========================================================
+                            // CÁLCULO COM FATOR - DESABILITADO (17/11/2025)
+                            // ========================================================
+                            // CÓDIGO ORIGINAL COMENTADO:
+                            // if (insumoFornecedorSelecionado && formData.fator && insumoFornecedorSelecionado.fator) {
+                            //   const X = (insumoFornecedorSelecionado.fator * precoUnidadeSistema) / formData.fator;
+                            //   return X;
+                            // }
                             
                             return precoUnidadeSistema;
                           })();
@@ -1037,12 +1056,17 @@ const resetForm = useCallback(() => {
                             return 0;
                           }
                           
+                          // Cálculo simplificado (sem fator)
                           const precoUnidadeSistema = formData.preco_compra_total / formData.quantidade;
                           
-                          if (insumoFornecedorSelecionado && formData.fator && insumoFornecedorSelecionado.fator) {
-                            const X = (insumoFornecedorSelecionado.fator * precoUnidadeSistema) / formData.fator;
-                            return X;
-                          }
+                          // ========================================================
+                          // CÁLCULO COM FATOR - DESABILITADO (17/11/2025)
+                          // ========================================================
+                          // CÓDIGO ORIGINAL COMENTADO:
+                          // if (insumoFornecedorSelecionado && formData.fator && insumoFornecedorSelecionado.fator) {
+                          //   const X = (insumoFornecedorSelecionado.fator * precoUnidadeSistema) / formData.fator;
+                          //   return X;
+                          // }
                           
                           return precoUnidadeSistema;
                         })();
@@ -5965,7 +5989,7 @@ const fetchInsumos = async () => {
                       <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Unidade</th>
                       <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Preço Compra</th>
                       <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Valor/Unidade</th>
-                      <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Fator</th>
+                      {/* <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Fator</th> */}
                       <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Comparativo de Preços</th>
                       <th className="px-6 py-4 text-right text-sm font-medium text-gray-900">Ações</th>
                     </tr>
@@ -6015,12 +6039,13 @@ const fetchInsumos = async () => {
                             : insumo.preco_compra_real?.toFixed(2) || '0.00'
                           }
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
+                        {/* COLUNA FATOR - DESABILITADA (17/11/2025) */}
+                        {/* <td className="px-6 py-4 text-sm text-gray-600">
                           {insumo.fator !== null && insumo.fator !== undefined ? 
                             parseFloat(parseFloat(insumo.fator).toFixed(2)) : 
                             ''
                           }
-                        </td>
+                        </td> */}
                         <td className="px-6 py-4 text-sm">
                           <div className="space-y-1">
                             <div className="flex items-center justify-between">
@@ -8534,8 +8559,11 @@ Receitas.displayName = 'Receitas';
         descricao: insumo.descricao || '',
         unidade: insumo.unidade || 'kg',
         preco_compra_real: insumo.preco_unitario || 0,
-        quantidade: insumo.quantidade || 1,
-        fator: insumo.fator || 1.0
+        quantidade: insumo.quantidade || 1
+        // ============================================================
+        // CAMPO FATOR - DESABILITADO (17/11/2025)
+        // ============================================================
+        // fator: insumo.fator || 1.0
       });
       setShowPopupEditarInsumo(true);
     };
@@ -8752,8 +8780,11 @@ const cancelarExclusao = () => {
           unidade: String(novoInsumo.unidade || 'kg').trim(),
           preco_unitario: Number(novoInsumo.preco_compra_real) || 0,
           descricao: String(novoInsumo.descricao || '').trim(),
-          quantidade: Number(novoInsumo.quantidade) || 1,
-          fator: novoInsumo.fator || 1.0
+          quantidade: Number(novoInsumo.quantidade) || 1
+          // ============================================================
+          // CAMPO FATOR - DESABILITADO (17/11/2025)
+          // ============================================================
+          // fator: novoInsumo.fator || 1.0
         };
 
         console.log('🎯 Dados do insumo do fornecedor (sem código):', insumoData);
@@ -8778,8 +8809,11 @@ const cancelarExclusao = () => {
             descricao: '',
             unidade: 'kg',
             preco_compra_real: 0,
-            quantidade: 1,
-            fator: 1.0
+            quantidade: 1
+            // ============================================================
+            // CAMPO FATOR - DESABILITADO (17/11/2025)
+            // ============================================================
+            // fator: 1.0
           });
           setShowPopupInsumo(false);
           
@@ -9647,7 +9681,7 @@ const cancelarExclusao = () => {
                 </div>
 
                 {/* Campo Fator */}
-                <div>
+                {/* <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Fator
                   </label>
@@ -9663,7 +9697,7 @@ const cancelarExclusao = () => {
                   <p className="text-xs text-gray-500 mt-1">
                     Padrão: 1.0. Usado para cálculo de preço unitário.
                   </p>
-                </div>
+                </div> */}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Preço (R$)</label>

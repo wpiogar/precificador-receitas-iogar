@@ -435,9 +435,12 @@ async refreshAccessToken(): Promise<string | null> {
       if (insumo.quantidade !== undefined && insumo.quantidade > 0) {
         dadosUpdate.quantidade = Number(insumo.quantidade);
       }
-      if (insumo.fator !== undefined && insumo.fator > 0) {
-        dadosUpdate.fator = Number(insumo.fator);
-      }
+      // ====================================================================
+      // CAMPO FATOR - DESABILITADO (17/11/2025)
+      // ====================================================================
+      // if (insumo.fator !== undefined && insumo.fator > 0) {
+      //   dadosUpdate.fator = Number(insumo.fator);
+      // }
       
       console.log('📦 Dados para update (apenas campos válidos):', dadosUpdate);
       
@@ -567,7 +570,10 @@ async updateReceita(id: number, receita: any): Promise<ApiResponse<any>> {
   if (receita.descricao !== undefined) dadosUpdate.descricao = receita.descricao;
   if (receita.unidade !== undefined) dadosUpdate.unidade = receita.unidade;
   if (receita.quantidade !== undefined) dadosUpdate.quantidade = receita.quantidade;
-  if (receita.fator !== undefined) dadosUpdate.fator = receita.fator;
+  // ====================================================================
+  // CAMPO FATOR - DESABILITADO (17/11/2025)
+  // ====================================================================
+  // if (receita.fator !== undefined) dadosUpdate.fator = receita.fator;
   if (receita.ativo !== undefined) dadosUpdate.ativo = receita.ativo;
   
   // Campos que precisam de mapeamento

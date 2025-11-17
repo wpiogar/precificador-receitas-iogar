@@ -61,14 +61,17 @@ def calcular_comparacao_precos(db: Session, insumo: Insumo) -> dict:
         # Aplicar fator se diferente de 1
         # Se fator != 1: divide o preço unitário pelo fator
         # Exemplo: Se fator = 0.75, preço_final = preco_unitario / 0.75
-        fator = getattr(insumo, 'fator', 1.0) or 1.0
-        if fator != 1.0:
-            preco_por_unidade_embalagem = preco_por_unidade_embalagem / fator
+        # fator = getattr(insumo, 'fator', 1.0) or 1.0
+        # if fator != 1.0:
+        #     preco_por_unidade_embalagem = preco_por_unidade_embalagem / fator
         
         resultado['preco_por_unidade'] = round(preco_por_unidade_embalagem, 2)
     
     # ========================================================================
-    # BUSCAR PREÇO DO FORNECEDOR E NORMALIZAR PELO FATOR DELE
+    # BUSCAR PREÇO DO FORNECEDOR (SEM NORMALIZAÇÃO POR FATOR)
+    # ========================================================================
+    # HISTÓRICO: Normalização por fator desabilitada em 17/11/2025
+    # NOVO CÁLCULO: Usa preço unitário direto do fornecedor
     # ========================================================================
     if (hasattr(insumo, 'fornecedor_insumo_id') and 
         insumo.fornecedor_insumo_id):
@@ -79,53 +82,68 @@ def calcular_comparacao_precos(db: Session, insumo: Insumo) -> dict:
         
         if (fornecedor_insumo and 
             hasattr(fornecedor_insumo, 'preco_unitario') and
-            fornecedor_insumo.preco_unitario and
-            hasattr(fornecedor_insumo, 'fator') and
-            fornecedor_insumo.fator):
+            fornecedor_insumo.preco_unitario):
             
-            # Calcular preço por unidade base do fornecedor
-            # Exemplo fornecedor: R$ 3,49 por unidade de 200ml (fator 0,2)
-            # Preço por litro: R$ 3,49 ÷ 0,2L = R$ 17,45/L
-            preco_fornecedor_por_unidade_base = (
-                float(fornecedor_insumo.preco_unitario) / float(fornecedor_insumo.fator)
-            )
+            # ================================================================
+            # CÓDIGO COM FATOR - DESABILITADO (MANTIDO POR PRECAUÇÃO)
+            # ================================================================
+            # HISTÓRICO: Divisão por fator removida em 17/11/2025
+            # CÓDIGO ORIGINAL COMENTADO:
+            #
+            # if hasattr(fornecedor_insumo, 'fator') and fornecedor_insumo.fator:
+            #     # Calcular preço por unidade base do fornecedor
+            #     # Exemplo fornecedor: R$ 3,49 por unidade de 200ml (fator 0,2)
+            #     # Preço por litro: R$ 3,49 ÷ 0,2L = R$ 17,45/L
+            #     preco_fornecedor_por_unidade_base = (
+            #         float(fornecedor_insumo.preco_unitario) / float(fornecedor_insumo.fator)
+            #     )
+            #     resultado['fornecedor_preco_unidade'] = round(
+            #         preco_fornecedor_por_unidade_base, 4
+            #     )
             
+            # NOVO CÁLCULO SIMPLIFICADO (sem fator)
             resultado['fornecedor_preco_unidade'] = round(
-                preco_fornecedor_por_unidade_base, 4
+                float(fornecedor_insumo.preco_unitario), 4
             )
     
     # ========================================================================
-    # CALCULAR DIFERENÇA PERCENTUAL NA MESMA BASE
+    # CALCULAR DIFERENÇA PERCENTUAL (SEM CONVERSÃO POR FATOR)
+    # ========================================================================
+    # HISTÓRICO: Regra de 3 com fator desabilitada em 17/11/2025
+    # NOVO CÁLCULO: Comparação direta de preços sem conversão
     # ========================================================================
     if resultado['preco_por_unidade'] and resultado['fornecedor_preco_unidade']:
         preco_sistema = resultado['preco_por_unidade']
         preco_fornecedor = resultado['fornecedor_preco_unidade']
         
         # ================================================================
-        # APLICAR REGRA DE 3 PARA COMPARAR NA MESMA UNIDADE
+        # CÓDIGO COM REGRA DE 3 - DESABILITADO (MANTIDO POR PRECAUÇÃO)
         # ================================================================
-        # Buscar o fornecedor_insumo para pegar o fator
-        if (hasattr(insumo, 'fornecedor_insumo_id') and 
-            insumo.fornecedor_insumo_id):
-            
-            fornecedor_insumo = db.query(FornecedorInsumo).filter(
-                FornecedorInsumo.id == insumo.fornecedor_insumo_id
-            ).first()
-            
-            if (fornecedor_insumo and hasattr(insumo, 'fator') and 
-                insumo.fator and fornecedor_insumo.fator):
-                
-                # REGRA DE 3:
-                # fator_insumo (0,8)     -------- preco_sistema (4,74)
-                # fator_fornecedor (0,2) -------- X
-                # X = (fator_fornecedor × preco_sistema) / fator_insumo
-                preco_sistema_convertido = (
-                    fornecedor_insumo.fator * preco_sistema
-                ) / insumo.fator
-                
-                preco_sistema = preco_sistema_convertido
+        # HISTÓRICO: Conversão por fator removida em 17/11/2025
+        # CÓDIGO ORIGINAL COMENTADO:
+        #
+        # # Buscar o fornecedor_insumo para pegar o fator
+        # if (hasattr(insumo, 'fornecedor_insumo_id') and 
+        #     insumo.fornecedor_insumo_id):
+        #     
+        #     fornecedor_insumo = db.query(FornecedorInsumo).filter(
+        #         FornecedorInsumo.id == insumo.fornecedor_insumo_id
+        #     ).first()
+        #     
+        #     if (fornecedor_insumo and hasattr(insumo, 'fator') and 
+        #         insumo.fator and fornecedor_insumo.fator):
+        #         
+        #         # REGRA DE 3:
+        #         # fator_insumo (0,8)     -------- preco_sistema (4,74)
+        #         # fator_fornecedor (0,2) -------- X
+        #         # X = (fator_fornecedor × preco_sistema) / fator_insumo
+        #         preco_sistema_convertido = (
+        #             fornecedor_insumo.fator * preco_sistema
+        #         ) / insumo.fator
+        #         
+        #         preco_sistema = preco_sistema_convertido
         
-        # Calcular diferença percentual com preços na mesma unidade
+        # Calcular diferença percentual (sem conversão por fator)
         diferenca_percentual = (
             (preco_sistema - preco_fornecedor) / preco_fornecedor
         ) * 100
@@ -545,7 +563,10 @@ def create_insumo(db: Session, insumo: InsumoCreate) -> Insumo:
         codigo=insumo.codigo.upper() if insumo.codigo else None,
         nome=insumo.nome,
         quantidade=insumo.quantidade,
-        fator=insumo.fator if hasattr(insumo, 'fator') else 1.0,
+        # ====================================================================
+        # CAMPO FATOR - DESABILITADO (17/11/2025)
+        # ====================================================================
+        # fator=insumo.fator if hasattr(insumo, 'fator') else 1.0,
         unidade=insumo.unidade,
         preco_compra=preco_centavos,
         restaurante_id=insumo.restaurante_id,  # Campo obrigatório
@@ -639,16 +660,34 @@ def update_insumo(db: Session, insumo_id: int, insumo_update: InsumoUpdate) -> O
             update_data["preco_compra"] = None
 
     # ============================================================================
-    # Copiar automaticamente do fornecedor_insumo se fornecido na atualização
+    # CÓPIA DE FATOR DO FORNECEDOR - DESABILITADA (17/11/2025)
     # ============================================================================
+    # CÓDIGO ORIGINAL COMENTADO:
+    # if "fornecedor_insumo_id" in update_data and update_data["fornecedor_insumo_id"]:
+    #     # Buscar o insumo do fornecedor para copiar o fator correto
+    #     fornecedor_insumo = db.query(FornecedorInsumo).filter(
+    #         FornecedorInsumo.id == update_data["fornecedor_insumo_id"]
+    #     ).first()
+    #     
+    #     if fornecedor_insumo:
+    #         update_data["fator"] = fornecedor_insumo.fator  # Copiar fator do fornecedor
+    #         update_data["eh_fornecedor_anonimo"] = False
+    #     else:
+    #         # Se fornecedor_insumo_id foi fornecido mas não existe, remover e marcar como anônimo
+    #         update_data.pop("fornecedor_insumo_id")
+    #         update_data["eh_fornecedor_anonimo"] = True
+    # elif "fornecedor_insumo_id" in update_data and update_data["fornecedor_insumo_id"] is None:
+    #     # Se fornecedor_insumo_id foi explicitamente definido como None, marcar como anônimo
+    #     update_data["eh_fornecedor_anonimo"] = True
+    
+    # NOVO CÓDIGO SIMPLIFICADO (sem fator)
     if "fornecedor_insumo_id" in update_data and update_data["fornecedor_insumo_id"]:
-        # Buscar o insumo do fornecedor para copiar o fator correto
+        # Verificar se fornecedor_insumo existe
         fornecedor_insumo = db.query(FornecedorInsumo).filter(
             FornecedorInsumo.id == update_data["fornecedor_insumo_id"]
         ).first()
         
         if fornecedor_insumo:
-            update_data["fator"] = fornecedor_insumo.fator  # Copiar fator do fornecedor
             update_data["eh_fornecedor_anonimo"] = False
         else:
             # Se fornecedor_insumo_id foi fornecido mas não existe, remover e marcar como anônimo

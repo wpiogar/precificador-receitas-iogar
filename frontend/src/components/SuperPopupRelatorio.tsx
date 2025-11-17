@@ -857,6 +857,75 @@ const calcularCustoPorPorcao = () => {
           </div>
         ) : (
           <>
+            {/* Análise da Sugestão Manual de Preço */}
+            {receita.sugestao_valor && receita.sugestao_valor > 0 && (
+              <div className="bg-purple-50 rounded-xl p-6 border border-purple-200">
+                <h4 className="font-semibold text-purple-900 mb-4 flex items-center gap-2">
+                  <Target className="w-5 h-5" />
+                  Análise da Sugestão Manual do Restaurante
+                </h4>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-purple-700">Preço Sugerido pelo Restaurante:</span>
+                    <span className="font-bold text-purple-900">{formatarPreco(receita.sugestao_valor)}</span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-purple-700">Custo por Porção:</span>
+                    <span className="font-medium text-purple-900">{formatarPreco(receita.cmv_real)}</span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between pt-2 border-t border-purple-200">
+                    <span className="text-sm font-semibold text-purple-700">CMV deste Preço:</span>
+                    <span className="text-lg font-bold text-purple-900">
+                      {((receita.cmv_real / receita.sugestao_valor) * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-purple-700">Lucro por rendimento:</span>
+                    <span className="text-lg font-bold text-purple-900">
+                      {formatarPreco(receita.sugestao_valor - receita.cmv_real)}
+                    </span>
+                  </div>
+                  
+                  {/* Feedback visual sobre a margem */}
+                  {(() => {
+                    const cmvPercent = (receita.cmv_real / receita.sugestao_valor) * 100;
+                    if (cmvPercent > 35) {
+                      return (
+                        <div className="bg-red-100 border border-red-300 rounded-lg p-3 mt-2">
+                          <p className="text-sm text-red-800">
+                            <AlertTriangle className="w-4 h-4 inline mr-1" />
+                            CMV muito alto! Recomenda-se aumentar o preço ou reduzir custos.
+                          </p>
+                        </div>
+                      );
+                    } else if (cmvPercent < 20) {
+                      return (
+                        <div className="bg-green-100 border border-green-300 rounded-lg p-3 mt-2">
+                          <p className="text-sm text-green-800">
+                            <CheckCircle className="w-4 h-4 inline mr-1" />
+                            Excelente margem! Preço competitivo com boa rentabilidade.
+                          </p>
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div className="bg-blue-100 border border-blue-300 rounded-lg p-3 mt-2">
+                          <p className="text-sm text-blue-800">
+                            <CheckCircle className="w-4 h-4 inline mr-1" />
+                            Margem adequada para operação sustentável.
+                          </p>
+                        </div>
+                      );
+                    }
+                  })()}
+                </div>
+              </div>
+            )}
+
             {/* Análise de Preços Sugeridos - APENAS PARA RECEITAS NÃO PROCESSADAS */}
             <div className="bg-white rounded-xl border border-gray-100 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
@@ -946,6 +1015,42 @@ const calcularCustoPorPorcao = () => {
           </div>
         </div>
 
+        {/* ===================================================================================================
+            VALORES POR RENDIMENTO - APENAS NA ABA ANÁLISE DE CUSTOS
+            Movido do footer para dentro da aba de custos, posicionado antes da Análise Comparativa
+            =================================================================================================== */}
+        {!receita.processada && receita.porcoes > 1 && (
+          <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+            <h4 className="font-semibold text-blue-900 mb-3">Valores por Rendimento</h4>
+            <div className="grid grid-cols-2 gap-4">
+              
+              <div>
+                <p className="text-sm text-blue-600 mb-1">Custo do Rendimento por unidade</p>
+                <p className="text-lg font-bold text-blue-900">
+                  {formatarPreco(receita.cmv_real)}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-sm text-blue-600 mb-1">CMV 25% por Rendimento</p>
+                <p className="text-lg font-bold text-blue-900">
+                  {formatarPreco(receita.preco_venda_sugerido)}
+                </p>
+                <p className="text-xs text-blue-600">
+                  Lucro: {formatarPreco(receita.preco_venda_sugerido - receita.cmv_real)}
+                </p>
+              </div>
+
+            </div>
+            
+            <div className="mt-3 text-center">
+              <p className="text-sm text-blue-600">
+                Base: {receita.porcoes} {receita.porcoes === 1 ? 'porção' : 'porções'}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Comparativo de Custos */}
         <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl p-6">
           <h4 className="font-semibold text-gray-900 mb-4">Análise Comparativa</h4>
@@ -969,74 +1074,7 @@ const calcularCustoPorPorcao = () => {
             </div>
           </div>
         </div>
-        {/* Análise da Sugestão Manual de Preço */}
-        {receita.sugestao_valor && receita.sugestao_valor > 0 && (
-          <div className="bg-purple-50 rounded-xl p-6 border border-purple-200">
-            <h4 className="font-semibold text-purple-900 mb-4 flex items-center gap-2">
-              <Target className="w-5 h-5" />
-              Análise da Sugestão Manual do Restaurante
-            </h4>
-            
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-purple-700">Preço Sugerido pelo Restaurante:</span>
-                <span className="font-bold text-purple-900">{formatarPreco(receita.sugestao_valor)}</span>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-purple-700">Custo por Porção:</span>
-                <span className="font-medium text-purple-900">{formatarPreco(receita.cmv_real)}</span>
-              </div>
-              
-              <div className="flex items-center justify-between pt-2 border-t border-purple-200">
-                <span className="text-sm font-semibold text-purple-700">CMV deste Preço:</span>
-                <span className="text-lg font-bold text-purple-900">
-                  {((receita.cmv_real / receita.sugestao_valor) * 100).toFixed(1)}%
-                </span>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-purple-700">Lucro por rendimento:</span>
-                <span className="text-lg font-bold text-purple-900">
-                  {formatarPreco(receita.sugestao_valor - receita.cmv_real)}
-                </span>
-              </div>
-              
-              {/* Feedback visual sobre a margem */}
-              {(() => {
-                const cmvPercent = (receita.cmv_real / receita.sugestao_valor) * 100;
-                if (cmvPercent > 35) {
-                  return (
-                    <div className="bg-red-100 border border-red-300 rounded-lg p-3 mt-2">
-                      <p className="text-sm text-red-800">
-                        <AlertTriangle className="w-4 h-4 inline mr-1" />
-                        CMV muito alto! Recomenda-se aumentar o preço ou reduzir custos.
-                      </p>
-                    </div>
-                  );
-                } else if (cmvPercent < 20) {
-                  return (
-                    <div className="bg-green-100 border border-green-300 rounded-lg p-3 mt-2">
-                      <p className="text-sm text-green-800">
-                        <CheckCircle className="w-4 h-4 inline mr-1" />
-                        Excelente margem! Preço competitivo com boa rentabilidade.
-                      </p>
-                    </div>
-                  );
-                } else {
-                  return (
-                    <div className="bg-blue-100 border border-blue-300 rounded-lg p-3 mt-2">
-                      <p className="text-sm text-blue-800">
-                        <CheckCircle className="w-4 h-4 inline mr-1" />
-                        Margem adequada para operação sustentável.
-                      </p>
-                    </div>
-                  );
-                }
-              })()}
-            </div>
-          </div>
-        )}
+        
           </>
         )}
       </div>
@@ -1489,46 +1527,7 @@ const calcularCustoPorPorcao = () => {
           {activeTab === 'custos' && <TabCustos />}
           {activeTab === 'analise' && <TabAnalise />}
         </div>
-
-        {/* ===================================================================================================
-            FOOTER COM AÇÕES PRINCIPAIS
-            =================================================================================================== */}
-
-        {/* ===================================================================================================
-            VALORES POR RENDIMENTO - NÃO MOSTRAR PARA RECEITAS PROCESSADAS
-            =================================================================================================== */}
-        {!receita.processada && receita.porcoes > 1 && (
-          <div className="bg-blue-50 rounded-lg p-4 border border-blue-200 mt-4">
-            <h4 className="font-semibold text-blue-900 mb-3">Valores por Rendimento</h4>
-            <div className="grid grid-cols-2 gap-4">
-              
-              <div>
-                <p className="text-sm text-blue-600 mb-1">Custo do Rendimento por unidade</p>
-                <p className="text-lg font-bold text-blue-900">
-                  {formatarPreco(calcularCustoPorPorcao())}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-sm text-blue-600 mb-1">CMV 25% por Rendimento</p>
-                <p className="text-lg font-bold text-blue-900">
-                  {formatarPreco(calcularCMVPorPorcao(receita.cmv_25_porcento || 0))}
-                </p>
-                <p className="text-xs text-blue-600">
-                  Lucro: {formatarPreco(calcularLucroPorPorcao(receita.cmv_25_porcento || 0))}
-                </p>
-              </div>
-
-            </div>
-            
-            <div className="mt-3 text-center">
-              <p className="text-sm text-blue-600">
-                Base: {receita.porcoes} {receita.porcoes === 1 ? 'porção' : 'porções'}
-              </p>
-            </div>
-          </div>
-        )}
-        
+                
         <div className="bg-gray-50 px-6 py-4 flex items-center justify-between border-t border-gray-200">
           
           {/* Info do Footer */}

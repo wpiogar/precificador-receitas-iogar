@@ -36,6 +36,7 @@ interface ReceitaDetalhada {
   updated_at: string;
   restaurante_id: number;
   total_insumos: number;
+  insumos_processados?: number;
   // Campos calculados
   cmv_20_porcento?: number;
   cmv_25_porcento?: number;
@@ -1085,6 +1086,15 @@ const calcularCustoPorPorcao = () => {
     if (!receita) return null;
 
     // ===================================================================================================
+    // DEBUG: Verificar se insumos_processados está sendo recebido
+    // ===================================================================================================
+    console.log('🔍 Debug Complexidade:', {
+      total_insumos: receita.total_insumos,
+      insumos_processados: receita.insumos_processados,
+      receita_completa: receita
+    });
+
+    // ===================================================================================================
     // VERIFICAR SE É RECEITA PROCESSADA COM RENDIMENTO DIFERENTE DE 1
     // ===================================================================================================
     const isReceitaProcessadaComRendimento = (
@@ -1154,47 +1164,75 @@ const calcularCustoPorPorcao = () => {
             Análise de Performance
           </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* 
+            ===================================================================================================
+            GRID DE INDICADORES - AJUSTADO PARA 3 COLUNAS
+            Removido "Potencial de Lucro" conforme solicitado
+            =================================================================================================== 
+          */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             
-            {/* Eficiência de Custo */}
+            {/* 
+              ===================================================================================================
+              EFICIÊNCIA DE CUSTO
+              Calcula o CMV Real baseado no preço sugerido pelo restaurante
+              Faixas: ótimo (≤20%), bom (≤25%), razoável (≤30%), atenção (≤35%), ruim (>40%)
+              =================================================================================================== 
+            */}
             <div className="bg-green-50 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
                 <Scale className="w-4 h-4 text-green-600" />
                 <span className="text-sm font-medium text-green-800">Eficiência de Custo</span>
               </div>
               <p className="text-2xl font-bold text-green-700">
-                {receita.cmv_real < 5 ? 'Alta' : receita.cmv_real < 10 ? 'Média' : 'Baixa'}
+                {(() => {
+                  if (!receita.sugestao_valor || receita.sugestao_valor === 0) return 'N/A';
+                  const cmvReal = (receita.cmv_real / receita.sugestao_valor) * 100;
+                  if (cmvReal <= 20) return 'Ótimo';
+                  if (cmvReal <= 25) return 'Bom';
+                  if (cmvReal <= 30) return 'Razoável';
+                  if (cmvReal <= 35) return 'Atenção';
+                  return 'Ruim';
+                })()}
               </p>
               <p className="text-xs text-green-600 mt-1">
-                Custo por rendimento: {formatarPreco(receita.cmv_real)}
+                CMV Real: {receita.sugestao_valor && receita.sugestao_valor > 0
+                  ? ((receita.cmv_real / receita.sugestao_valor) * 100).toFixed(1)
+                  : '0.0'}%
               </p>
             </div>
 
-            {/* Potencial de Lucro */}
-            <div className="bg-blue-50 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="w-4 h-4 text-blue-600" />
-                <span className="text-sm font-medium text-blue-800">Potencial de Lucro</span>
-              </div>
-              <p className="text-2xl font-bold text-blue-700">
-                {receita.margem_percentual > 25 ? 'Alto' : receita.margem_percentual > 15 ? 'Médio' : 'Baixo'}
-              </p>
-              <p className="text-xs text-blue-600 mt-1">
-                Margem atual: {receita.margem_percentual.toFixed(1)}%
-              </p>
-            </div>
-
-            {/* Complexidade */}
+            {/* 
+              ===================================================================================================
+              COMPLEXIDADE
+              Baseada na quantidade de receitas processadas:
+              - 0 processados = Baixa
+              - 1 processado = Moderada
+              - 2 processados = Média
+              - >2 processados = Alta
+              =================================================================================================== 
+            */}
             <div className="bg-yellow-50 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
                 <Package className="w-4 h-4 text-yellow-600" />
                 <span className="text-sm font-medium text-yellow-800">Complexidade</span>
               </div>
               <p className="text-2xl font-bold text-yellow-700">
-                {receita.total_insumos > 10 ? 'Alta' : receita.total_insumos > 5 ? 'Média' : 'Baixa'}
+                {(() => {
+                  // Tentar pegar o valor de insumos_processados
+                  const processados = receita.insumos_processados ?? 0;
+                  
+                  if (processados === 0) return 'Baixa';
+                  if (processados === 1) return 'Moderada';
+                  if (processados === 2) return 'Média';
+                  return 'Alta';
+                })()}
               </p>
               <p className="text-xs text-yellow-600 mt-1">
-                {receita.total_insumos} insumos
+                {(() => {
+                  const processados = receita.insumos_processados ?? 0;
+                  return `${processados} ${processados === 1 ? 'processado' : 'processados'}`;
+                })()}
               </p>
             </div>
 

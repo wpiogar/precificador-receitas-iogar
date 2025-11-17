@@ -7619,6 +7619,17 @@ const fetchInsumos = async () => {
         receita_insumos: 1
       });
 
+      // ===================================================================================================
+      // EXTRAIR CAMPO INSUMOS_PROCESSADOS DO BACKEND - COM DEBUG COMPLETO
+      // ===================================================================================================
+      console.log('🔍 DEBUG COMPLETO - Objeto receita do backend:', receita);
+      const insumosProcessados = receita.insumos_processados || 0;
+      console.log(`📦 Receita ${receita.nome}:`, {
+        insumos_processados_backend: receita.insumos_processados,
+        valor_extraido: insumosProcessados,
+        tipo: typeof receita.insumos_processados
+      });
+
       // === FALLBACK: Calcular CMV baseado nos insumos se disponível ===
       let custoProducao = receita.preco_compra || 0;
       
@@ -7693,6 +7704,10 @@ const fetchInsumos = async () => {
         updated_at: receita.updated_at || new Date().toISOString(),
         restaurante_id: receita.restaurante_id,
         total_insumos: receita.receita_insumos?.length || 0,
+        // ===================================================================================================
+        // CAMPO ADICIONADO: Quantidade de receitas processadas usadas como insumo
+        // ===================================================================================================
+        insumos_processados: insumosProcessados,
         
         // Campos para compatibilidade com SuperPopupRelatorio
         cmv_20_porcento: cmv20 || 0,

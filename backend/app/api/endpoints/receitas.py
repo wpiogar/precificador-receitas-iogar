@@ -202,12 +202,16 @@ def list_receitas(
         except Exception as e:
             print(f"❌ Erro ao buscar insumos da receita {receita.id}: {e}")
 
-        # Contar quantos insumos são processados (receitas usadas como insumo)
+        # ===================================================================================================
+        # CONTAR INSUMOS PROCESSADOS
+        # Lógica: Se receita_processada_id existe e não é NULL, é um processado
+        # ===================================================================================================
         insumos_processados = 0
         try:
             for ri in receita.receita_insumos:
-                if ri.insumo and hasattr(ri.insumo, 'eh_processado') and ri.insumo.eh_processado:
+                if ri.receita_processada_id is not None:
                     insumos_processados += 1
+            print(f"📊 Receita {receita.nome}: {insumos_processados} processados contados")
         except Exception as e:
             print(f"⚠️ Erro ao contar insumos processados: {e}")
             insumos_processados = 0

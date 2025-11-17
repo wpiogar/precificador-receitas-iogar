@@ -581,19 +581,67 @@ const SuperGridReceitas: React.FC<SuperGridReceitasProps> = ({
       </td>
       
      <td className="px-6 py-4 whitespace-nowrap">
-      <div className="flex items-center gap-2">
-        <Utensils className="w-4 h-4 text-green-500" />
-        <span className="text-sm font-semibold text-green-600">
-          {formatarPreco(receita.cmv_real)}
-        </span>
-      </div>
-    </td>
+        {/* ===================================================================================================
+            CUSTO DO PRATO - Preco sugerido pelo restaurante (sugestao_valor)
+            Exibe o valor manual cadastrado pelo restaurante ao inves do CMV real
+            =================================================================================================== */}
+        <div className="flex items-center gap-2">
+          <Utensils className="w-4 h-4 text-green-500" />
+          <span className="text-sm font-semibold text-green-600">
+            {receita.sugestao_valor && receita.sugestao_valor > 0 
+              ? formatarPreco(receita.sugestao_valor)
+              : formatarPreco(receita.cmv_real)
+            }
+          </span>
+        </div>
+      </td>
 
     <td className="px-6 py-4 whitespace-nowrap">
-      <div className="flex items-center gap-2">
-        <TrendingUp className="w-4 h-4 text-blue-500" />
-        <span className="text-sm text-gray-900">25%</span>
-      </div>
+      {/* ===================================================================================================
+          CALCULO DO CMV % BASEADO NO PRECO SUGERIDO PELO RESTAURANTE
+          Formula: (custo_prato / preco_sugerido) * 100
+          Exemplo: R$2,88 / R$7,80 = 36,9%
+          
+          Cores dinamicas baseadas no CMV:
+          - Verde: ate 20% (otimo)
+          - Azul: 20% a 30% (bom)
+          - Roxo: 30% ou mais (atencao)
+          =================================================================================================== */}
+      {(() => {
+        if (!receita.sugestao_valor || receita.sugestao_valor <= 0) {
+          return (
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-gray-400" />
+              <span className="text-sm text-gray-400">-</span>
+            </div>
+          );
+        }
+        
+        const cmvPercentual = (receita.cmv_real / receita.sugestao_valor) * 100;
+        
+        let corIcone = 'text-blue-500';
+        let corTexto = 'text-gray-900';
+        
+        if (cmvPercentual <= 20) {
+          corIcone = 'text-green-500';
+          corTexto = 'text-green-600';
+        } else if (cmvPercentual <= 30) {
+          corIcone = 'text-blue-500';
+          corTexto = 'text-blue-600';
+        } else {
+          corIcone = 'text-purple-500';
+          corTexto = 'text-purple-600';
+        }
+        
+        return (
+          <div className="flex items-center gap-2">
+            <TrendingUp className={`w-4 h-4 ${corIcone}`} />
+            <span className={`text-sm font-medium ${corTexto}`}>
+              {cmvPercentual.toFixed(1)}%
+            </span>
+          </div>
+        );
+      })()}
     </td>
       
       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
@@ -1168,8 +1216,12 @@ const SuperGridReceitas: React.FC<SuperGridReceitasProps> = ({
                         onClick={() => handleOrdenacao('cmv')}
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                       >
+                        {/* ===================================================================================================
+                            HEADER DA COLUNA - Alterado de CMV para Custo do Prato
+                            Representa o custo real de producao da receita
+                            =================================================================================================== */}
                         <div className="flex items-center gap-1">
-                          CMV
+                          Custo do Prato
                           {filtros.ordenacao === 'cmv' && (
                             filtros.direcao === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />
                           )}
@@ -1180,8 +1232,12 @@ const SuperGridReceitas: React.FC<SuperGridReceitasProps> = ({
                         onClick={() => handleOrdenacao('margem')}
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                       >
+                        {/* ===================================================================================================
+                            HEADER DA COLUNA - Alterado de Margem para CMV %
+                            Mostra o percentual de CMV baseado no preco sugerido pelo restaurante
+                            =================================================================================================== */}
                         <div className="flex items-center gap-1">
-                          Margem
+                          CMV %
                           {filtros.ordenacao === 'margem' && (
                             filtros.direcao === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />
                           )}

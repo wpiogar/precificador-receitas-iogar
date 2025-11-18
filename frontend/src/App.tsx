@@ -816,8 +816,7 @@ const resetForm = useCallback(() => {
                 {/* Preço de Compra Total */}
                 <div className="space-y-2">
                   <label className="flex items-center text-sm font-medium text-gray-900">
-                    <span>Preço de Compra Total (R$)</span>
-                    <span className="text-red-500 ml-1">*</span>
+                    <span>Último preço praticado</span>
                   </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500">R$</span>
@@ -3528,9 +3527,14 @@ const fetchInsumos = async () => {
                 <Upload className="w-5 h-5 text-green-600" />
                 <h4 className="font-medium text-gray-900">Sistema de Importação</h4>
               </div>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 mb-3">
                 Importação de arquivos CSV/SQL
               </p>
+              <button 
+                  onClick={() => setMostrarImportacao(true)}
+                  className="w-full py-2 px-4 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors">
+                    Importar
+                  </button>
             </div>
 
             {/* Integração TOTVS Chef Web */}
@@ -10061,7 +10065,7 @@ return (  //RETORN DO COMPONENTE PRINCIPAL
                   <button 
                   onClick={() => setMostrarImportacao(true)}
                   className="w-full py-2 px-4 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors">
-                    Configurar
+                    Importar
                   </button>
                 </div>
 

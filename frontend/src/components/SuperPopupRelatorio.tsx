@@ -1566,46 +1566,58 @@ const calcularCustoPorPorcao = () => {
           {activeTab === 'analise' && <TabAnalise />}
         </div>
                 
-        <div className="bg-gray-50 px-6 py-4 flex items-center justify-between border-t border-gray-200">
-          
-          {/* Info do Footer */}
-          <div className="text-sm text-gray-500">
-            Relatório gerado em {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+        <div className="bg-gradient-to-br from-gray-50 to-gray-100 px-4 sm:px-6 py-3 sm:py-4 border-t border-gray-200">
+  
+          {/* LAYOUT MOBILE: Stack vertical / DESKTOP: Horizontal */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            
+            {/* Info do Footer - Esconder em mobile, mostrar em desktop */}
+            <div className="hidden sm:block text-xs text-gray-500">
+              {new Date().toLocaleDateString('pt-BR')} • {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            </div>
+            
+            {/* Botões de Ação - Grid responsivo */}
+            <div className="grid grid-cols-2 sm:flex sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
+              
+              {/* Botão Editar - Tamanho completo em mobile */}
+              <button
+                onClick={handleEdit}
+                className="flex items-center justify-center gap-2 px-4 py-3 sm:py-2 text-gray-700 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all font-medium shadow-sm"
+              >
+                <Edit3 className="w-5 h-5 sm:w-4 sm:h-4" />
+                <span className="text-sm">Editar</span>
+              </button>
+              
+              {/* Botão Duplicar */}
+              <button
+                onClick={handleDuplicate}
+                className="flex items-center justify-center gap-2 px-4 py-3 sm:py-2 text-blue-700 bg-white border-2 border-blue-300 rounded-lg hover:bg-blue-50 hover:border-blue-400 transition-all font-medium shadow-sm"
+              >
+                <Copy className="w-5 h-5 sm:w-4 sm:h-4" />
+                <span className="text-sm">Duplicar</span>
+              </button>
+              
+              {/* Botão Excluir */}
+              <button
+                onClick={handleDelete}
+                className="flex items-center justify-center gap-2 px-4 py-3 sm:py-2 text-red-700 bg-white border-2 border-red-300 rounded-lg hover:bg-red-50 hover:border-red-400 transition-all font-medium shadow-sm"
+              >
+                <AlertTriangle className="w-5 h-5 sm:w-4 sm:h-4" />
+                <span className="text-sm">Excluir</span>
+              </button>
+              
+              {/* Botão Fechar - Destaque com gradiente, ocupa 2 colunas em mobile */}
+              <button
+                onClick={onClose}
+                className="col-span-2 sm:col-span-1 flex items-center justify-center gap-2 px-6 py-3 sm:py-2 bg-gradient-to-r from-green-500 to-pink-500 text-white rounded-lg hover:from-green-600 hover:to-pink-600 transition-all font-medium shadow-md"
+              >
+                <X className="w-5 h-5 sm:w-4 sm:h-4" />
+                <span className="text-sm font-semibold">Fechar</span>
+              </button>
+              
+            </div>
           </div>
           
-          {/* Ações do Footer */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleEdit}
-              className="flex items-center gap-2 px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-all"
-            >
-              <Edit3 className="w-4 h-4" />
-              Editar
-            </button>
-            
-            <button
-              onClick={handleDuplicate}
-              className="flex items-center gap-2 px-4 py-2 text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50 transition-all"
-            >
-              <Copy className="w-4 h-4" />
-              Duplicar
-            </button>
-            
-            <button
-              onClick={handleDelete}
-              className="flex items-center gap-2 px-4 py-2 text-red-700 border border-red-300 rounded-lg hover:bg-red-50 transition-all"
-            >
-              <AlertTriangle className="w-4 h-4" />
-              Excluir
-            </button>
-            
-            <button
-              onClick={onClose}
-              className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-green-500 to-pink-500 text-white rounded-lg hover:from-green-600 hover:to-pink-600 transition-all"
-            >
-              Fechar
-            </button>
-          </div>
         </div>
       </div>
     </div>

@@ -1205,7 +1205,8 @@ def gerar_pdf_receita(
         
         # Calcular CMV total
         cmv_total = sum(ing['custo_total'] for ing in ingredientes)
-        cmv_unitario = cmv_total / receita.rendimento_porcoes if receita.rendimento_porcoes and receita.rendimento_porcoes > 0 else 0
+        # Converter para float para evitar erro de tipagem Decimal
+        cmv_unitario = float(cmv_total) / float(receita.rendimento_porcoes) if receita.rendimento_porcoes and receita.rendimento_porcoes > 0 else 0.0
         
         # Calcular precificação com margem de 65%
         margem_sugerida = 65.0

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 // Importar modal de selecao de relatorio
 import ModalSelecaoRelatorio from './ModalSelecaoRelatorio';
+import { API_BASE_URL } from '../config';
 
 // ===================================================================================================
 // INTERFACES E TIPOS
@@ -285,6 +286,80 @@ const calcularCustoPorPorcao = () => {
   const handlePrint = () => {
     // Implementar impressão do relatório
     window.print();
+  };
+
+  // ===================================================================================================
+  // HANDLER: COMPARTILHAR PDF
+  // ===================================================================================================
+
+  const handleCompartilhar = async () => {
+    try {
+      setLoading(true);
+      
+      // Construir URL do endpoint
+      const url = `${API_BASE_URL}/api/v1/receitas/${receita.id}/pdf?tipo=completo`;
+      
+      console.log('Gerando PDF para compartilhamento:', url);
+      
+      // Buscar o token de autenticacao
+      const token = localStorage.getItem('foodcost_access_token');
+      
+      // Fazer requisicao para gerar PDF
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Erro ao gerar PDF: ${response.status}`);
+      }
+      
+      // Converter resposta em Blob
+      const blob = await response.blob();
+      
+      // Criar nome do arquivo
+      const nomeArquivo = `receita_${receita.codigo}.pdf`;
+      
+      // Verificar se o navegador suporta Web Share API Level 2 (com arquivos)
+      if (navigator.canShare && navigator.canShare({ files: [new File([blob], nomeArquivo)] })) {
+        
+        // Criar File object para compartilhar
+        const file = new File([blob], nomeArquivo, { type: 'application/pdf' });
+        
+        // Compartilhar usando Web Share API
+        await navigator.share({
+          title: `Receita: ${receita.nome}`,
+          text: `Relatório completo da receita ${receita.nome}`,
+          files: [file]
+        });
+        
+        console.log('PDF compartilhado com sucesso via Web Share API');
+        
+      } else {
+        // Fallback: fazer download do PDF se Web Share API nao estiver disponivel
+        console.log('Web Share API nao disponivel, fazendo download do PDF');
+        
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = nomeArquivo;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        
+        // Mostrar mensagem de fallback
+        alert('PDF baixado! Você pode compartilhá-lo manualmente a partir dos seus arquivos.');
+      }
+      
+    } catch (error) {
+      console.error('Erro ao compartilhar PDF:', error);
+      alert('Erro ao gerar PDF para compartilhamento. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ===================================================================================================
@@ -1427,9 +1502,9 @@ const calcularCustoPorPorcao = () => {
               </button>
               
               <button
-                onClick={() => navigator.share && navigator.share({ title: receita.nome, text: `Relatório da receita ${receita.nome}` })}
+                onClick={handleCompartilhar}
                 className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition-all"
-                title="Compartilhar"
+                title="Compartilhar PDF"
               >
                 <Share2 className="w-5 h-5" />
               </button>

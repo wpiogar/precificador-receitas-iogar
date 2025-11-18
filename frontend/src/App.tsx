@@ -16,7 +16,7 @@
 // ============================================================================
 import { apiService } from './api-service';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import PopupPortalContainer, { showSuccessPopup, showErrorPopup } from './components/PopupPortal';
 // ============================================================================
 // REGISTRAR FUNÇÕES DE POPUP NO WINDOW (ACESSO GLOBAL)
@@ -221,6 +221,8 @@ const FormularioInsumoIsolado = React.memo(({
   loading,
   // Prop com lista de restaurantes disponíveis
   restaurantes,
+  // Prop com restaurante atualmente selecionado no menu
+  selectedRestaurante,
   // Props para fornecedores
   ehFornecedorAnonimo,
   setEhFornecedorAnonimo,
@@ -852,7 +854,7 @@ const resetForm = useCallback(() => {
             {/* ============================================================================ */}
             {/* SEÇÃO 2.5: VÍNCULO COM RESTAURANTE (Global vs Específico) */}
             {/* ============================================================================ */}
-            
+
             <div className="space-y-6">
               {/* Header da seção */}
               <div className="flex items-center space-x-3 border-b border-gray-200 pb-3">
@@ -861,71 +863,111 @@ const resetForm = useCallback(() => {
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">Vínculo com Restaurante</h3>
-                  <p className="text-sm text-gray-500">Defina se o insumo é global ou específico de um restaurante</p>
+                  <p className="text-sm text-gray-500">
+                    {selectedRestaurante 
+                      ? 'Insumo será vinculado ao restaurante selecionado no menu'
+                      : 'Defina se o insumo é global ou específico de um restaurante'
+                    }
+                  </p>
                 </div>
               </div>
 
-              {/* Toggle: Global vs Específico */}
-              <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-xl p-6">
-                <div className="flex items-start space-x-4">
-                  <div className="flex items-center h-6 mt-1">
-                    <input
-                      type="checkbox"
-                      checked={insumoGlobal}
-                      onChange={(e) => {
-                        setInsumoGlobal(e.target.checked);
-                        // Se marcar como global, limpar restaurante selecionado
-                        if (e.target.checked) {
-                          setRestauranteSelecionado(null);
-                        }
-                      }}
-                      className="w-5 h-5 text-purple-600 bg-white border-2 border-gray-300 rounded focus:ring-purple-500 focus:ring-2 transition-all duration-200"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-base font-semibold text-gray-900 cursor-pointer">
-                      Marcar como Insumo Global
-                    </label>
-                    <p className="text-sm text-gray-700 mt-2 leading-relaxed">
-                      Insumos globais podem ser utilizados por qualquer restaurante do sistema. 
-                      Ideal para ingredientes comuns que não pertencem a uma unidade específica.
-                    </p>
+              {/* CASO 1: Restaurante JÁ SELECIONADO no menu - Campo BLOQUEADO */}
+              {selectedRestaurante && (
+                <div className="bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200 rounded-xl p-6">
+                  <div className="flex items-start space-x-4">
+                    <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Store className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-base font-semibold text-gray-900 mb-2 block">
+                        Restaurante Selecionado
+                      </label>
+                      <div className="flex items-center gap-3 p-4 bg-white rounded-lg border-2 border-purple-300 mb-3">
+                        <span className="font-bold text-gray-900 text-lg">{selectedRestaurante.nome}</span>
+                        <span className="ml-auto px-3 py-1 bg-purple-100 text-purple-700 text-xs rounded-full font-bold">
+                          BLOQUEADO
+                        </span>
+                      </div>
+                      <div className="flex items-start space-x-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                        <p className="text-sm text-blue-800">
+                          <strong>Informação:</strong> Este insumo será criado automaticamente para o restaurante 
+                          selecionado no menu lateral. Para criar um insumo global, desselecione o restaurante 
+                          no menu antes de abrir este formulário.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* Dropdown de seleção de restaurante (só aparece se não for global) */}
-              {!insumoGlobal && (
-                <div className="bg-white border border-gray-200 rounded-xl p-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    Selecione o Restaurante *
-                  </label>
-                  <select
-                    value={restauranteSelecionado || ''}
-                    onChange={(e) => setRestauranteSelecionado(e.target.value ? parseInt(e.target.value) : null)}
-                    className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
-                    required={!insumoGlobal}
-                  >
-                    <option value="">Selecione um restaurante...</option>
-                    {restaurantes?.map((rest) => (
-                      <option key={rest.id} value={rest.id}>
-                        {rest.nome} {rest.cnpj ? `- CNPJ: ${rest.cnpj}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  
-                  {/* Mensagem de aviso se não houver restaurantes */}
-                  {(!restaurantes || restaurantes.length === 0) && (
-                    <div className="mt-3 flex items-start space-x-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                      <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                      <p className="text-sm text-amber-800">
-                        <strong>Atenção:</strong> Nenhum restaurante cadastrado. 
-                        Cadastre um restaurante antes de criar insumos específicos, 
-                        ou marque como "Insumo Global".
-                      </p>
+              {/* CASO 2: NENHUM restaurante selecionado - Opções DISPONÍVEIS */}
+              {!selectedRestaurante && (
+                <>
+                  {/* Toggle: Global vs Específico */}
+                  <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-xl p-6">
+                    <div className="flex items-start space-x-4">
+                      <div className="flex items-center h-6 mt-1">
+                        <input
+                          type="checkbox"
+                          checked={insumoGlobal}
+                          onChange={(e) => {
+                            setInsumoGlobal(e.target.checked);
+                            // Se marcar como global, limpar restaurante selecionado
+                            if (e.target.checked) {
+                              setRestauranteSelecionado(null);
+                            }
+                          }}
+                          className="w-5 h-5 text-purple-600 bg-white border-2 border-gray-300 rounded focus:ring-purple-500 focus:ring-2 transition-all duration-200"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-base font-semibold text-gray-900 cursor-pointer">
+                          Marcar como Insumo Global
+                        </label>
+                        <p className="text-sm text-gray-700 mt-2 leading-relaxed">
+                          Insumos globais podem ser utilizados por qualquer restaurante do sistema. 
+                          Ideal para ingredientes comuns que não pertencem a uma unidade específica.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Dropdown de seleção de restaurante (só aparece se não for global) */}
+                  {!insumoGlobal && (
+                    <div className="bg-white border border-gray-200 rounded-xl p-6">
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        Selecione o Restaurante *
+                      </label>
+                      <select
+                        value={restauranteSelecionado || ''}
+                        onChange={(e) => setRestauranteSelecionado(e.target.value ? parseInt(e.target.value) : null)}
+                        className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                        required={!insumoGlobal}
+                      >
+                        <option value="">Selecione um restaurante...</option>
+                        {restaurantes?.map((rest) => (
+                          <option key={rest.id} value={rest.id}>
+                            {rest.nome} {rest.cnpj ? `- CNPJ: ${rest.cnpj}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      
+                      {/* Mensagem de aviso se não houver restaurantes */}
+                      {(!restaurantes || restaurantes.length === 0) && (
+                        <div className="mt-3 flex items-start space-x-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                          <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                          <p className="text-sm text-amber-800">
+                            <strong>Atenção:</strong> Nenhum restaurante cadastrado. 
+                            Cadastre um restaurante antes de criar insumos específicos, 
+                            ou marque como "Insumo Global".
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
+                </>
               )}
             </div>
 
@@ -2038,6 +2080,11 @@ const FoodCostSystem: React.FC = () => {
   const [estatisticasRestaurante, setEstatisticasRestaurante] = useState<RestauranteEstatisticas | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [showInsumoForm, setShowInsumoForm] = useState<boolean>(false);
+  // Estados para exportação e importação de insumos
+  const [showExportDropdown, setShowExportDropdown] = useState(false);
+  // Ref para posicionar dropdown de exportação
+  const exportButtonRef = useRef<HTMLButtonElement>(null);
+  const [showImportarInsumosModal, setShowImportarInsumosModal] = useState(false);
   // Estados para popup de classificação IA
   const [showClassificacaoPopup, setShowClassificacaoPopup] = useState<boolean>(false);
   const [insumoRecemCriado, setInsumoRecemCriado] = useState<{id: number, nome: string} | null>(null);
@@ -5589,7 +5636,7 @@ const fetchInsumos = async () => {
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
         <input
           type="text"
-          placeholder="Buscar insumos..."
+          placeholder="Buscar insumos por nome ou código..."
           value={localSearch}
           onChange={(e) => setLocalSearch(e.target.value)}
           className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 bg-white text-gray-900"
@@ -5638,12 +5685,27 @@ const fetchInsumos = async () => {
       setSearchTerm(term);
     }, [setSearchTerm]);
 
-    // Filtro dos insumos baseado na busca
-    const insumosFiltrados = insumos.filter(insumoItem => 
-      insumoItem && 
-      insumoItem.nome && 
-      insumoItem.nome.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // ============================================================================
+    // Filtro dos insumos baseado na busca (nome OU código)
+    // ============================================================================
+    const insumosFiltrados = insumos.filter(insumoItem => {
+      // Verificar se insumo é válido
+      if (!insumoItem || !insumoItem.nome) return false;
+      
+      // Se não houver termo de busca, incluir todos
+      if (!searchTerm || !searchTerm.trim()) return true;
+      
+      const searchLower = searchTerm.toLowerCase().trim();
+      
+      // Buscar por nome
+      const nomeMatch = insumoItem.nome.toLowerCase().includes(searchLower);
+      
+      // Buscar por código (se existir)
+      const codigoMatch = insumoItem.codigo?.toLowerCase().includes(searchLower);
+      
+      // Retornar true se encontrou em qualquer um dos campos
+      return nomeMatch || codigoMatch;
+    });
 
     // ============================================================================
     // CÁLCULO DE PAGINAÇÃO PARA INSUMOS
@@ -5809,6 +5871,138 @@ const fetchInsumos = async () => {
       });
     }, []);
 
+    // ============================================================================
+    // FUNÇÕES DE EXPORTAÇÃO DE INSUMOS
+    // ============================================================================
+
+    /**
+     * Exporta lista de insumos para PDF
+     */
+    const handleExportarInsumosPDF = async () => {
+      try {
+        setLoading(true);
+        
+        // Preparar dados para exportação
+        const insumosParaExportar = insumosFiltrados.map(insumo => ({
+          nome: insumo.nome,
+          codigo: insumo.codigo || '',
+          unidade: insumo.unidade,
+          categoria: insumo.grupo || insumo.categoria || 'Sem categoria',
+          preco: insumo.preco_compra_real || 0,
+          restaurante: insumo.restaurante_id ? 'Específico' : 'Global'
+        }));
+        
+        // TODO: Implementar chamada ao backend para gerar PDF real
+        // const response = await apiService.exportarInsumosPDF({
+        //   insumos: insumosParaExportar,
+        //   restaurante_id: selectedRestaurante?.id
+        // });
+        
+        // Simulação temporária - remover quando implementar backend
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        showSuccessPopup(
+          'Funcionalidade em Desenvolvimento',
+          'A exportação para PDF será implementada em breve. Por enquanto, use a exportação CSV.'
+        );
+        
+      } catch (error) {
+        console.error('Erro ao exportar insumos para PDF:', error);
+        showErrorPopup('Erro na Exportação', 'Não foi possível gerar o arquivo PDF.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    /**
+     * Exporta lista de insumos para Excel
+     */
+    const handleExportarInsumosExcel = async () => {
+      try {
+        setLoading(true);
+        
+        // Preparar dados para exportação
+        const insumosParaExportar = insumosFiltrados.map(insumo => ({
+          Código: insumo.codigo || '',
+          Nome: insumo.nome,
+          Unidade: insumo.unidade,
+          Categoria: insumo.grupo || insumo.categoria || 'Sem categoria',
+          'Preço Unitário': insumo.preco_compra_real || 0,
+          Tipo: insumo.restaurante_id ? 'Específico' : 'Global'
+        }));
+        
+        // TODO: Implementar chamada ao backend para gerar Excel real
+        // const response = await apiService.exportarInsumosExcel({
+        //   insumos: insumosParaExportar,
+        //   restaurante_id: selectedRestaurante?.id
+        // });
+        
+        // Simulação temporária - remover quando implementar backend
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        showSuccessPopup(
+          'Funcionalidade em Desenvolvimento',
+          'A exportação para Excel será implementada em breve. Por enquanto, use a exportação CSV.'
+        );
+        
+      } catch (error) {
+        console.error('Erro ao exportar insumos para Excel:', error);
+        showErrorPopup('Erro na Exportação', 'Não foi possível gerar o arquivo Excel.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    /**
+     * Exporta lista de insumos para CSV
+     */
+    const handleExportarInsumosCSV = async () => {
+      try {
+        setLoading(true);
+        
+        // Preparar dados para CSV
+        const insumosParaExportar = insumosFiltrados.map(insumo => ({
+          codigo: insumo.codigo || '',
+          nome: insumo.nome,
+          unidade: insumo.unidade,
+          categoria: insumo.grupo || insumo.categoria || 'Sem categoria',
+          preco_unitario: insumo.preco_compra_real || 0,
+          tipo: insumo.restaurante_id ? 'Específico' : 'Global'
+        }));
+        
+        // Gerar CSV no frontend
+        const headers = ['Código', 'Nome', 'Unidade', 'Categoria', 'Preço Unitário', 'Tipo'];
+        const csvContent = [
+          headers.join(','),
+          ...insumosParaExportar.map(insumo => 
+            `"${insumo.codigo}","${insumo.nome}","${insumo.unidade}","${insumo.categoria}",${insumo.preco_unitario},"${insumo.tipo}"`
+          )
+        ].join('\n');
+        
+        // Download do arquivo
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `insumos_${new Date().getTime()}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showSuccessPopup(
+          'CSV Gerado!',
+          `Exportação de ${insumosParaExportar.length} insumos concluída com sucesso.`
+        );
+        
+      } catch (error) {
+        console.error('Erro ao exportar insumos para CSV:', error);
+        showErrorPopup('Erro na Exportação', 'Não foi possível gerar o arquivo CSV.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     // Função para confirmar e executar a exclusão
     const confirmDeleteInsumo = async () => {
       if (!deleteConfirm.insumoId) return;
@@ -5864,13 +6058,98 @@ const fetchInsumos = async () => {
             <h2 className="text-2xl font-bold text-gray-900">Gestão de Insumos</h2>
             <p className="text-gray-600">Controle total de ingredientes e custos</p>
           </div>
-          <button
-            onClick={() => setShowInsumoForm(true)}
-            className="bg-gradient-to-r from-green-500 to-pink-500 text-white px-6 py-3 rounded-lg flex items-center gap-2 hover:from-green-600 hover:to-pink-600 transition-all"
-          >
-            <Plus className="w-5 h-5" />
-            Novo Insumo
-          </button>
+          
+          {/* Container dos botões - seguindo padrão de Receitas */}
+          <div className="flex items-center gap-3">
+            {/* Botão Exportar com dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowExportDropdown(!showExportDropdown)}
+                className="bg-gray-100 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2"
+              >
+                <Upload className="w-5 h-5 rotate-180" />
+                <span className="font-medium">Exportar</span>
+                <ChevronDown className="w-4 h-4" />
+              </button>
+
+              {/* Overlay invisível para fechar dropdown ao clicar fora */}
+              {showExportDropdown && (
+                <div 
+                  className="fixed inset-0 z-40" 
+                  onClick={() => setShowExportDropdown(false)}
+                />
+              )}
+              
+              {/* Dropdown de opções de exportação */}
+              {showExportDropdown && (
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                  <button
+                    onClick={() => {
+                      handleExportarInsumosPDF();
+                      setShowExportDropdown(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Exportar para PDF
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleExportarInsumosExcel();
+                      setShowExportDropdown(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    Exportar para Excel
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleExportarInsumosCSV();
+                      setShowExportDropdown(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Exportar para CSV
+                  </button>
+                </div>
+              )}
+            </div>
+            
+            {/* Botão Importar */}
+            <button
+              onClick={() => {
+                if (!selectedRestaurante) {
+                  showErrorPopup(
+                    'Restaurante Não Selecionado',
+                    'Por favor, selecione um restaurante no menu lateral antes de importar insumos.'
+                  );
+                  return;
+                }
+                setShowImportarInsumosModal(true);
+              }}
+              className={`px-4 py-3 rounded-lg transition-colors flex items-center gap-2 ${
+                selectedRestaurante 
+                  ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' 
+                  : 'bg-gray-50 text-gray-400 cursor-not-allowed'
+              }`}
+              disabled={!selectedRestaurante}
+              title={!selectedRestaurante ? 'Selecione um restaurante primeiro' : 'Importar insumos via Excel'}
+            >
+              <Upload className="w-5 h-5" />
+              <span className="font-medium">Importar</span>
+            </button>
+            
+            {/* Botão Novo Insumo */}
+            <button
+              onClick={() => setShowInsumoForm(true)}
+              className="bg-gradient-to-r from-green-500 to-pink-500 text-white px-6 py-3 rounded-lg flex items-center gap-2 hover:from-green-600 hover:to-pink-600 transition-all"
+            >
+              <Plus className="w-5 h-5" />
+              <span className="font-medium">Novo Insumo</span>
+            </button>
+          </div>
         </div>
 
         {/* Barra de busca - COMPONENTE ISOLADO */}
@@ -6320,6 +6599,8 @@ const fetchInsumos = async () => {
           loading={loading}
           // Lista de restaurantes disponíveis
           restaurantes={restaurantes}
+          // Restaurante atualmente selecionado no menu
+          selectedRestaurante={selectedRestaurante}
           // Props para fornecedores
           ehFornecedorAnonimo={ehFornecedorAnonimo}
           setEhFornecedorAnonimo={setEhFornecedorAnonimo}
@@ -6383,6 +6664,69 @@ const fetchInsumos = async () => {
             </div>
           </div>
         )}
+        {/* ADICIONAR AQUI - Modal de Importação de Insumos */}
+      {/* Modal de Importação de Insumos */}
+      {showImportarInsumosModal && selectedRestaurante && (
+        <ImportacaoInsumos
+          restauranteId={selectedRestaurante.id}
+          onClose={() => setShowImportarInsumosModal(false)}
+          onSuccess={() => {
+            fetchInsumos();
+            setShowImportarInsumosModal(false);
+          }}
+        />
+      )}
+
+      {/* Modal de aviso quando não há restaurante selecionado */}
+      {showImportarInsumosModal && !selectedRestaurante && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Selecione um Restaurante
+              </h3>
+              <button
+                onClick={() => setShowImportarInsumosModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            {/* Conteúdo */}
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm text-yellow-800 font-medium">
+                    Atenção: Nenhum restaurante selecionado
+                  </p>
+                  <p className="text-sm text-yellow-700 mt-1">
+                    Para importar insumos, você precisa selecionar um restaurante no menu lateral.
+                  </p>
+                </div>
+              </div>
+              
+              <p className="text-sm text-gray-600">
+                Os insumos importados serão vinculados ao restaurante selecionado. 
+                Se desejar criar insumos globais (disponíveis para todos os restaurantes), 
+                selecione essa opção durante o cadastro individual.
+              </p>
+            </div>
+            
+            {/* Botões */}
+            <div className="flex items-center justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowImportarInsumosModal(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Entendi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>   /* <--- Este é o fechamento do componente Insumos */
     );
   };

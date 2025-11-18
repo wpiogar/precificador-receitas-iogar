@@ -173,6 +173,8 @@ const SuperGridReceitas: React.FC<SuperGridReceitasProps> = ({
   const [isExporting, setIsExporting] = useState(false);
   // Estado para controlar modal de exportacao PDF
   const [showModalExportacaoPDF, setShowModalExportacaoPDF] = useState(false);
+  // Ref para posicionar dropdown de exportação
+  const exportButtonRef = useRef<HTMLButtonElement>(null);
   
   // ===================================================================================================
   // IMPORTAR CONFIGURACAO CENTRALIZADA DA API
@@ -340,6 +342,19 @@ const SuperGridReceitas: React.FC<SuperGridReceitasProps> = ({
           }
         }}
       >
+      {/* Checkbox de seleção - canto superior esquerdo */}
+      <div className="absolute top-3 left-3 z-10">
+        <input
+          type="checkbox"
+          checked={receitaSelecionada === receita.id}
+          onChange={(e) => {
+            e.stopPropagation();
+            setReceitaSelecionada(receitaSelecionada === receita.id ? null : receita.id);
+          }}
+          className="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500 cursor-pointer shadow-lg"
+          onClick={(e) => e.stopPropagation()}
+        />
+      </div>
       {/* Marca d'água de fundo */}
       <div 
         className="absolute inset-0 flex items-center justify-center pointer-events-none"
@@ -621,6 +636,18 @@ const SuperGridReceitas: React.FC<SuperGridReceitasProps> = ({
         }
       }}
     >
+      <td className="px-6 py-4 w-12">
+        <input
+          type="checkbox"
+          checked={receitaSelecionada === receita.id}
+          onChange={(e) => {
+            e.stopPropagation();
+            setReceitaSelecionada(receitaSelecionada === receita.id ? null : receita.id);
+          }}
+          className="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500 cursor-pointer"
+          onClick={(e) => e.stopPropagation()}
+        />
+      </td>
       <td className="px-6 py-4 whitespace-nowrap">
         <div>
           <div className="text-sm font-medium text-gray-900">{receita.nome}</div>
@@ -935,11 +962,13 @@ const SuperGridReceitas: React.FC<SuperGridReceitasProps> = ({
     
     switch (opcao) {
       case 'individual':
-        // Exportar apenas a receita selecionada
+        // Se há receita selecionada explicitamente, exportar ela
         if (receitaSelecionada) {
           await exportarReceitaPDF(receitaSelecionada);
-        } else {
-          alert('Selecione uma receita primeiro.');
+        } 
+        // Caso contrário, mostrar aviso
+        else {
+          alert('Por favor, selecione uma receita clicando no checkbox ao lado do nome da receita.');
           return;
         }
         break;
@@ -1025,6 +1054,7 @@ const SuperGridReceitas: React.FC<SuperGridReceitasProps> = ({
               <div className="relative">
                 <Tooltip content="Exportar receitas em diferentes formatos">
                   <button
+                    ref={exportButtonRef}
                     onClick={() => setShowExportDropdown(!showExportDropdown)}
                     className="flex items-center justify-center gap-2 px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 hover:shadow-sm transition-all duration-200 flex-1 sm:flex-initial active:scale-95"
                   >
@@ -1033,10 +1063,29 @@ const SuperGridReceitas: React.FC<SuperGridReceitasProps> = ({
                     <ChevronDown className={`w-4 h-4 transition-transform ${showExportDropdown ? 'rotate-180' : ''}`} />
                   </button>
                 </Tooltip>
-                
-                {/* Dropdown de opções de exportação */}
-                {showExportDropdown && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+              </div>
+
+              {/* Dropdown renderizado com position fixed - fora do container */}
+              {showExportDropdown && (
+                <>
+                  {/* Overlay para fechar ao clicar fora */}
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => setShowExportDropdown(false)}
+                  />
+                  
+                  {/* Dropdown com posição fixed */}
+                  <div 
+                    className="fixed bg-white rounded-lg shadow-xl border border-gray-200 z-50 min-w-[220px]"
+                    style={{
+                      top: exportButtonRef.current 
+                        ? `${exportButtonRef.current.getBoundingClientRect().bottom + 8}px`
+                        : 'auto',
+                      right: exportButtonRef.current
+                        ? `${window.innerWidth - exportButtonRef.current.getBoundingClientRect().right}px`
+                        : 'auto'
+                    }}
+                  >
                     <div className="py-1">
                       <button
                         onClick={() => {
@@ -1070,8 +1119,8 @@ const SuperGridReceitas: React.FC<SuperGridReceitasProps> = ({
                       </button>
                     </div>
                   </div>
-                )}
-              </div>
+                </>
+              )}
               
               <Tooltip content="Importar receitas a partir de arquivo Excel ou CSV">
                 <button className="flex items-center justify-center gap-2 px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 hover:shadow-sm transition-all duration-200 flex-1 sm:flex-initial active:scale-95">
@@ -1244,6 +1293,9 @@ const SuperGridReceitas: React.FC<SuperGridReceitasProps> = ({
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
+                      <th className="px-6 py-3 w-12">
+                        {/* Espaço para checkbox de seleção */}
+                      </th>
                       <th 
                         onClick={() => handleOrdenacao('nome')}
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"

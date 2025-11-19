@@ -131,10 +131,42 @@ def limpar_receitas(
                 mensagem="Nenhuma receita encontrada com os filtros aplicados"
             )
         
-        # PASSO 1: Deletar vínculos em receita_insumos PRIMEIRO
+         # PASSO 1: Deletar vínculos em receita_insumos PRIMEIRO
         db.query(ReceitaInsumo).filter(ReceitaInsumo.receita_id.in_(receita_ids)).delete(synchronize_session=False)
         
-        # PASSO 2: Deletar as receitas
+        # PASSO 2: Liberar códigos das receitas que serão deletadas
+        # Buscar códigos das receitas a serem removidas
+        receitas_a_remover = db.query(Receita).filter(Receita.id.in_(receita_ids)).all()
+        codigos_a_liberar = []
+        
+        for receita in receitas_a_remover:
+            if receita.codigo and receita.restaurante_id:
+                try:
+                    codigo_int = int(receita.codigo)
+                    # Determinar tipo baseado na faixa do código
+                    tipo_codigo = 'receita_processada' if 4000 <= codigo_int <= 4999 else 'receita'
+                    codigos_a_liberar.append((receita.restaurante_id, codigo_int, tipo_codigo))
+                except (ValueError, TypeError):
+                    continue
+        
+        # Importar modelo CodigoDisponivel
+        from app.models.codigo_disponivel import CodigoDisponivel
+        
+        # Liberar códigos (marcar como disponível novamente)
+        for rest_id, codigo, tipo in codigos_a_liberar:
+            db.query(CodigoDisponivel).filter(
+                CodigoDisponivel.restaurante_id == rest_id,
+                CodigoDisponivel.codigo == codigo,
+                CodigoDisponivel.tipo == tipo
+            ).update(
+                {
+                    'disponivel': True,
+                    'usado_em': None
+                },
+                synchronize_session=False
+            )
+        
+        # PASSO 3: Deletar as receitas
         db.query(Receita).filter(Receita.id.in_(receita_ids)).delete(synchronize_session=False)
         
         # Commit das alterações
@@ -200,7 +232,39 @@ def limpar_insumos(
         # PASSO 1: Deletar vínculos em receita_insumos PRIMEIRO
         db.query(ReceitaInsumo).filter(ReceitaInsumo.insumo_id.in_(insumo_ids)).delete(synchronize_session=False)
         
-        # PASSO 2: Deletar os insumos
+        # PASSO 2: Liberar códigos dos insumos que serão deletados
+        # Buscar códigos dos insumos a serem removidos
+        insumos_a_remover = db.query(Insumo).filter(Insumo.id.in_(insumo_ids)).all()
+        codigos_a_liberar = []
+        restaurante_ids_affected = set()
+        
+        for insumo in insumos_a_remover:
+            if insumo.codigo and insumo.restaurante_id:
+                try:
+                    codigo_int = int(insumo.codigo)
+                    codigos_a_liberar.append((insumo.restaurante_id, codigo_int))
+                    restaurante_ids_affected.add(insumo.restaurante_id)
+                except (ValueError, TypeError):
+                    continue
+        
+        # Importar modelo CodigoDisponivel
+        from app.models.codigo_disponivel import CodigoDisponivel
+        
+        # Liberar códigos (marcar como disponível novamente)
+        for rest_id, codigo in codigos_a_liberar:
+            db.query(CodigoDisponivel).filter(
+                CodigoDisponivel.restaurante_id == rest_id,
+                CodigoDisponivel.codigo == codigo,
+                CodigoDisponivel.tipo == 'insumo'
+            ).update(
+                {
+                    'disponivel': True,
+                    'usado_em': None
+                },
+                synchronize_session=False
+            )
+        
+        # PASSO 3: Deletar os insumos
         db.query(Insumo).filter(Insumo.id.in_(insumo_ids)).delete(synchronize_session=False)
         
         # Commit das alterações
@@ -322,7 +386,17 @@ def limpar_restaurantes(
         # PASSO 4: Deletar insumos dos restaurantes
         db.query(Insumo).filter(Insumo.restaurante_id.in_(restaurante_ids)).delete(synchronize_session=False)
         
-        # PASSO 5: Deletar os restaurantes
+        # PASSO 5: Liberar TODOS os códigos dos restaurantes que serão removidos
+        # Importar modelo CodigoDisponivel
+        from app.models.codigo_disponivel import CodigoDisponivel
+        
+        # Deletar todos os códigos dos restaurantes (CASCADE já cuida disso via FK)
+        # Mas vamos fazer explicitamente para garantir
+        db.query(CodigoDisponivel).filter(
+            CodigoDisponivel.restaurante_id.in_(restaurante_ids)
+        ).delete(synchronize_session=False)
+        
+        # PASSO 6: Deletar os restaurantes
         db.query(Restaurante).filter(Restaurante.id.in_(restaurante_ids)).delete(synchronize_session=False)
         
         # Commit das alterações

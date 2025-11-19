@@ -128,13 +128,32 @@ def extrair_dados_linha(row, colunas_mapeadas: Dict[str, int]) -> Dict[str, Any]
     if not isinstance(row, (list, tuple)):
         row = list(row)
     
-    # Extrair código
+    # ====================================================================
+    # Extrair código - LIMPAR formato decimal do Excel (5228.0 -> 5228)
+    # ====================================================================
     if 'codigo' in colunas_mapeadas:
         idx = colunas_mapeadas['codigo']
         if idx < len(row):
             codigo_cell = row[idx]
             valor = codigo_cell.value if hasattr(codigo_cell, 'value') else codigo_cell
-            dados['codigo'] = str(valor).strip() if valor else None
+            if valor:
+                codigo_str = str(valor).strip()
+                # Se o código é numérico com .0, remover o decimal
+                if '.' in codigo_str:
+                    try:
+                        # Tentar converter para float e depois para int
+                        codigo_float = float(codigo_str)
+                        # Se é um número inteiro (ex: 5228.0), converter para int
+                        if codigo_float == int(codigo_float):
+                            dados['codigo'] = str(int(codigo_float))
+                        else:
+                            dados['codigo'] = codigo_str
+                    except (ValueError, TypeError):
+                        dados['codigo'] = codigo_str
+                else:
+                    dados['codigo'] = codigo_str
+            else:
+                dados['codigo'] = None
     
     # Extrair nome
     if 'nome' in colunas_mapeadas:
@@ -428,168 +447,211 @@ class ImportacaoService:
             linha_dados_inicial = linha_cabecalho + 1
             total_linhas = ws.max_row - linha_cabecalho
 
+            logger.info(f"🚀 Iniciando processamento de {total_linhas} linhas a partir da linha {linha_dados_inicial}")
+
             for row_num, row in enumerate(
                 ws.iter_rows(min_row=linha_dados_inicial),
                 start=linha_dados_inicial
             ):
-                # Extrair dados
-                dados = extrair_dados_linha(row, colunas_mapeadas)
-                
-                # ========================================================================
-                # VERIFICAÇÃO 1: Ignorar linhas de cabeçalho de grupo (ex: "Grupo: DP")
-                # ========================================================================
-                codigo_valor = dados.get('codigo', '')
-                if codigo_valor and str(codigo_valor).strip().upper().startswith('GRUPO'):
-                    log.ignorados.append(ItemLog(
-                        linha=row_num,
-                        tipo="ignorado",
-                        mensagem="Linha de cabeçalho de grupo",
-                        dados={'codigo': codigo_valor}
-                    ))
-                    continue
-                
-                # ========================================================================
-                # VERIFICAÇÃO 2: Ignorar linhas completamente vazias
-                # ========================================================================
-                tem_algum_valor = any(
-                    dados.get(campo) and str(dados.get(campo)).strip() not in ['', 'None', 'none']
-                    for campo in ['codigo', 'nome']
-                )
-                if not tem_algum_valor:
-                    log.ignorados.append(ItemLog(
-                        linha=row_num,
-                        tipo="ignorado",
-                        mensagem="Linha vazia",
-                        dados={}
-                    ))
-                    continue
-                
-                # ========================================================================
-                # VERIFICAÇÃO 3: Se não tem código mas tem nome, gerar código automático
-                # ========================================================================
-                # Se não tem código mas tem nome, gerar código automático
-                if (not dados.get('codigo') or str(dados.get('codigo')).strip() in ['', 'None', 'none']) and dados.get('nome'):
-                    # Gerar código baseado no nome + timestamp para garantir unicidade
-                    nome_limpo = ''.join(c for c in str(dados['nome'])[:12].upper() if c.isalnum())
-                    
-                    # Usar número da linha como diferenciador
-                    codigo_final = f"AUTO_{nome_limpo}_{row_num}"
-                    
-                    # Garantir que não existe (extra segurança)
-                    contador = 1
-                    while self.db.query(Insumo).filter(
-                        Insumo.codigo == codigo_final,
-                        Insumo.restaurante_id == restaurante_id
-                    ).first():
-                        codigo_final = f"AUTO_{nome_limpo}_{row_num}_{contador}"
-                        contador += 1
-                    
-                    dados['codigo'] = codigo_final
-                    logger.info(f"Linha {row_num}: Código gerado automaticamente: {codigo_final}")
-                
-                # ========================================================================
-                # FILTRO: Apenas códigos entre 5000 e 5999
-                # ========================================================================
                 try:
-                    codigo_str = str(dados.get('codigo', '')).strip()
-                    # Se começar com AUTO_, permitir (código gerado automaticamente)
-                    if not codigo_str.startswith('AUTO_'):
-                        codigo_numero = int(codigo_str)
-                        if codigo_numero < 5000 or codigo_numero > 5999:
-                            log.ignorados.append(ItemLog(
+                    # Log início do processamento da linha
+                    logger.info(f"🔄 Processando linha {row_num}")
+                    
+                    # Extrair dados
+                    dados = extrair_dados_linha(row, colunas_mapeadas)
+                    logger.info(f"📋 Dados extraídos linha {row_num}: {dados}")
+                    
+                    # VERIFICAÇÃO 1: Ignorar linhas de cabeçalho de grupo
+                    codigo_valor = dados.get('codigo', '')
+                    if codigo_valor and str(codigo_valor).strip().upper().startswith('GRUPO'):
+                        logger.info(f"⏭️ Ignorando linha {row_num}: cabeçalho de grupo")
+                        log.ignorados.append(ItemLog(
+                            linha=row_num,
+                            tipo="ignorado",
+                            mensagem="Linha de cabeçalho de grupo",
+                            dados={'codigo': codigo_valor}
+                        ))
+                        continue
+                    
+                    # VERIFICAÇÃO 2: Ignorar linhas completamente vazias
+                    tem_algum_valor = any(
+                        dados.get(campo) and str(dados.get(campo)).strip() not in ['', 'None', 'none']
+                        for campo in ['codigo', 'nome']
+                    )
+                    if not tem_algum_valor:
+                        logger.info(f"⏭️ Ignorando linha {row_num}: vazia")
+                        log.ignorados.append(ItemLog(
+                            linha=row_num,
+                            tipo="ignorado",
+                            mensagem="Linha vazia",
+                            dados={}
+                        ))
+                        continue
+                    
+                    # VERIFICAÇÃO 3: Gerar código automático se necessário
+                    if (not dados.get('codigo') or str(dados.get('codigo')).strip() in ['', 'None', 'none']) and dados.get('nome'):
+                        nome_limpo = ''.join(c for c in str(dados['nome'])[:12].upper() if c.isalnum())
+                        codigo_final = f"AUTO_{nome_limpo}_{row_num}"
+                        contador = 1
+                        while self.db.query(Insumo).filter(
+                            Insumo.codigo == codigo_final,
+                            Insumo.restaurante_id == restaurante_id
+                        ).first():
+                            codigo_final = f"AUTO_{nome_limpo}_{row_num}_{contador}"
+                            contador += 1
+                        dados['codigo'] = codigo_final
+                        logger.info(f"Linha {row_num}: Código gerado automaticamente: {codigo_final}")
+                    
+                    # FILTRO: Apenas códigos entre 5000 e 5999
+                    try:
+                        codigo_str = str(dados.get('codigo', '')).strip()
+                        if not codigo_str.startswith('AUTO_'):
+                            codigo_numero = int(codigo_str)
+                            if codigo_numero < 5000 or codigo_numero > 5999:
+                                log.ignorados.append(ItemLog(
+                                    linha=row_num,
+                                    tipo="ignorado",
+                                    mensagem=f"Código {dados['codigo']} fora da faixa permitida (5000-5999)",
+                                    dados=dados
+                                ))
+                                continue
+                    except (ValueError, TypeError):
+                        if not str(dados.get('codigo', '')).startswith('AUTO_'):
+                            log.erros.append(ItemLog(
                                 linha=row_num,
-                                tipo="ignorado",
-                                mensagem=f"Código {dados['codigo']} fora da faixa permitida (5000-5999)",
+                                tipo="erro",
+                                mensagem=f"Código inválido: {dados.get('codigo')}",
                                 dados=dados
                             ))
                             continue
-                except (ValueError, TypeError):
-                    # Se não conseguir converter para int e não for AUTO_, é erro
-                    if not str(dados.get('codigo', '')).startswith('AUTO_'):
+                    
+                    # Validar dados
+                    valido, erro = validar_dados_linha(dados, row_num)
+                    if not valido:
                         log.erros.append(ItemLog(
                             linha=row_num,
                             tipo="erro",
-                            mensagem=f"Código inválido: {dados.get('codigo')}",
+                            mensagem=erro,
                             dados=dados
                         ))
                         continue
-                
-                # Validar dados
-                valido, erro = validar_dados_linha(dados, row_num)
-                
-                if not valido:
+                    
+                    # ====================================================================
+                    # IMPORTANTE: Limpar cache do SQLAlchemy antes de verificar duplicados
+                    # Isso garante que após uma limpeza de insumos, a verificação
+                    # consulta dados frescos do banco, não do cache da sessão
+                    # ====================================================================
+                    self.db.flush()
+                    self.db.expire_all()
+
+                    # Verificar se insumo já existe (consulta fresca no banco)
+                    insumo_existente = self.db.query(Insumo).filter(
+                        Insumo.restaurante_id == restaurante_id,
+                        Insumo.codigo == dados['codigo']
+                    ).first()
+
+                    if insumo_existente:
+                        log.ignorados.append(ItemLog(
+                            linha=row_num,
+                            tipo="ignorado",
+                            mensagem=f"Insumo com código {dados['codigo']} já existe",
+                            dados=dados
+                        ))
+                        logger.info(f"⏭️ Pulando linha {row_num}: código {dados['codigo']} duplicado")
+                        continue
+                    
+                    # ================================================================
+                    # CRIAR INSUMO NO BANCO DE DADOS
+                    # ================================================================
+                    try:
+                        logger.info(f"🆕 Tentando criar insumo linha {row_num}")
+                        
+                        # Preparar quantidade
+                        quantidade = dados.get('quantidade', 1)
+                        if quantidade is None or quantidade == 0:
+                            quantidade = 1
+                        
+                        # Preparar preço
+                        preco_real = dados.get('preco_unitario', dados.get('preco_compra_real', 0)) or 0
+                        preco_centavos = int(float(preco_real) * 100) if preco_real else 0
+                        
+                        logger.info(f"📦 Valores preparados - codigo: {dados.get('codigo')}, nome: {dados.get('nome')}, qtd: {quantidade}, preco_centavos: {preco_centavos}")
+                        
+                        # Criar objeto Insumo
+                        novo_insumo = Insumo(
+                            restaurante_id=restaurante_id,
+                            importacao_id=importacao_id,
+                            codigo=dados['codigo'],
+                            nome=dados['nome'],
+                            quantidade=float(quantidade),
+                            unidade=dados['unidade'],
+                            preco_compra=preco_centavos,
+                            grupo='',
+                            subgrupo='',
+                            eh_fornecedor_anonimo=True,
+                            aguardando_classificacao=False
+                        )
+                        
+                        logger.info(f"➕ Adicionando insumo ao banco: {dados['codigo']} - {dados['nome']}")
+                        self.db.add(novo_insumo)
+                        self.db.flush()  # Força commit imediato para detectar erros
+                        logger.info(f"✅ Insumo linha {row_num} adicionado com sucesso ao banco")
+                        
+                        log.sucessos.append(ItemLog(
+                            linha=row_num,
+                            tipo="sucesso",
+                            mensagem=f"Insumo '{dados['nome']}' importado",
+                            dados=dados
+                        ))
+                        
+                    except Exception as e_create:
+                        # Log detalhado de erro na criação
+                        import traceback
+                        logger.error(f"❌ ERRO ao criar insumo linha {row_num}")
+                        logger.error(f"   Código: {dados.get('codigo')}")
+                        logger.error(f"   Nome: {dados.get('nome')}")
+                        logger.error(f"   Erro: {str(e_create)}")
+                        logger.error(f"   Tipo: {type(e_create).__name__}")
+                        logger.error(f"   Traceback: {traceback.format_exc()}")
+                        
+                        log.erros.append(ItemLog(
+                            linha=row_num,
+                            tipo="erro",
+                            mensagem=f"Erro ao criar insumo: {str(e_create)}",
+                            dados=dados
+                        ))
+                        
+                        # Rollback desta transação específica
+                        self.db.rollback()
+                        continue
+                    
+                except Exception as e_linha:
+                    import traceback
+                    logger.error(f"❌ ERRO linha {row_num}: {str(e_linha)}")
+                    logger.error(f"   Traceback:\n{traceback.format_exc()}")
+                    logger.error(f"   Dados: {dados if 'dados' in locals() else 'N/A'}")
+                    
                     log.erros.append(ItemLog(
                         linha=row_num,
                         tipo="erro",
-                        mensagem=erro,
-                        dados=dados
-                    ))
-                    continue
-                
-                # Verificar se insumo já existe
-                insumo_existente = self.db.query(Insumo).filter(
-                    Insumo.restaurante_id == restaurante_id,
-                    Insumo.codigo == dados['codigo']
-                ).first()
-                
-                if insumo_existente:
-                    log.ignorados.append(ItemLog(
-                        linha=row_num,
-                        tipo="ignorado",
-                        mensagem=f"Insumo com código {dados['codigo']} já existe",
-                        dados=dados
-                    ))
-                    continue
-                
-                # Criar insumo
-                try:
-                    novo_insumo = Insumo(
-                        restaurante_id=restaurante_id,
-                        importacao_id=importacao_id,
-                        codigo=dados['codigo'],
-                        nome=dados['nome'],
-                        quantidade=dados.get('quantidade', 1),
-                        unidade=dados['unidade'],
-                        preco_compra=int(dados.get('preco_compra_real', 0) * 100),
-                        grupo=dados.get('grupo', ''),
-                        subgrupo='',
-                        eh_fornecedor_anonimo=True,
-                        aguardando_classificacao=False
-                    )
-                    
-                    self.db.add(novo_insumo)
-                    
-                    log.sucessos.append(ItemLog(
-                        linha=row_num,
-                        tipo="sucesso",
-                        mensagem=f"Insumo '{dados['nome']}' importado com sucesso",
-                        dados=dados
-                    ))
-                    
-                except Exception as e:
-                    log.erros.append(ItemLog(
-                        linha=row_num,
-                        tipo="erro",
-                        mensagem=f"Erro ao criar insumo: {str(e)}",
-                        dados=dados
-                    ))
-                
-                except Exception as e:
-                    log.erros.append(ItemLog(
-                        linha=row_num,
-                        tipo="erro",
-                        mensagem=f"Erro ao criar insumo: {str(e)}",
-                        dados=dados
+                        mensagem=f"Erro: {str(e_linha)}",
+                        dados=dados if 'dados' in locals() else {}
                     ))
 
-            # ADICIONAR AQUI: Commit a cada 100 linhas para não perder tudo
-            if len(log.sucessos) % 100 == 0 and len(log.sucessos) > 0:
-                try:
-                    self.db.commit()
-                    logger.info(f"✓ Commit parcial: {len(log.sucessos)} insumos salvos")
-                except Exception as e:
-                    logger.error(f"Erro no commit parcial: {e}")
-                    self.db.rollback()
+                # ============================================================
+                # COMMIT EM LOTE - A cada 50 sucessos, salvar no banco
+                # ============================================================
+                if len(log.sucessos) > 0 and len(log.sucessos) % 50 == 0:
+                    try:
+                        self.db.commit()
+                        logger.info(f"💾 Commit em lote: {len(log.sucessos)} insumos salvos no banco")
+                    except Exception as e_commit:
+                        logger.error(f"❌ Erro no commit em lote: {str(e_commit)}")
+                        self.db.rollback()
+                
+                # Log de progresso a cada 50 linhas processadas
+                if row_num % 50 == 0:
+                    logger.info(f"📊 Progresso linha {row_num} - Sucessos: {len(log.sucessos)}, Erros: {len(log.erros)}, Ignorados: {len(log.ignorados)}")
 
             wb.close()
 

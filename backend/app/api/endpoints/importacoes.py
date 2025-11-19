@@ -233,7 +233,8 @@ async def processar_importacao(
     service = ImportacaoService(db)
     sucesso, mensagem = service.processar_importacao(
         importacao.id,
-        importacao.restaurante_id
+        importacao.restaurante_id,
+        mapeamento_customizado=confirmacao.mapeamento_colunas
     )
     
     if not sucesso:

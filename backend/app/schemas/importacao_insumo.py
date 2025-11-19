@@ -233,6 +233,10 @@ class ConfirmacaoImportacao(BaseModel):
     """
     importacao_id: int = Field(description="ID da importação pendente", gt=0)
     confirmar: bool = Field(description="True para confirmar e processar")
+    mapeamento_colunas: Optional[Dict[str, str]] = Field(
+        None,
+        description="Mapeamento de colunas do Excel para campos do sistema"
+    )
     observacoes: Optional[str] = Field(
         None,
         description="Observações adicionais",

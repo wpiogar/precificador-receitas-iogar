@@ -42,6 +42,8 @@ import {
 import ClassificadorIA from './components/ClassificadorIA.tsx';
 import PopupClassificacaoIA from './components/PopupClassificacaoIA.tsx';
 
+import ModalSelecaoImportacao from './components/ModalSelecaoImportacao.tsx';
+
 // Importar gerenciador de permissões
 import PermissionsManager from './components/PermissionsManager.tsx';
 
@@ -1997,6 +1999,13 @@ const FoodCostSystem: React.FC = () => {
   });
 
   const [mostrarImportacao, setMostrarImportacao] = useState(false);
+  // Estado para modal de seleção de tipo de importação
+  const [mostrarModalSelecaoImportacao, setMostrarModalSelecaoImportacao] = useState(false);
+  const [tipoImportacaoSelecionado, setTipoImportacaoSelecionado] = useState<{
+    tipo: 'insumos' | 'receitas';
+    restauranteId: number | null;
+    isGlobal: boolean;
+  } | null>(null);
 
   // ============================================================================
   // ESTADOS - GERENCIAMENTO DE USUÁRIOS (ADMIN)
@@ -3578,7 +3587,7 @@ const fetchInsumos = async () => {
                 Importação de arquivos CSV/SQL
               </p>
               <button 
-                  onClick={() => setMostrarImportacao(true)}
+                  onClick={() => setMostrarModalSelecaoImportacao(true)}
                   className="w-full py-2 px-4 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors">
                     Importar
                   </button>
@@ -10407,7 +10416,7 @@ return (  //RETORN DO COMPONENTE PRINCIPAL
                     Importação de arquivos CSV/SQL
                   </p>
                   <button 
-                  onClick={() => setMostrarImportacao(true)}
+                  onClick={() => setMostrarModalSelecaoImportacao(true)}
                   className="w-full py-2 px-4 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors">
                     Importar
                   </button>
@@ -10849,7 +10858,7 @@ return (  //RETORN DO COMPONENTE PRINCIPAL
                     {/* ABA LIMPEZA DE DADOS - APENAS ADMIN */}
                     {/* ============================================================================ */}
                     {activeConfigTab === 'limpeza-dados' && user?.role === 'ADMIN' && (
-                      <LimpezaDados />
+                      <LimpezaDados selectedRestaurante={selectedRestaurante} />
                     )}
                   </div>
                 </div>
@@ -11152,16 +11161,56 @@ return (  //RETORN DO COMPONENTE PRINCIPAL
       )}
 
       {/* Modal de Importação de Insumos */}
-      {mostrarImportacao && (
+      {mostrarImportacao && tipoImportacaoSelecionado && (
         <ImportacaoInsumos
-          restauranteId={selectedRestaurante?.id || 1}  // ✅ CORRETO
-          onClose={() => setMostrarImportacao(false)}
-          onSuccess={() => setMostrarImportacao(false)}
+          restauranteId={
+            tipoImportacaoSelecionado.isGlobal 
+              ? null 
+              : (tipoImportacaoSelecionado.restauranteId || selectedRestaurante?.id || null)
+          }
+          onClose={() => {
+            setMostrarImportacao(false);
+            setTipoImportacaoSelecionado(null);
+          }}
+          onSuccess={() => {
+            setMostrarImportacao(false);
+            setTipoImportacaoSelecionado(null);
+          }}
         />
       )}
+      {/* Modal de Seleção de Tipo de Importação */}
+      {mostrarModalSelecaoImportacao && (
+        <ModalSelecaoImportacao
+          onClose={() => setMostrarModalSelecaoImportacao(false)}
+          onSelectInsumos={(restauranteId, isGlobal) => {
+            setTipoImportacaoSelecionado({
+              tipo: 'insumos',
+              restauranteId,
+              isGlobal
+            });
+            setMostrarModalSelecaoImportacao(false);
+            setMostrarImportacao(true);
+          }}
+          onSelectReceitas={(restauranteId) => {
+            setTipoImportacaoSelecionado({
+              tipo: 'receitas',
+              restauranteId,
+              isGlobal: false
+            });
+            setMostrarModalSelecaoImportacao(false);
+            // TODO: Abrir modal de importação de receitas quando implementado
+            alert('Modal de importação de receitas será implementado em breve!');
+          }}
+          restauranteSelecionado={selectedRestaurante}
+          restaurantesDisponiveis={restaurantes}
+          userRole={user?.role || ''}
+        />
+      )}
+
     </div>
     </>
   );
 };
+
 // FINAL DO RETURN DO COMPONENTE PRINCIPAL
 export default FoodCostSystem;

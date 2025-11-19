@@ -899,11 +899,12 @@ async updateReceita(id: number, receita: any): Promise<ApiResponse<any>> {
   }
 
   // Limpar restaurantes
-  async limparRestaurantes(manterPrimeiro: boolean = true): Promise<ApiResponse<any>> {
-    return this.request<any>(
-      `/api/v1/limpeza-dados/restaurantes?manter_primeiro=${manterPrimeiro}`,
-      { method: 'DELETE' }
-    );
+  async limparRestaurantes(manterPrimeiro: boolean = true, restauranteId?: number): Promise<ApiResponse<any>> {
+    let url = `/api/v1/limpeza-dados/restaurantes?manter_primeiro=${manterPrimeiro}`;
+    if (restauranteId) {
+      url += `&restaurante_id=${restauranteId}`;
+    }
+    return this.request<any>(url, { method: 'DELETE' });
   }
 
   // Limpar tudo (reset completo)

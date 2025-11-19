@@ -52,10 +52,21 @@ interface ResultadoLimpeza {
 }
 
 // ============================================================================
+// PROPS DO COMPONENTE
+// ============================================================================
+
+interface LimpezaDadosProps {
+  selectedRestaurante: {
+    id: number;
+    nome: string;
+  } | null;
+}
+
+// ============================================================================
 // COMPONENTE PRINCIPAL
 // ============================================================================
 
-const LimpezaDados: React.FC = () => {
+const LimpezaDados: React.FC<LimpezaDadosProps> = ({ selectedRestaurante }) => {
   // Estados
   const [estatisticas, setEstatisticas] = useState<Estatisticas | null>(null);
   const [loading, setLoading] = useState(false);
@@ -71,6 +82,11 @@ const LimpezaDados: React.FC = () => {
   
   // Filtros
   const [filtros, setFiltros] = useState<FiltroLimpeza>({});
+
+  // Estados para modal de selecao de restaurante
+  const [mostrarModalRestaurante, setMostrarModalRestaurante] = useState(false);
+  const [restaurantes, setRestaurantes] = useState<Array<{ id: number; nome: string }>>([]);
+  const [restauranteSelecionadoModal, setRestauranteSelecionadoModal] = useState<number | 'todos'>('todos');
 
   // ============================================================================
   // CARREGAR ESTATISTICAS
@@ -98,19 +114,76 @@ const LimpezaDados: React.FC = () => {
   };
 
   // ============================================================================
+  // CARREGAR LISTA DE RESTAURANTES
+  // ============================================================================
+
+  const carregarRestaurantes = async () => {
+    try {
+      // Usar apiService para manter consistência
+      const response = await apiService.getRestaurantesGrid();
+      
+      if (response.data) {
+        // Extrair apenas id e nome para o modal
+        const restaurantesSimples = response.data.map((r: any) => ({
+          id: r.id,
+          nome: r.nome
+        }));
+        setRestaurantes(restaurantesSimples);
+        console.log('✅ Restaurantes carregados:', restaurantesSimples);
+      } else if (response.error) {
+        console.error('Erro ao carregar restaurantes:', response.error);
+        setRestaurantes([]);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar restaurantes:', error);
+      setRestaurantes([]);
+    }
+  };
+
+  // ============================================================================
   // FUNCOES DE LIMPEZA
   // ============================================================================
 
   const iniciarLimpeza = (secao: string) => {
     setAcaoSelecionada(secao);
+    setResultados([]);
+    
+    // Se for limpeza de receitas, insumos ou restaurantes e NAO houver restaurante selecionado
+    if ((secao === 'receitas' || secao === 'insumos' || secao === 'restaurantes') && !selectedRestaurante) {
+      // Carregar lista de restaurantes e mostrar modal de selecao
+      carregarRestaurantes();
+      setMostrarModalRestaurante(true);
+      setRestauranteSelecionadoModal('todos');
+    } else {
+      // Se houver restaurante selecionado ou for outra secao, ir direto para confirmacao
+      setMostrarConfirmacao(true);
+      setConfirmacaoTexto('');
+    }
+  };
+
+  // ============================================================================
+  // CONFIRMAR SELECAO DE RESTAURANTE NO MODAL
+  // ============================================================================
+
+  const confirmarSelecaoRestaurante = () => {
+    // Fechar modal de selecao de restaurante
+    setMostrarModalRestaurante(false);
+    
+    // Configurar filtros baseado na selecao
+    if (restauranteSelecionadoModal !== 'todos') {
+      setFiltros({ restaurante_id: restauranteSelecionadoModal as number });
+    } else {
+      setFiltros({});
+    }
+    
+    // Mostrar modal de confirmacao
     setMostrarConfirmacao(true);
     setConfirmacaoTexto('');
-    setResultados([]);
   };
 
   const confirmarLimpeza = async () => {
-    // Validar confirmacao para limpeza total
-    if (acaoSelecionada === 'limpar-tudo' && confirmacaoTexto !== 'CONFIRMAR LIMPEZA TOTAL') {
+    // Validar confirmacao para limpeza total APENAS se NAO houver restaurante selecionado
+    if (acaoSelecionada === 'limpar-tudo' && !selectedRestaurante && confirmacaoTexto !== 'CONFIRMAR LIMPEZA TOTAL') {
       setErroTitulo('Confirmação Incorreta');
       setErroMensagem('Digite exatamente: CONFIRMAR LIMPEZA TOTAL');
       setMostrarErro(true);
@@ -123,22 +196,57 @@ const LimpezaDados: React.FC = () => {
     try {
       let response;
       
+      // Preparar filtros com base no restaurante selecionado
+      let filtrosParaEnviar = { ...filtros };
+      
+      // Se houver restaurante selecionado no menu, adicionar ao filtro
+      if (selectedRestaurante && (acaoSelecionada === 'receitas' || acaoSelecionada === 'insumos' || acaoSelecionada === 'restaurantes')) {
+        filtrosParaEnviar.restaurante_id = selectedRestaurante.id;
+      }
+      
       // Executar ação conforme seleção
       switch (acaoSelecionada) {
         case 'receitas':
-          response = await apiService.limparReceitas(Object.keys(filtros).length > 0 ? filtros : undefined);
+          response = await apiService.limparReceitas(Object.keys(filtrosParaEnviar).length > 0 ? filtrosParaEnviar : undefined);
           break;
         case 'insumos':
-          response = await apiService.limparInsumos(Object.keys(filtros).length > 0 ? filtros : undefined);
+          response = await apiService.limparInsumos(Object.keys(filtrosParaEnviar).length > 0 ? filtrosParaEnviar : undefined);
           break;
         case 'fornecedores':
           response = await apiService.limparFornecedores();
           break;
         case 'restaurantes':
-          response = await apiService.limparRestaurantes(true);
+          // Se houver filtro de restaurante, enviar; senão, manter ID 1
+          if (Object.keys(filtrosParaEnviar).length > 0 && filtrosParaEnviar.restaurante_id) {
+            response = await apiService.limparRestaurantes(false, filtrosParaEnviar.restaurante_id);
+          } else {
+            response = await apiService.limparRestaurantes(true);
+          }
           break;
         case 'limpar-tudo':
-          response = await apiService.limparTudo('CONFIRMAR LIMPEZA TOTAL');
+          // Se houver restaurante selecionado, limpar apenas dados desse restaurante
+          if (selectedRestaurante) {
+            // Limpar em sequência: receitas, insumos e o restaurante
+            const resultadosLimpezaRestaurante: ResultadoLimpeza[] = [];
+            
+            // 1. Limpar receitas do restaurante
+            const resReceitas = await apiService.limparReceitas({ restaurante_id: selectedRestaurante.id });
+            if (resReceitas.data) resultadosLimpezaRestaurante.push(resReceitas.data);
+            
+            // 2. Limpar insumos do restaurante
+            const resInsumos = await apiService.limparInsumos({ restaurante_id: selectedRestaurante.id });
+            if (resInsumos.data) resultadosLimpezaRestaurante.push(resInsumos.data);
+            
+            // 3. Limpar o restaurante
+            const resRestaurante = await apiService.limparRestaurantes(false, selectedRestaurante.id);
+            if (resRestaurante.data) resultadosLimpezaRestaurante.push(resRestaurante.data);
+            
+            // Criar resposta consolidada
+            response = { data: resultadosLimpezaRestaurante, error: null };
+          } else {
+            // Limpeza total do sistema
+            response = await apiService.limparTudo('CONFIRMAR LIMPEZA TOTAL');
+          }
           break;
         default:
           throw new Error('Ação inválida');
@@ -171,8 +279,11 @@ const LimpezaDados: React.FC = () => {
 
   const cancelarLimpeza = () => {
     setMostrarConfirmacao(false);
+    setMostrarModalRestaurante(false);
     setAcaoSelecionada('');
     setConfirmacaoTexto('');
+    setFiltros({});
+    setRestauranteSelecionadoModal('todos');
   };
 
   // ============================================================================
@@ -246,21 +357,31 @@ const LimpezaDados: React.FC = () => {
         {/* Receitas */}
         <SecaoLimpeza
           titulo="Receitas"
-          descricao="Remove receitas e seus vínculos com insumos"
+          descricao={
+            selectedRestaurante 
+              ? `Remove receitas de: ${selectedRestaurante.nome}`
+              : "Remove receitas e seus vínculos com insumos"
+          }
           icone={ShoppingCart}
           cor="blue"
           onLimpar={() => iniciarLimpeza('receitas')}
           total={estatisticas?.total_receitas || 0}
+          restauranteInfo={selectedRestaurante ? selectedRestaurante.nome : null}
         />
 
         {/* Insumos */}
         <SecaoLimpeza
           titulo="Insumos"
-          descricao="Remove insumos do sistema"
+          descricao={
+            selectedRestaurante 
+              ? `Remove insumos de: ${selectedRestaurante.nome}`
+              : "Remove insumos do sistema"
+          }
           icone={Package}
           cor="green"
           onLimpar={() => iniciarLimpeza('insumos')}
           total={estatisticas?.total_insumos || 0}
+          restauranteInfo={selectedRestaurante ? selectedRestaurante.nome : null}
         />
 
         {/* Fornecedores */}
@@ -276,36 +397,71 @@ const LimpezaDados: React.FC = () => {
         {/* Restaurantes */}
         <SecaoLimpeza
           titulo="Restaurantes"
-          descricao="Remove restaurantes (mantém ID 1)"
+          descricao={
+            selectedRestaurante 
+              ? `Remove restaurante: ${selectedRestaurante.nome}`
+              : "Remove restaurantes (mantém ID 1)"
+          }
           icone={Building}
           cor="orange"
           onLimpar={() => iniciarLimpeza('restaurantes')}
           total={estatisticas?.total_restaurantes || 0}
+          restauranteInfo={selectedRestaurante ? selectedRestaurante.nome : null}
         />
       </div>
 
-      {/* Limpeza Total */}
-      <div className="bg-red-50 border-2 border-red-300 rounded-xl p-6">
+      {/* Limpeza Total do Sistema ou Limpeza do Restaurante */}
+      <div className={`border-2 rounded-xl p-6 ${
+        selectedRestaurante 
+          ? 'bg-orange-50 border-orange-300' 
+          : 'bg-red-50 border-red-300'
+      }`}>
         <div className="flex items-start gap-4">
-          <AlertTriangle className="w-8 h-8 text-red-600 flex-shrink-0" />
+          <AlertTriangle className={`w-8 h-8 flex-shrink-0 ${
+            selectedRestaurante ? 'text-orange-600' : 'text-red-600'
+          }`} />
           <div className="flex-1">
-            <h3 className="text-xl font-bold text-red-900 mb-2">
-              Limpeza Total do Sistema
-            </h3>
-            <p className="text-red-700 mb-4">
-              Remove TODOS os dados do sistema (receitas, insumos, fornecedores, restaurantes, 
-              taxonomias e usuários). Apenas o usuário ADMIN atual e o restaurante ID 1 serão mantidos.
-            </p>
-            <button
-              onClick={() => iniciarLimpeza('limpar-tudo')}
-              disabled={loading}
-              className="px-6 py-3 bg-red-600 text-white font-semibold rounded-lg 
-                       hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed
-                       transition-colors flex items-center gap-2"
-            >
-              <Trash2 className="w-5 h-5" />
-              Limpar Tudo
-            </button>
+            {selectedRestaurante ? (
+              <>
+                <h3 className="text-xl font-bold text-orange-900 mb-2">
+                  Limpeza Total do Restaurante: {selectedRestaurante.nome}
+                </h3>
+                <p className="text-orange-700 mb-4">
+                  Remove TODOS os dados deste restaurante (receitas, insumos e o próprio restaurante). 
+                  Esta ação é IRREVERSÍVEL!
+                </p>
+                <button
+                  onClick={() => iniciarLimpeza('limpar-tudo')}
+                  disabled={loading}
+                  className="px-6 py-3 bg-orange-600 text-white font-semibold rounded-lg 
+                           hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed
+                           transition-colors flex items-center gap-2"
+                >
+                  <Trash2 className="w-5 h-5" />
+                  Limpar Restaurante Completo
+                </button>
+              </>
+            ) : (
+              <>
+                <h3 className="text-xl font-bold text-red-900 mb-2">
+                  Limpeza Total do Sistema
+                </h3>
+                <p className="text-red-700 mb-4">
+                  Remove TODOS os dados do sistema (receitas, insumos, fornecedores, restaurantes, 
+                  taxonomias e usuários). Apenas o usuário ADMIN atual e o restaurante ID 1 serão mantidos.
+                </p>
+                <button
+                  onClick={() => iniciarLimpeza('limpar-tudo')}
+                  disabled={loading}
+                  className="px-6 py-3 bg-red-600 text-white font-semibold rounded-lg 
+                           hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed
+                           transition-colors flex items-center gap-2"
+                >
+                  <Trash2 className="w-5 h-5" />
+                  Limpar Tudo
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -370,14 +526,40 @@ const LimpezaDados: React.FC = () => {
                   Confirmar Limpeza
                 </h3>
                 <p className="text-gray-600">
-                  {acaoSelecionada === 'limpar-tudo'
+                  {acaoSelecionada === 'limpar-tudo' && selectedRestaurante
+                    ? `Você está prestes a APAGAR TODOS OS DADOS do restaurante "${selectedRestaurante.nome}". Esta ação é IRREVERSÍVEL!`
+                    : acaoSelecionada === 'limpar-tudo'
                     ? 'Você está prestes a APAGAR TODOS OS DADOS do sistema. Esta ação é IRREVERSÍVEL!'
                     : `Você está prestes a remover dados de: ${acaoSelecionada}. Esta ação é IRREVERSÍVEL!`}
                 </p>
+                
+                {/* Mostrar informacao do restaurante se houver filtro ou restaurante selecionado */}
+                {(selectedRestaurante || filtros.restaurante_id) && (acaoSelecionada === 'receitas' || acaoSelecionada === 'insumos' || acaoSelecionada === 'restaurantes') && (
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      <strong>Restaurante:</strong>{' '}
+                      {selectedRestaurante 
+                        ? selectedRestaurante.nome 
+                        : restaurantes.find(r => r.id === filtros.restaurante_id)?.nome || 'Selecionado'}
+                    </p>
+                    <p className="text-xs text-blue-600 mt-1">
+                      Apenas os dados deste restaurante serão removidos
+                    </p>
+                  </div>
+                )}
+                
+                {/* Mostrar aviso se for limpar TODOS os restaurantes */}
+                {!selectedRestaurante && !filtros.restaurante_id && (acaoSelecionada === 'receitas' || acaoSelecionada === 'insumos') && (
+                  <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                    <p className="text-sm text-orange-800 font-semibold">
+                      Atenção: Dados de TODOS os restaurantes serão removidos
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
-            {acaoSelecionada === 'limpar-tudo' && (
+            {acaoSelecionada === 'limpar-tudo' && !selectedRestaurante && (
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Digite: <span className="font-mono text-red-600">CONFIRMAR LIMPEZA TOTAL</span>
@@ -455,6 +637,105 @@ const LimpezaDados: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Modal de Selecao de Restaurante */}
+      {mostrarModalRestaurante && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6">
+            {/* Header */}
+            <div className="flex items-start gap-4 mb-6">
+              <div className="bg-gradient-to-r from-green-500 to-pink-500 p-3 rounded-lg">
+                <Building className="w-6 h-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  Selecione o Restaurante
+                </h3>
+                <p className="text-gray-600 text-sm">
+                  Escolha de qual restaurante deseja limpar os dados, ou selecione "Todos" para limpar de todos os restaurantes.
+                </p>
+              </div>
+            </div>
+
+            {/* Selecao de Restaurante */}
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-gray-700 mb-3">
+                Restaurante:
+              </label>
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {/* Opcao: Todos */}
+                <label className="flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-gray-50">
+                  <input
+                    type="radio"
+                    name="restaurante"
+                    value="todos"
+                    checked={restauranteSelecionadoModal === 'todos'}
+                    onChange={() => setRestauranteSelecionadoModal('todos')}
+                    className="w-5 h-5 text-blue-600"
+                  />
+                  <div className="flex-1">
+                    <span className="font-semibold text-gray-900">Todos os Restaurantes</span>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Limpar dados de todos os restaurantes do sistema
+                    </p>
+                  </div>
+                </label>
+
+                {/* Mensagem se não houver restaurantes */}
+                {restaurantes.length === 0 && (
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800">
+                      Nenhum restaurante cadastrado no sistema
+                    </p>
+                  </div>
+                )}
+
+                {/* Lista de Restaurantes */}
+                {restaurantes.map((rest) => (
+                  <label
+                    key={rest.id}
+                    className="flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-gray-50"
+                  >
+                    <input
+                      type="radio"
+                      name="restaurante"
+                      value={rest.id}
+                      checked={restauranteSelecionadoModal === rest.id}
+                      onChange={() => setRestauranteSelecionadoModal(rest.id)}
+                      className="w-5 h-5 text-blue-600"
+                    />
+                    <div className="flex-1">
+                      <span className="font-semibold text-gray-900">{rest.nome}</span>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Limpar apenas dados deste restaurante
+                      </p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Botoes */}
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={cancelarLimpeza}
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg
+                         hover:bg-gray-50 transition-colors font-medium"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarSelecaoRestaurante}
+                className="px-6 py-2 bg-gradient-to-r from-green-600 to-pink-600 text-white 
+                         rounded-lg hover:shadow-lg transition-all font-medium"
+              >
+                Continuar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>             /* ← Fecha o container principal do componente */
   );
 };
@@ -498,6 +779,7 @@ interface SecaoLimpezaProps {
   cor: string;
   onLimpar: () => void;
   total: number;
+  restauranteInfo?: string | null;
 }
 
 const SecaoLimpeza: React.FC<SecaoLimpezaProps> = ({
@@ -507,6 +789,7 @@ const SecaoLimpeza: React.FC<SecaoLimpezaProps> = ({
   cor,
   onLimpar,
   total,
+  restauranteInfo,
 }) => {
   const cores = {
     blue: 'border-blue-200 hover:border-blue-300',
@@ -518,11 +801,18 @@ const SecaoLimpeza: React.FC<SecaoLimpezaProps> = ({
   return (
     <div className={`bg-white rounded-xl shadow-sm border-2 ${cores[cor]} p-6 transition-all`}>
       <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-1">
           <Icon className="w-6 h-6 text-gray-700" />
-          <div>
-            <h3 className="text-lg font-bold text-gray-900">{titulo}</h3>
-            <p className="text-sm text-gray-600">{descricao}</p>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-lg font-bold text-gray-900">{titulo}</h3>
+              {restauranteInfo && (
+                <span className="px-3 py-1 bg-gradient-to-r from-green-500 to-pink-500 text-white text-xs font-semibold rounded-full">
+                  {restauranteInfo}
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-gray-600 mt-1">{descricao}</p>
           </div>
         </div>
         <span className="text-xl font-bold text-gray-700">{total}</span>

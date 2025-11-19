@@ -268,6 +268,10 @@ def limpar_restaurantes(
         True, 
         description="Manter o primeiro restaurante (ID 1) para testes"
     ),
+    restaurante_id: Optional[int] = Query(
+        None,
+        description="ID específico do restaurante a ser removido"
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_admin_user)
 ):
@@ -286,8 +290,11 @@ def limpar_restaurantes(
         # Query base para restaurantes
         query_restaurantes = db.query(Restaurante)
         
-        # Opção de manter o primeiro restaurante
-        if manter_primeiro:
+        # Se foi especificado um restaurante_id, remover apenas ele
+        if restaurante_id:
+            query_restaurantes = query_restaurantes.filter(Restaurante.id == restaurante_id)
+        # Senão, opção de manter o primeiro restaurante
+        elif manter_primeiro:
             query_restaurantes = query_restaurantes.filter(Restaurante.id != 1)
         
         # Obter IDs dos restaurantes que serão deletados

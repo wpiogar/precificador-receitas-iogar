@@ -36,7 +36,7 @@ interface ResultadoImportacao {
   linhas_ignoradas: number;
 }
 
-type EtapaImportacao = 'upload' | 'preview' | 'processando' | 'concluido';
+type EtapaImportacao = 'upload' | 'preview' | 'mapeamento' | 'processando' | 'concluido';
 
 interface ImportacaoInsumosProps {
   restauranteId: number;
@@ -63,6 +63,24 @@ const ImportacaoInsumos: React.FC<ImportacaoInsumosProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [contador, setContador] = useState<number>(60);
   const [intervaloId, setIntervaloId] = useState<NodeJS.Timeout | null>(null);
+
+  // Estado para mapeamento de colunas
+  const [mapeamento, setMapeamento] = useState<{
+    [colunaExcel: string]: {
+      selecionada: boolean;
+      campoDestino: string;
+    }
+  }>({});
+
+  // Campos disponíveis no sistema
+  const camposDisponiveis = [
+    { value: 'nome', label: 'Nome do Insumo' },
+    { value: 'unidade', label: 'Unidade de Medida' },
+    { value: 'quantidade', label: 'Quantidade' },
+    { value: 'preco_unitario', label: 'Último Preço Praticado' },
+    { value: 'codigo', label: 'Código (Opcional)' },
+    { value: 'grupo', label: 'Categoria/Grupo (Opcional)' }
+  ];
 
 // Limpar intervalo ao desmontar componente
 useEffect(() => {
@@ -187,9 +205,38 @@ return () => {
     }
 
     const data = await response.json();
-      setImportacaoId(data.importacao_id);
-      setPreview(data.preview);
-      setEtapa('preview');
+    setImportacaoId(data.importacao_id);
+    setPreview(data.preview);
+
+    // Inicializar mapeamento automático
+    const mapeamentoInicial: typeof mapeamento = {};
+    data.preview.colunas_detectadas.forEach((coluna: string) => {
+      // Tentar mapear automaticamente
+      const colunaLower = coluna.toLowerCase();
+      let campoAuto = '';
+      
+      if (colunaLower.includes('nome') || colunaLower.includes('produto') || colunaLower.includes('descri')) {
+        campoAuto = 'nome';
+      } else if (colunaLower.includes('unid')) {
+        campoAuto = 'unidade';
+      } else if (colunaLower.includes('qtd') || colunaLower.includes('quantidade') || colunaLower.includes('estoque')) {
+        campoAuto = 'quantidade';
+      } else if (colunaLower.includes('prec') || colunaLower.includes('valor') || colunaLower.includes('custo')) {
+        campoAuto = 'preco_unitario';
+      } else if (colunaLower.includes('cod') || colunaLower.includes('ean')) {
+        campoAuto = 'codigo';
+      } else if (colunaLower.includes('categ') || colunaLower.includes('grupo') || colunaLower.includes('tipo')) {
+        campoAuto = 'grupo';
+      }
+      
+      mapeamentoInicial[coluna] = {
+        selecionada: campoAuto !== '', // Selecionar automaticamente se encontrou mapeamento
+        campoDestino: campoAuto
+      };
+    });
+
+    setMapeamento(mapeamentoInicial);
+    setEtapa('mapeamento');
 
     } catch (error: any) {
       setErro(error.message || 'Erro ao processar arquivo');
@@ -208,6 +255,16 @@ return () => {
     setErro(null);
 
     try {
+        // Preparar mapeamento apenas das colunas selecionadas
+        const mapeamentoParaEnviar: Record<string, string> = {};
+        Object.entries(mapeamento).forEach(([colunaExcel, config]) => {
+          if (config.selecionada && config.campoDestino) {
+            mapeamentoParaEnviar[colunaExcel] = config.campoDestino;
+          }
+        });
+
+        console.log('📤 Enviando mapeamento:', mapeamentoParaEnviar);
+
         const response = await fetch(`${API_BASE_URL}/api/v1/importacoes/processar`, {
           method: 'POST',
           headers: {
@@ -216,9 +273,11 @@ return () => {
           },
           body: JSON.stringify({
               importacao_id: importacaoId,
-              confirmar: true
+              confirmar: true,
+              mapeamento_colunas: mapeamentoParaEnviar
           })
-      });
+        });
+
 
       console.log('Status da resposta (processar):', response.status);
       console.log('Headers:', response.headers);
@@ -401,6 +460,171 @@ return () => {
   // ========================================================================
   // RENDER: ETAPA PREVIEW
   // ========================================================================
+
+  // ========================================================================
+  // RENDER: ETAPA MAPEAMENTO DE COLUNAS
+  // ========================================================================
+
+  const renderMapeamento = () => {
+    if (!preview) return null;
+
+    // Verificar se pelo menos uma coluna está selecionada e mapeada
+    const temMapeamentoValido = Object.values(mapeamento).some(
+      m => m.selecionada && m.campoDestino
+    );
+
+    // Verificar se tem campo "nome" mapeado (obrigatório)
+    const temNomeMapeado = Object.values(mapeamento).some(
+      m => m.selecionada && m.campoDestino === 'nome'
+    );
+
+    return (
+      <div className="space-y-6">
+        {/* Informações do arquivo */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h4 className="font-semibold text-blue-900 mb-2">Arquivo: {preview.nome_arquivo}</h4>
+          <p className="text-sm text-blue-800">
+            {preview.colunas_detectadas.length} colunas detectadas | {preview.total_linhas} linhas para importar
+          </p>
+        </div>
+
+        {/* Instruções */}
+        <div className="bg-gradient-to-r from-green-50 to-pink-50 border-2 border-green-200 rounded-xl p-4">
+          <h3 className="font-semibold text-gray-900 mb-2">Como funciona o mapeamento?</h3>
+          <ol className="text-sm text-gray-700 space-y-1 list-decimal list-inside">
+            <li>Marque as colunas da planilha que você deseja importar</li>
+            <li>Para cada coluna marcada, escolha em qual campo do sistema ela será inserida</li>
+            <li>O campo <strong>"Nome do Insumo"</strong> é obrigatório</li>
+            <li>O sistema tentou fazer o mapeamento automático - revise e ajuste conforme necessário</li>
+          </ol>
+        </div>
+
+        {/* Tabela de Mapeamento */}
+        <div className="border border-gray-200 rounded-lg overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-12">
+                  Importar
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Coluna na Planilha
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Exemplo de Valor
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Campo no Sistema
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {preview.colunas_detectadas.map((coluna, index) => (
+                <tr key={coluna} className={mapeamento[coluna]?.selecionada ? 'bg-green-50' : ''}>
+                  {/* Checkbox */}
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={mapeamento[coluna]?.selecionada || false}
+                      onChange={(e) => {
+                        setMapeamento(prev => ({
+                          ...prev,
+                          [coluna]: {
+                            ...prev[coluna],
+                            selecionada: e.target.checked
+                          }
+                        }));
+                      }}
+                      className="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                    />
+                  </td>
+
+                  {/* Nome da coluna */}
+                  <td className="px-4 py-3">
+                    <span className="text-sm font-medium text-gray-900">{coluna}</span>
+                  </td>
+
+                  {/* Exemplo de valor */}
+                  <td className="px-4 py-3">
+                    <span className="text-sm text-gray-600">
+                      {preview.primeiras_linhas[0]?.[coluna] || '-'}
+                    </span>
+                  </td>
+
+                  {/* Select de campo destino */}
+                  <td className="px-4 py-3">
+                    <select
+                      value={mapeamento[coluna]?.campoDestino || ''}
+                      onChange={(e) => {
+                        setMapeamento(prev => ({
+                          ...prev,
+                          [coluna]: {
+                            selecionada: e.target.value !== '' ? true : prev[coluna]?.selecionada,
+                            campoDestino: e.target.value
+                          }
+                        }));
+                      }}
+                      disabled={!mapeamento[coluna]?.selecionada}
+                      className={`w-full px-3 py-2 bg-white border-2 rounded-lg transition-all ${
+                        mapeamento[coluna]?.selecionada
+                          ? 'border-green-500 focus:ring-2 focus:ring-green-500'
+                          : 'border-gray-200 bg-gray-50 cursor-not-allowed'
+                      }`}
+                    >
+                      <option value="">Selecione um campo...</option>
+                      {camposDisponiveis.map(campo => (
+                        <option key={campo.value} value={campo.value}>
+                          {campo.label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Avisos */}
+        {!temNomeMapeado && (
+          <div className="flex items-start gap-2 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-red-900">Campo obrigatório faltando</p>
+              <p className="text-sm text-red-800">
+                Você precisa mapear pelo menos uma coluna para o campo <strong>"Nome do Insumo"</strong>
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Botões */}
+        <div className="flex justify-between pt-4">
+          <button
+            onClick={() => setEtapa('upload')}
+            className="px-6 py-3 text-gray-700 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+          >
+            Voltar
+          </button>
+          <button
+            onClick={() => {
+              if (temNomeMapeado) {
+                setEtapa('preview');
+              }
+            }}
+            disabled={!temNomeMapeado}
+            className={`px-6 py-3 rounded-lg font-medium transition-all ${
+              temNomeMapeado
+                ? 'bg-gradient-to-r from-green-500 to-pink-500 text-white hover:from-green-600 hover:to-pink-600 shadow-md hover:shadow-lg'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            Continuar para Preview
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   const renderPreview = () => {
     if (!preview) return null;
@@ -671,6 +895,7 @@ return () => {
         {/* Content */}
         <div className="p-6">
           {etapa === 'upload' && renderUpload()}
+          {etapa === 'mapeamento' && renderMapeamento()}
           {etapa === 'preview' && renderPreview()}
           {etapa === 'processando' && renderProcessando()}
           {etapa === 'concluido' && renderConcluido()}

@@ -138,26 +138,58 @@ from pathlib import Path
 
 def run_migrations_on_startup():
     """
-    Executa migrações automaticamente na inicialização.
-    Necessário no Render Free Tier onde não há acesso ao shell.
+    Executa migrações e adiciona coluna fator se não existir.
     """
     try:
+        print("=" * 80)
+        print("🚀 VERIFICANDO SCHEMA DO BANCO")
+        print("=" * 80)
+        
+        from sqlalchemy import text
+        from app.database import engine
+        
+        # Verificar e adicionar coluna fator se não existir
+        with engine.connect() as conn:
+            # Verificar se coluna existe
+            result = conn.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name='insumos' AND column_name='fator'
+            """))
+            
+            if result.fetchone() is None:
+                print("⚠️  Coluna 'fator' não encontrada, criando...")
+                conn.execute(text("""
+                    ALTER TABLE insumos 
+                    ADD COLUMN fator FLOAT DEFAULT 1.0
+                """))
+                conn.commit()
+                print("✅ Coluna 'fator' criada com sucesso!")
+            else:
+                print("✅ Coluna 'fator' já existe")
+        
+        print("=" * 80)
+        
+        # Executar migrações normais do Alembic
         from alembic.config import Config
         from alembic import command
+        from pathlib import Path
         
-        # Caminho para alembic.ini
         alembic_ini = Path(__file__).parent.parent / "alembic.ini"
         
         if alembic_ini.exists():
-            print("🔄 Executando migrações do banco de dados...")
+            print("🔄 Executando migrações do Alembic...")
             alembic_cfg = Config(str(alembic_ini))
+            alembic_cfg.set_main_option("script_location", str(Path(__file__).parent.parent / "alembic"))
             command.upgrade(alembic_cfg, "head")
-            print("✅ Migrações aplicadas com sucesso!")
-        else:
-            print("⚠️ alembic.ini não encontrado")
+            print("✅ Migrações concluídas!")
+        
+        print("=" * 80)
             
     except Exception as e:
-        print(f"❌ Erro ao executar migrações: {e}")
+        print("=" * 80)
+        print(f"❌ ERRO: {e}")
+        print("=" * 80)
         import traceback
         traceback.print_exc()
 

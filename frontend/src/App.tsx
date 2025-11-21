@@ -38,6 +38,9 @@ import {
   Target, Eye, ChevronDown, ChevronRight, Copy, AlertTriangle, Store, FileSpreadsheet
 } from 'lucide-react';
 
+// Logo após os outros imports de componentes
+import LoadingSpinner from './components/LoadingSpinner';
+
 // Importar componente da IA
 import ClassificadorIA from './components/ClassificadorIA.tsx';
 import PopupClassificacaoIA from './components/PopupClassificacaoIA.tsx';
@@ -91,10 +94,7 @@ interface Insumo {
   nome: string;
   unidade: string;
   preco_compra_real: number;
-  // ============================================================
-  // CAMPO FATOR - DESABILITADO (17/11/2025)
-  // ============================================================
-  // fator: number;
+  fator: number;
   codigo?: string;
   grupo?: string;     
   subgrupo?: string;  
@@ -254,10 +254,7 @@ const [formData, setFormData] = useState(() => {
     nome: editingInsumo?.nome || '',
     unidade: editingInsumo?.unidade || 'kg',
     quantidade: editingInsumo?.quantidade || 1,
-    // ============================================================
-    // CAMPO FATOR - DESABILITADO (17/11/2025)
-    // ============================================================
-    // fator: editingInsumo?.fator || 1.0,
+    fator: editingInsumo?.fator || 1.0,
     subgrupo: editingInsumo?.subgrupo || '',
     grupo: editingInsumo?.grupo || '',
     descricao: editingInsumo?.descricao || '',
@@ -478,7 +475,7 @@ const resetForm = useCallback(() => {
       // ====================================================================
       // 🆕 VÍNCULO COM RESTAURANTE - NULL para global, ID para específico
       // ====================================================================
-      restaurante_id: insumoGlobal ? null : restauranteSelecionado,
+      restaurante_id: insumoGlobal ? null : (restauranteSelecionado?.id || null),
       
       // ====================================================================
       // CAMPOS PARA COMPARAÇÃO DE PREÇOS
@@ -798,24 +795,42 @@ const resetForm = useCallback(() => {
                   />
                 </div>
 
-                {/* Campo Fator */}
-                {/* <div>
+                {/* Campo Fator - Permite edição livre incluindo valores decimais */}
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Fator
+                    Fator <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
-                    step="0.01"
-                    min="0.01"
-                    value={formData.fator || 1.0}
-                    onChange={(e) => setFormData({...formData, fator: parseFloat(e.target.value) || 1.0})}
+                    step="0.0001"
+                    min="0.0001"
+                    value={formData.fator === '' ? '' : formData.fator}
+                    onChange={(e) => {
+                      const valor = e.target.value;
+                      // Permite campo vazio temporariamente durante edição
+                      if (valor === '') {
+                        setFormData({...formData, fator: ''});
+                      } else {
+                        const numero = parseFloat(valor);
+                        // Só atualiza se for um número válido
+                        if (!isNaN(numero)) {
+                          setFormData({...formData, fator: numero});
+                        }
+                      }
+                    }}
+                    onBlur={(e) => {
+                      // Quando sair do campo, se estiver vazio, volta para 1.0
+                      if (e.target.value === '' || parseFloat(e.target.value) <= 0) {
+                        setFormData({...formData, fator: 1.0});
+                      }
+                    }}
                     className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none transition-colors bg-white"
                     placeholder="1.0"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Padrão: 1.0. Usado para cálculo de preço unitário.
+                  <p className="text-xs text-gray-600 mt-1">
+                    💡 <strong>Exemplo:</strong> 0.75 para 750ml, 50 para caixa com 50 unidades
                   </p>
-                </div> */}
+                </div>
 
                 {/* Preço de Compra Total */}
                 <div className="space-y-2">
@@ -1005,27 +1020,21 @@ const resetForm = useCallback(() => {
                           return '0.00';
                         }
                         
-                        // Cálculo simplificado (sem fator)
-                        const precoUnidadeSistema = formData.preco_compra_total / formData.quantidade;
+                        // Obter fator (padrão 1.0 se não informado)
+                        const fator = parseFloat(formData.fator) || 1.0;
                         
-                        // ============================================================
-                        // CÁLCULO COM FATOR - DESABILITADO (17/11/2025)
-                        // ============================================================
-                        // CÓDIGO ORIGINAL COMENTADO:
-                        // if (!ehFornecedorAnonimo && insumoFornecedorSelecionado && formData.fator && insumoFornecedorSelecionado.fator) {
-                        //   const precoConvertido = (insumoFornecedorSelecionado.fator * precoUnidadeSistema) / formData.fator;
-                        //   return precoConvertido.toFixed(2);
-                        // }
+                        // Cálculo correto: Preço Total ÷ (Quantidade × Fator)
+                        const precoUnitarioReal = formData.preco_compra_total / (formData.quantidade * fator);
                         
-                        return precoUnidadeSistema.toFixed(2);
+                        return precoUnitarioReal.toFixed(2);
                       })()}
                     </p>
                     <p className="text-sm text-gray-600">
-                      {!ehFornecedorAnonimo && insumoFornecedorSelecionado ? (
-                        `Preço convertido para unidade do fornecedor (${(insumoFornecedorSelecionado.fator || 1) * 1000}ml)`
-                      ) : (
-                        `R$ ${(formData.preco_compra_total || 0).toFixed(2)} ÷ ${formData.quantidade || 1} = R$ ${formData.preco_compra_total && formData.quantidade && formData.quantidade > 0 ? (formData.preco_compra_total / formData.quantidade).toFixed(2) : '0.00'}/unidade`
-                      )}
+                      R$ {(formData.preco_compra_total || 0).toFixed(2)} ÷ ({formData.quantidade || 1} × {parseFloat(formData.fator) || 1}) = R$ {
+                        formData.preco_compra_total && formData.quantidade && formData.quantidade > 0 ?
+                        (formData.preco_compra_total / (formData.quantidade * (parseFloat(formData.fator) || 1))).toFixed(2) :
+                        '0.00'
+                      }/unidade
                     </p>
                   </div>
                 </div>
@@ -3505,6 +3514,11 @@ const fetchInsumos = async () => {
     const totalRestaurantes = restaurantes.length;
     const totalReceitas = receitas.length;
 
+    // Renderizar spinner enquanto carrega
+    if (loading) {
+      return <LoadingSpinner message="Carregando dados do dashboard..." />;
+    }
+
     return (
       
       <div className="space-y-6">
@@ -5728,33 +5742,41 @@ const fetchInsumos = async () => {
     const handleSaveInsumo = async (dadosInsumo) => {
       try {
         setLoading(true);
-        console.log('📤 Iniciando salvamento do insumo com nova lógica:', dadosInsumo);
-        console.log('🔍 DEBUG - restaurante_id recebido:', dadosInsumo.restaurante_id);
-        console.log('🔍 DEBUG - tipo de restaurante_id:', typeof dadosInsumo.restaurante_id);
-
-        // Preparar dados com nova estrutura
+        
+        // ============================================================================
+        // 🔍 DEBUG COMPLETO - VERIFICAR O QUE ESTÁ SENDO ENVIADO
+        // ============================================================================
+        console.log('🔍 ===== DEBUG handleSaveInsumo =====');
+        console.log('📥 dadosInsumo recebido:', dadosInsumo);
+        console.log('🏪 restauranteSelecionado:', restauranteSelecionado);
+        console.log('🌍 insumoGlobal:', insumoGlobal);
+        console.log('🔍 selectedRestaurante:', selectedRestaurante);
+        
+        // Preparar dados
         const dadosParaEnvio = {
           nome: dadosInsumo.nome || '',
           unidade: dadosInsumo.unidade || 'kg',
           preco_compra_real: dadosInsumo.preco_compra_real || null,
           quantidade: dadosInsumo.quantidade || 0,
+          fator: dadosInsumo.fator || 1.0,
           
-          // ================================================================
-          // VÍNCULO COM RESTAURANTE - Usa exatamente o valor do formulário
-          // Se dadosInsumo.restaurante_id === null, manter null (insumo global)
-          // Se dadosInsumo.restaurante_id === ID, manter ID (insumo específico)
-          // ================================================================
-          restaurante_id: dadosInsumo.restaurante_id !== undefined ? dadosInsumo.restaurante_id : null,
+          // CRITICAL: Garantir que restaurante_id seja um número ou null
+          restaurante_id: dadosInsumo.restaurante_id !== undefined 
+            ? (typeof dadosInsumo.restaurante_id === 'object' 
+                ? dadosInsumo.restaurante_id?.id 
+                : dadosInsumo.restaurante_id)
+            : null,
           
-          // Novos campos para fornecedor
+          // Outros campos
           eh_fornecedor_anonimo: ehFornecedorAnonimo,
           fornecedor_insumo_id: ehFornecedorAnonimo ? null : (insumoFornecedorSelecionado?.id || null),
           grupo: dadosInsumo.grupo || 'Geral',
-          subgrupo: dadosInsumo.subgrupo || ''
+          subgrupo: dadosInsumo.subgrupo || 'Geral',
         };
-        console.log('📦 Dados preparados para envio:', dadosParaEnvio);
-        console.log('🔍 DEBUG dadosParaEnvio - restaurante_id:', dadosParaEnvio.restaurante_id);
-        console.log('🔍 DEBUG dadosParaEnvio - tipo:', typeof dadosParaEnvio.restaurante_id);
+        
+        console.log('📤 dadosParaEnvio ANTES de enviar:', dadosParaEnvio);
+        console.log('🔍 Tipo de restaurante_id:', typeof dadosParaEnvio.restaurante_id);
+        console.log('=======================================');
 
         // 🆕 Log de mudança de preço (se insumo do fornecedor selecionado)
         if (insumoFornecedorSelecionado && dadosInsumo.preco_compra_real !== insumoFornecedorSelecionado.preco_unitario) {
@@ -6058,6 +6080,13 @@ const fetchInsumos = async () => {
       });
       setShowInsumoForm(true);
     };
+
+    // ============================================================================
+    // RENDERIZAR SPINNER DURANTE CARREGAMENTO
+    // ============================================================================
+    if (loading) {
+      return <LoadingSpinner message="Carregando insumos..." />;
+    }
 
     return (
       <div className="space-y-6 min-h-screen">
@@ -7325,6 +7354,14 @@ const fetchInsumos = async () => {
       setLoading(false);
     }
   };
+
+  // ============================================================================
+  // RENDERIZAR SPINNER DURANTE CARREGAMENTO
+  // ============================================================================
+  if (loading) {
+    return <LoadingSpinner message="Carregando restaurantes..." />;
+  }
+
     return (  // Return do componente Restaurante
       <div className="space-y-6">
         {/* ============================================================================ */}
@@ -8558,6 +8595,12 @@ const Receitas = React.memo(() => {
       </div>
     );
   }
+  // ============================================================================
+  // RENDERIZAR SPINNER DURANTE CARREGAMENTO
+  // ============================================================================
+  if (loading) {
+    return <LoadingSpinner message="Carregando receitas..." />;
+  }
 
   // ===================================================================================================
   // RENDERIZAÇÃO PRINCIPAL
@@ -8916,11 +8959,8 @@ Receitas.displayName = 'Receitas';
         descricao: insumo.descricao || '',
         unidade: insumo.unidade || 'kg',
         preco_compra_real: insumo.preco_unitario || 0,
-        quantidade: insumo.quantidade || 1
-        // ============================================================
-        // CAMPO FATOR - DESABILITADO (17/11/2025)
-        // ============================================================
-        // fator: insumo.fator || 1.0
+        quantidade: insumo.quantidade || 1,
+        fator: insumo.fator || 1.0
       });
       setShowPopupEditarInsumo(true);
     };
@@ -9137,11 +9177,8 @@ const cancelarExclusao = () => {
           unidade: String(novoInsumo.unidade || 'kg').trim(),
           preco_unitario: Number(novoInsumo.preco_compra_real) || 0,
           descricao: String(novoInsumo.descricao || '').trim(),
-          quantidade: Number(novoInsumo.quantidade) || 1
-          // ============================================================
-          // CAMPO FATOR - DESABILITADO (17/11/2025)
-          // ============================================================
-          // fator: novoInsumo.fator || 1.0
+          quantidade: Number(novoInsumo.quantidade) || 1,
+          fator: novoInsumo.fator || 1.0
         };
 
         console.log('🎯 Dados do insumo do fornecedor (sem código):', insumoData);
@@ -9166,11 +9203,8 @@ const cancelarExclusao = () => {
             descricao: '',
             unidade: 'kg',
             preco_compra_real: 0,
-            quantidade: 1
-            // ============================================================
-            // CAMPO FATOR - DESABILITADO (17/11/2025)
-            // ============================================================
-            // fator: 1.0
+            quantidade: 1,
+            fator: 1.0
           });
           setShowPopupInsumo(false);
           
@@ -9390,7 +9424,14 @@ const cancelarExclusao = () => {
         setIsLoading(false);
       }
     };
-
+    
+    // ============================================================================
+    // RENDERIZAR SPINNER DURANTE CARREGAMENTO
+    // ============================================================================
+    if (loading) {
+      return <LoadingSpinner message="Carregando fornecedores..." />;
+    }
+    
     // INICIO RETURN FORNECEDORES
     return (
       <div className="p-6">
@@ -10638,220 +10679,222 @@ return (  //RETORN DO COMPONENTE PRINCIPAL
                     {/* ============================================================================ */}
                     {activeConfigTab === 'usuarios' && (
                       <div className="space-y-6">
-                        {/* Header com botão criar e filtros */}
-                        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-                          <div className="flex-1 w-full lg:w-auto">
-                            <div className="flex flex-col sm:flex-row gap-3">
-                              {/* Campo de busca */}
-                              <div className="relative flex-1">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-500 w-5 h-5" />
-                                <input
-                                  type="text"
-                                  placeholder="Buscar por username ou email..."
-                                  value={buscaUsuario}
-                                  onChange={(e) => setBuscaUsuario(e.target.value)}
-                                  className="w-full pl-10 pr-4 py-2 border-2 border-green-500 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-600 bg-white"
-                                />
+                        {/* ============================================================================ */}
+                        {/* RENDERIZAR SPINNER DURANTE CARREGAMENTO */}
+                        {/* ============================================================================ */}
+                        {loadingUsuarios ? (
+                          <LoadingSpinner message="Carregando usuários..." />
+                        ) : (
+                          <>
+                            {/* Header com botão criar e filtros */}
+                            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                              <div className="flex-1 w-full lg:w-auto">
+                                <div className="flex flex-col sm:flex-row gap-3">
+                                  {/* Campo de busca */}
+                                  <div className="relative flex-1">
+                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-500 w-5 h-5" />
+                                    <input
+                                      type="text"
+                                      placeholder="Buscar por username ou email..."
+                                      value={buscaUsuario}
+                                      onChange={(e) => setBuscaUsuario(e.target.value)}
+                                      className="w-full pl-10 pr-4 py-2 border-2 border-green-500 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-600 bg-white"
+                                    />
+                                  </div>
+
+                                  {/* Filtro por Role */}
+                                  <select
+                                    value={filtroRoleUsuario}
+                                    onChange={(e) => setFiltroRoleUsuario(e.target.value)}
+                                    className="px-4 py-2 border-2 border-green-500 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-600 bg-white"
+                                  >
+                                    <option value="">Todos os perfis</option>
+                                    <option value="ADMIN">Admin</option>
+                                    <option value="CONSULTANT">Consultor</option>
+                                    <option value="OWNER">Proprietário</option>
+                                    <option value="MANAGER">Gerente de Loja</option>
+                                    <option value="OPERATOR">Operador</option>
+                                  </select>
+
+                                  {/* Filtro por Status */}
+                                  <select
+                                    value={filtroStatusUsuario}
+                                    onChange={(e) => setFiltroStatusUsuario(e.target.value)}
+                                    className="px-4 py-2 border-2 border-green-500 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-600 bg-white"
+                                  >
+                                    <option value="">Todos os status</option>
+                                    <option value="true">Ativos</option>
+                                    <option value="false">Inativos</option>
+                                  </select>
+                                </div>
                               </div>
 
-                              {/* Filtro por Role */}
-                              <select
-                                value={filtroRoleUsuario}
-                                onChange={(e) => setFiltroRoleUsuario(e.target.value)}
-                                className="px-4 py-2 border-2 border-green-500 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-600 bg-white"
+                              {/* Botão criar novo usuário */}
+                              <button
+                                onClick={abrirFormNovoUsuario}
+                                className="w-full lg:w-auto bg-gradient-to-r from-green-500 to-pink-500 text-white px-6 py-2 rounded-lg flex items-center justify-center gap-2 hover:from-green-600 hover:to-pink-600 transition-all shadow-md"
                               >
-                                <option value="">Todos os perfis</option>
-                                <option value="ADMIN">Admin</option>
-                                <option value="CONSULTANT">Consultor</option>
-                                <option value="OWNER">Proprietário</option>
-                                <option value="MANAGER">Gerente de Loja</option>
-                                <option value="OPERATOR">Operador</option>
-                              </select>
-
-                              {/* Filtro por Status */}
-                              <select
-                                value={filtroStatusUsuario}
-                                onChange={(e) => setFiltroStatusUsuario(e.target.value)}
-                                className="px-4 py-2 border-2 border-green-500 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-600 bg-white"
-                              >
-                                <option value="">Todos os status</option>
-                                <option value="true">Ativos</option>
-                                <option value="false">Inativos</option>
-                              </select>
+                                <Plus className="w-5 h-5" />
+                                Novo Usuário
+                              </button>
                             </div>
-                          </div>
 
-                          {/* Botão criar novo usuário */}
-                          <button
-                            onClick={abrirFormNovoUsuario}
-                            className="w-full lg:w-auto bg-gradient-to-r from-green-500 to-pink-500 text-white px-6 py-2 rounded-lg flex items-center justify-center gap-2 hover:from-green-600 hover:to-pink-600 transition-all shadow-md"
-                          >
-                            <Plus className="w-5 h-5" />
-                            Novo Usuário
-                          </button>
-                        </div>
-
-                        {/* Tabela de usuários */}
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                          {loadingUsuarios ? (
-                            <div className="flex items-center justify-center py-12">
-                              <div className="text-center">
-                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
-                                <p className="text-gray-600">Carregando usuários...</p>
-                              </div>
-                            </div>
-                          ) : usuarios.length === 0 ? (
-                            <div className="text-center py-12">
-                              <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                              <h3 className="text-lg font-semibold text-gray-600 mb-2">
-                                Nenhum usuário encontrado
-                              </h3>
-                              <p className="text-sm text-gray-500 mb-4">
-                                Clique em "Novo Usuário" para criar o primeiro usuário
-                              </p>
-                            </div>
-                          ) : (
-                            <div className="overflow-x-auto">
-                              <table className="w-full">
-                                <thead className="bg-gray-50 border-b border-gray-200">
-                                  <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                      Usuário
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                      Email
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                      Perfil
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                      Restaurante
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                      Status
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                      Ações
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                  {usuarios
-                                    .filter(usuario => {
-                                      // Filtro por role
-                                      if (filtroRoleUsuario && usuario.role !== filtroRoleUsuario) {
-                                        return false;
-                                      }
-                                      
-                                      // Filtro por status
-                                      if (filtroStatusUsuario && usuario.ativo.toString() !== filtroStatusUsuario) {
-                                        return false;
-                                      }
-                                      
-                                      // Filtro por busca
-                                      if (buscaUsuario) {
-                                        const termo = buscaUsuario.toLowerCase();
-                                        if (!usuario.username.toLowerCase().includes(termo) && 
-                                            !usuario.email.toLowerCase().includes(termo)) {
-                                          return false;
-                                        }
-                                      }
-                                      
-                                      return true;
-                                    })
-                                    .map((usuario) => {
-                                    const restauranteNome = usuario.restaurante_id
-                                      ? restaurantes.find(r => r.id === usuario.restaurante_id)?.nome || 'N/A'
-                                      : '-';
-
-                                    return (
-                                      <tr key={usuario.id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                          <div className="flex items-center">
-                                            <div className="flex-shrink-0 h-10 w-10 rounded-full bg-gradient-to-r from-green-400 to-pink-400 flex items-center justify-center">
-                                              <span className="text-white font-semibold text-sm">
-                                                {usuario.username.substring(0, 2).toUpperCase()}
-                                              </span>
-                                            </div>
-                                            <div className="ml-4">
-                                              <div className="text-sm font-medium text-gray-900">
-                                                {usuario.username}
-                                              </div>
-                                              {usuario.primeiro_acesso && (
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
-                                                  Primeiro acesso
-                                                </span>
-                                              )}
-                                            </div>
-                                          </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                          <div className="text-sm text-gray-900">{usuario.email}</div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                            usuario.role === 'ADMIN'
-                                              ? 'bg-purple-100 text-purple-800'
-                                              : usuario.role === 'CONSULTANT'
-                                              ? 'bg-blue-100 text-blue-800'
-                                              : 'bg-green-100 text-green-800'
-                                          }`}>
-                                            {getRoleLabel(usuario.role)}
-                                          </span>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                          <div className="text-sm text-gray-900">{restauranteNome}</div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                            usuario.ativo
-                                              ? 'bg-green-100 text-green-800'
-                                              : 'bg-red-100 text-red-800'
-                                          }`}>
-                                            {usuario.ativo ? 'Ativo' : 'Inativo'}
-                                          </span>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                          <div className="flex items-center gap-2">
-                                            <button
-                                              onClick={() => abrirEdicaoUsuario(usuario)}
-                                              className="text-blue-600 hover:text-blue-900 transition-colors"
-                                              title="Editar usuário"
-                                            >
-                                              <Edit2 className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                              onClick={() => excluirUsuario(usuario)}
-                                              className="text-red-600 hover:text-red-900 transition-colors"
-                                              title="Excluir usuário"
-                                            >
-                                              <Trash2 className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                              onClick={() => resetarSenhaUsuario(usuario)}
-                                              className="text-yellow-600 hover:text-yellow-900 transition-colors"
-                                              title="Resetar senha"
-                                            >
-                                              <Shield className="w-4 h-4" />
-                                            </button>
-                                          </div>
-                                        </td>
+                            {/* Tabela de usuários */}
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                              {usuarios.length === 0 ? (
+                                <div className="text-center py-12">
+                                  <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                                  <h3 className="text-lg font-semibold text-gray-600 mb-2">
+                                    Nenhum usuário encontrado
+                                  </h3>
+                                  <p className="text-sm text-gray-500 mb-4">
+                                    Clique em "Novo Usuário" para criar o primeiro usuário
+                                  </p>
+                                </div>
+                              ) : (
+                                <div className="overflow-x-auto">
+                                  <table className="w-full">
+                                    <thead className="bg-gray-50 border-b border-gray-200">
+                                      <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                          Usuário
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                          Email
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                          Perfil
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                          Restaurante
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                          Status
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                          Ações
+                                        </th>
                                       </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
-                          )}
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                      {usuarios
+                                        .filter(usuario => {
+                                          // Filtro por role
+                                          if (filtroRoleUsuario && usuario.role !== filtroRoleUsuario) {
+                                            return false;
+                                          }
+                                          
+                                          // Filtro por status
+                                          if (filtroStatusUsuario && usuario.ativo.toString() !== filtroStatusUsuario) {
+                                            return false;
+                                          }
+                                          
+                                          // Filtro por busca
+                                          if (buscaUsuario) {
+                                            const termo = buscaUsuario.toLowerCase();
+                                            if (!usuario.username.toLowerCase().includes(termo) && 
+                                                !usuario.email.toLowerCase().includes(termo)) {
+                                              return false;
+                                            }
+                                          }
+                                          
+                                          return true;
+                                        })
+                                        .map((usuario) => {
+                                        const restauranteNome = usuario.restaurante_id
+                                          ? restaurantes.find(r => r.id === usuario.restaurante_id)?.nome || 'N/A'
+                                          : '-';
 
-                          {!loadingUsuarios && usuarios.length > 0 && (
-                            <div className="bg-gray-50 px-6 py-3 border-t border-gray-200">
-                              <p className="text-sm text-gray-600">
-                                Total: <span className="font-semibold">{usuarios.length}</span> usuário{usuarios.length !== 1 ? 's' : ''}
-                              </p>
+                                        return (
+                                          <tr key={usuario.id} className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                              <div className="flex items-center">
+                                                <div className="flex-shrink-0 h-10 w-10 rounded-full bg-gradient-to-r from-green-400 to-pink-400 flex items-center justify-center">
+                                                  <span className="text-white font-semibold text-sm">
+                                                    {usuario.username.substring(0, 2).toUpperCase()}
+                                                  </span>
+                                                </div>
+                                                <div className="ml-4">
+                                                  <div className="text-sm font-medium text-gray-900">
+                                                    {usuario.username}
+                                                  </div>
+                                                  {usuario.primeiro_acesso && (
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                      Primeiro acesso
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                              <div className="text-sm text-gray-900">{usuario.email}</div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                                usuario.role === 'ADMIN'
+                                                  ? 'bg-purple-100 text-purple-800'
+                                                  : usuario.role === 'CONSULTANT'
+                                                  ? 'bg-blue-100 text-blue-800'
+                                                  : 'bg-green-100 text-green-800'
+                                              }`}>
+                                                {getRoleLabel(usuario.role)}
+                                              </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                              <div className="text-sm text-gray-900">{restauranteNome}</div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                                usuario.ativo
+                                                  ? 'bg-green-100 text-green-800'
+                                                  : 'bg-red-100 text-red-800'
+                                              }`}>
+                                                {usuario.ativo ? 'Ativo' : 'Inativo'}
+                                              </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                              <div className="flex items-center gap-2">
+                                                <button
+                                                  onClick={() => abrirEdicaoUsuario(usuario)}
+                                                  className="text-blue-600 hover:text-blue-900 transition-colors"
+                                                  title="Editar usuário"
+                                                >
+                                                  <Edit2 className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                  onClick={() => excluirUsuario(usuario)}
+                                                  className="text-red-600 hover:text-red-900 transition-colors"
+                                                  title="Excluir usuário"
+                                                >
+                                                  <Trash2 className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                  onClick={() => resetarSenhaUsuario(usuario)}
+                                                  className="text-yellow-600 hover:text-yellow-900 transition-colors"
+                                                  title="Resetar senha"
+                                                >
+                                                  <Shield className="w-4 h-4" />
+                                                </button>
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+
+                              {usuarios.length > 0 && (
+                                <div className="bg-gray-50 px-6 py-3 border-t border-gray-200">
+                                  <p className="text-sm text-gray-600">
+                                    Total: <span className="font-semibold">{usuarios.length}</span> usuário{usuarios.length !== 1 ? 's' : ''}
+                                  </p>
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
+                          </>
+                        )}
                       </div>
                     )}
                     {/* ============================================================================ */}

@@ -130,6 +130,41 @@ import time
 import signal
 import sys
 
+# ============================================================================
+# FORÇAR MIGRAÇÃO AUTOMÁTICA NO STAGING (Render Free Tier)
+# ============================================================================
+import os
+from pathlib import Path
+
+def run_migrations_on_startup():
+    """
+    Executa migrações automaticamente na inicialização.
+    Necessário no Render Free Tier onde não há acesso ao shell.
+    """
+    try:
+        from alembic.config import Config
+        from alembic import command
+        
+        # Caminho para alembic.ini
+        alembic_ini = Path(__file__).parent.parent / "alembic.ini"
+        
+        if alembic_ini.exists():
+            print("🔄 Executando migrações do banco de dados...")
+            alembic_cfg = Config(str(alembic_ini))
+            command.upgrade(alembic_cfg, "head")
+            print("✅ Migrações aplicadas com sucesso!")
+        else:
+            print("⚠️ alembic.ini não encontrado")
+            
+    except Exception as e:
+        print(f"❌ Erro ao executar migrações: {e}")
+        import traceback
+        traceback.print_exc()
+
+# Executar migrações apenas em staging/produção
+if os.getenv("ENVIRONMENT") in ["staging", "production"]:
+    run_migrations_on_startup()
+
 #   ===================================================================================================
 #   Configuração do ciclo de vida da aplicação
 #   ===================================================================================================

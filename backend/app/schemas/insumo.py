@@ -18,14 +18,16 @@ class InsumoBase(BaseModel):
     """
     Schema base com campos comuns dos insumos.
     Usado como base para criação e atualização.
-    Campo fator removido conforme nova regra de negócio.
+    
+    CAMPO FATOR: Reativado para cálculo correto de preço unitário.
+    Exemplo: Compra 3 caixas com 50 unidades cada = quantidade: 3, fator: 50
     """
     grupo: Optional[str] = Field(default="", max_length=100, description="Grupo de insumo (legado)")
     subgrupo: Optional[str] = Field(default="", max_length=100, description="Subgrupo do insumo (legado)")
     codigo: Optional[str] = Field(default=None, description="Código único (gerado automaticamente se não fornecido)")
     nome: str = Field(..., min_length=1, max_length=255, description="Nome do produto")
     quantidade: int = Field(default=1, ge=1, description="Quantidade padrão")
-    # fator: Optional[float] = Field(default=1.0, description="Fator multiplicador para cálculo de preço unitário")
+    fator: Optional[float] = Field(default=1.0, description="Fator multiplicador para cálculo de preço unitário")
     unidade: str = Field(..., description="Unidade de medida")
     preco_compra_real: Optional[float] = Field(None, ge=0, description="Preço de compra em reais")
     valor_compra_por_kg: Optional[float] = Field(None, ge=0, description="Valor de compra por Kg", example=85.0)
@@ -98,6 +100,38 @@ class InsumoBase(BaseModel):
         # Arredonda para 2 casas decimais
         return round(v, 2)
     
+    @field_validator('fator')
+    @classmethod
+    def validar_fator(cls, v):
+        """
+        Valida o fator de conversão.
+        
+        Regras:
+        - Deve ser sempre maior que zero
+        - Aceita valores decimais com até 4 casas
+        - Padrão: 1.0 (sem conversão)
+        
+        Exemplos:
+        - Caixa com 50 unidades: fator = 50.0
+        - Embalagem de 500g: fator = 0.5 (para base kg)
+        - Garrafa de 750ml: fator = 0.75 (para base L)
+        """
+        # DEBUG: Log do valor recebido
+        print(f"🔍 VALIDADOR FATOR - Valor recebido: {v}, Tipo: {type(v)}")
+        
+        # Se None ou 0, retornar 1.0 (valor padrão)
+        if v is None or v == 0:
+            print(f"⚠️ VALIDADOR FATOR - Valor inválido, usando padrão 1.0")
+            return 1.0
+            
+        if v <= 0:
+            raise ValueError('Fator deve ser um número positivo maior que zero')
+        
+        # Arredonda para 4 casas decimais
+        fator_arredondado = round(float(v), 4)
+        print(f"✅ VALIDADOR FATOR - Valor final: {fator_arredondado}")
+        return fator_arredondado
+    
     @field_validator('codigo', mode='before')
     @classmethod
     def validar_codigo_opcional(cls, v):
@@ -131,6 +165,22 @@ class InsumoCreate(InsumoBase):
         None,
         description="ID do restaurante proprietário do insumo (NULL = insumo global)"
     )
+    # Campo alternativo para compatibilidade com frontend
+    preco_unitario: Optional[float] = Field(None, ge=0, description="Preço unitário (alias para preco_compra_real)")
+    
+    @field_validator('preco_compra_real', mode='before')
+    @classmethod
+    def mapear_preco_unitario(cls, v, info):
+        """
+        Mapeia preco_unitario para preco_compra_real se fornecido.
+        Isso garante compatibilidade com o frontend que envia preco_unitario.
+        """
+        # Se preco_compra_real está None mas preco_unitario foi fornecido, usar preco_unitario
+        if v is None and 'preco_unitario' in info.data and info.data['preco_unitario'] is not None:
+            print(f"🔄 Mapeando preco_unitario ({info.data['preco_unitario']}) para preco_compra_real")
+            return info.data['preco_unitario']
+        return v
+    
     fornecedor_id: Optional[int] = Field(
         None,
         description="ID do fornecedor deste insumo (opcional)"
@@ -176,7 +226,7 @@ class InsumoUpdate(BaseModel):
     codigo: Optional[str] = Field(None, min_length=1, max_length=50)
     nome: Optional[str] = Field(None, min_length=2, max_length=255)
     quantidade: Optional[int] = Field(None, ge=1)
-    # fator: Optional[float] = Field(default=1.0, description="Fator multiplicador para cálculo de preço unitário")
+    fator: Optional[float] = Field(default=1.0, description="Fator multiplicador para cálculo de preço unitário")
     unidade: Optional[str] = None
     preco_compra_real: Optional[float] = Field(None, ge=0)
     aguardando_classificacao: Optional[bool] = Field(default=None, description="Se está aguardando classificação")
@@ -269,7 +319,8 @@ class InsumoResponse(InsumoBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
     preco_compra_centavos: Optional[int] = Field(None, description="Preço em centavos")
-
+    # Campo calculado - preço unitário real considerando fator
+    # preco_unitario_real: Optional[float] = Field(None, description="Preço unitário real calculado com fator (preco_total / (quantidade × fator))")
     # Campos para comparação de preços
     preco_por_unidade: Optional[float] = Field(None, description="Preço por unidade calculado (preco_compra * quantidade)")
     fornecedor_insumo_id: Optional[int] = Field(None, description="ID do insumo no catálogo do fornecedor")
@@ -322,8 +373,7 @@ class InsumoListResponse(BaseModel):
     """
     Schema simplificado para resposta de listagem de insumos.
     Usado no endpoint GET /api/v1/insumos/ para exibir listas.
-    Inclui campos essenciais incluindo taxonomia_id e aguardando_classificacao.
-    Campo fator removido conforme nova regra de negócio.
+    Inclui campos essenciais incluindo taxonomia_id, aguardando_classificacao e fator.
     """
     id: int = Field(description="ID único do insumo")
     codigo: str = Field(description="Código do insumo")
@@ -333,6 +383,7 @@ class InsumoListResponse(BaseModel):
     unidade: str = Field(description="Unidade de medida")
     preco_compra_real: Optional[float] = Field(description="Preço de compra em reais")
     quantidade: int = Field(description="Quantidade")
+    fator: Optional[float] = Field(default=1.0, description="Fator multiplicador para cálculo de preço unitário")
     restaurante_id: Optional[int] = None
     
     # Campo importante para taxonomias

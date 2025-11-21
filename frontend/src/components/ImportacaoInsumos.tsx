@@ -77,6 +77,7 @@ const ImportacaoInsumos: React.FC<ImportacaoInsumosProps> = ({
     { value: 'nome', label: 'Nome do Insumo' },
     { value: 'unidade', label: 'Unidade de Medida' },
     { value: 'quantidade', label: 'Quantidade' },
+    { value: 'fator', label: 'Fator (Multiplicador)' },
     { value: 'preco_unitario', label: 'Último Preço Praticado' },
     { value: 'codigo', label: 'Código (Opcional)' },
     { value: 'grupo', label: 'Categoria/Grupo (Opcional)' }
@@ -675,6 +676,8 @@ return () => {
                 <tr>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Código</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Nome</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Quantidade</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Fator</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Preço</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Unidade</th>
                 </tr>
@@ -684,6 +687,8 @@ return () => {
                   <tr key={index}>
                     <td className="px-4 py-2 text-sm text-gray-900">{linha.codigo}</td>
                     <td className="px-4 py-2 text-sm text-gray-900">{linha.nome}</td>
+                    <td className="px-4 py-2 text-sm text-gray-900">{linha.quantidade || 1}</td>
+                    <td className="px-4 py-2 text-sm text-gray-900">{linha.fator || 1.0}</td>
                     <td className="px-4 py-2 text-sm text-gray-900">
                       R$ {linha.preco_compra_real?.toFixed(2)}
                     </td>

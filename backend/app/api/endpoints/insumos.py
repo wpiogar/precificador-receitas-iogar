@@ -96,7 +96,8 @@ def listar_insumos(
         incluir_globais=incluir_globais
     )
 
-    # Converter preços para reais e retornar
+    # Converter preços para reais e calcular preço unitário com fator
+    # NOTA: preco_unitario_real é calculado automaticamente pela @property do modelo
     for insumo in insumos:
         # Conversão segura - adiciona propriedade calculada para preço em reais
         if hasattr(insumo, 'preco_compra') and insumo.preco_compra is not None:
@@ -258,13 +259,13 @@ def obter_insumo(
             detail=f"Insumo com ID {insumo_id} não encontrado"
         )
     
-    # Converter preço para reais
+    # Converter preço para reais e calcular preço unitário
+   # NOTA: preco_unitario_real é calculado automaticamente pela @property do modelo
     if hasattr(insumo, 'preco_compra') and insumo.preco_compra is not None:
         insumo.preco_compra_centavos = insumo.preco_compra
         # A property preco_compra_real já foi corrigida no modelo
     else:
         insumo.preco_compra_centavos = None
-
     return insumo
 
 @router.get("/codigo/{codigo}", response_model=InsumoListResponse, summary="Buscar insumo por código")
@@ -284,7 +285,8 @@ def obter_insumo_por_codigo(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Insumo com codigo '{codigo}' não encontrado"
         )
-    # Converter preço para reais
+    # Converter preço para reais e calcular preço unitário
+    # NOTA: preco_unitario_real é calculado automaticamente pela @property do modelo
     if hasattr(insumo, 'preco_compra') and insumo.preco_compra:
         insumo.preco_compra_centavos = insumo.preco_compra
     else:
@@ -379,7 +381,8 @@ def criar_insumo(
         # Criar insumo usando CRUD
         insumo_criado = crud_insumo.create_insumo(db=db, insumo=insumo_com_codigo)
 
-        # Converter preço para reais na resposta
+        # Converter preço para reais e calcular preço unitário na resposta
+       # NOTA: preco_unitario_real é calculado automaticamente pela @property do modelo
         if hasattr(insumo_criado, 'preco_compra') and insumo_criado.preco_compra:
             insumo_criado.preco_compra_real = insumo_criado.preco_compra / 100
             insumo_criado.preco_compra_centavos = insumo_criado.preco_compra
@@ -420,17 +423,15 @@ def criar_insumos_lote(
     """
     insumos_criados = crud_insumo.create_insumos_batch(db=db, insumos=insumos)
 
-    # Converter preços para reais
-    for insumo in insumos_criados:
-        if hasattr(insumo, 'preco_compra') and insumo.preco_compra:
-            # Usa a property que já foi corrigida no modelo
-            insumo.preco_compra_centavos = insumo.preco_compra
-            # A property preco_compra_real já calcula corretamente
+    # Converter preços para reais - NÃO setar preco_unitario_real (é calculado automaticamente)
+    for insumo in insumos:
+        if hasattr(insumo, 'preco_compra') and insumo.preco_compra is not None:
+            insumo.preco_compra_real = insumo.preco_compra_real
+            # preco_unitario_real é calculado automaticamente pela property
         else:
             insumo.preco_compra_real = None
-            insumo.preco_compra_centavos = None
-    
-    return insumos_criados
+
+    return insumos
 
 #   ===================================================================================================
 #   Endpoints de Atualizção (PUT)
@@ -467,8 +468,9 @@ def atualizar_insumo(
                 detail=f"Insumo com ID {insumo_id} não encontrado"
             )
         # Converter preço para reais
+        # NOTA: preco_unitario_real é calculado automaticamente pela @property do modelo
         if hasattr(insumo_atualizado, 'preco_compra') and insumo_atualizado.preco_compra:
-           insumo_atualizado.preco_compra_centavos = insumo_atualizado.preco_compra
+            insumo_atualizado.preco_compra_centavos = insumo_atualizado.preco_compra
         else:
             insumo_atualizado.preco_compra_real = None
             insumo_atualizado.preco_compra_centavos = None

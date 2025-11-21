@@ -16,7 +16,7 @@ from .taxonomia import Taxonomia
 # Importar modelos de taxonomia
 from .taxonomia import Taxonomia
 from .taxonomia_alias import TaxonomiaAlias
-
+from app.models.codigo_sequence import CodigoSequence
 # Importar modelos de receitas
 from .receita import Restaurante, Receita, ReceitaInsumo
 

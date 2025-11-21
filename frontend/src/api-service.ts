@@ -329,8 +329,10 @@ async refreshAccessToken(): Promise<string | null> {
       subgrupo: String(insumo.subgrupo || 'Geral').trim(),
       nome: String(insumo.nome || '').trim(),
       quantidade: Number(insumo.quantidade) || 1,
+      fator: Number(insumo.fator) || 1.0,
       unidade: String(insumo.unidade || 'kg').trim(),
       preco_compra_real: insumo.preco_compra_real || insumo.preco_compra_total || null,
+      preco_unitario: insumo.preco_unitario || insumo.preco_compra_total || insumo.preco_compra_real || null,
       fornecedor_id: insumo.fornecedor_id || null,
       fornecedor_insumo_id: insumo.fornecedor_insumo_id || null,
       // Usar o valor final determinado acima (null para global, ID para específico)

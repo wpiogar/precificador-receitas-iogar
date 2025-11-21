@@ -25,7 +25,8 @@ logger = logging.getLogger(__name__)
 
 def gerar_proximo_codigo(db: Session, tipo: TipoCodigo, restaurante_id: int) -> str:
     """
-    Gera o proximo codigo disponivel para o tipo especificado dentro do restaurante
+    Gera o proximo codigo disponivel para o tipo especificado dentro do restaurante.
+    USA TABELA DE SEQUÊNCIA para garantir que códigos nunca sejam reusados.
     
     IMPORTANTE: Cada restaurante possui sua própria sequência de códigos independente.
     O mesmo número de código pode existir em restaurantes diferentes.
@@ -36,16 +37,17 @@ def gerar_proximo_codigo(db: Session, tipo: TipoCodigo, restaurante_id: int) -> 
         restaurante_id: ID do restaurante para o qual gerar o código
         
     Returns:
-        Codigo gerado no formato "PREFIXO-NUMERO" (ex: "REC-3045")
+        Codigo gerado no formato "NUMERO" (ex: "5000")
         
     Raises:
         ValueError: Se a faixa estiver esgotada ou restaurante_id inválido
         Exception: Erros de banco de dados
     """
     try:
+        # Importar modelo de sequência
+        from app.models.codigo_sequence import CodigoSequence
+        
         # Validar restaurante_id
-        # ATENÇÃO: restaurante_id = 0 é permitido para insumos globais
-        # restaurante_id = None ou < 0 não é permitido
         if restaurante_id is None or restaurante_id < -1:
             raise ValueError("restaurante_id é obrigatório e não pode ser menor que -1")
         
@@ -54,15 +56,40 @@ def gerar_proximo_codigo(db: Session, tipo: TipoCodigo, restaurante_id: int) -> 
         inicio = faixa["inicio"]
         fim = faixa["fim"]
         
-        # Buscar ultimo codigo usado conforme o tipo e restaurante
-        ultimo_numero = _buscar_ultimo_codigo_usado(db, tipo, restaurante_id)
+        # Buscar ou criar registro de sequência para este restaurante + tipo
+        tipo_str = tipo.value if hasattr(tipo, 'value') else str(tipo)
         
-        # Se nao existe nenhum codigo, comecar do inicio da faixa
-        if ultimo_numero is None:
-            proximo_numero = inicio
+        sequence = db.query(CodigoSequence).filter(
+            CodigoSequence.restaurante_id == restaurante_id,
+            CodigoSequence.tipo_codigo == tipo_str
+        ).first()
+        
+        if sequence is None:
+            # Primeira vez gerando código para este restaurante + tipo
+            # Buscar se já existe algum código no banco (dados legados)
+            ultimo_numero_legado = _buscar_ultimo_codigo_usado(db, tipo, restaurante_id)
+            
+            if ultimo_numero_legado is None:
+                # Começar do início da faixa
+                proximo_numero = inicio
+            else:
+                # Começar do próximo após o último legado
+                proximo_numero = ultimo_numero_legado + 1
+            
+            # Criar novo registro de sequência
+            sequence = CodigoSequence(
+                restaurante_id=restaurante_id,
+                tipo_codigo=tipo_str,
+                ultimo_numero=proximo_numero
+            )
+            db.add(sequence)
+            db.flush()  # Garantir que foi inserido
+            
         else:
-            # Incrementar o ultimo codigo
-            proximo_numero = ultimo_numero + 1
+            # Já existe sequência, incrementar
+            proximo_numero = sequence.ultimo_numero + 1
+            sequence.ultimo_numero = proximo_numero
+            sequence.updated_at = func.now()
         
         # Validar se ainda ha codigos disponiveis na faixa
         if proximo_numero > fim:
@@ -71,8 +98,11 @@ def gerar_proximo_codigo(db: Session, tipo: TipoCodigo, restaurante_id: int) -> 
                 f"Limite: {fim}"
             )
         
-        # Formatar e retornar o codigo
-        codigo_gerado = formatar_codigo(proximo_numero, tipo)
+        # Commit da atualização da sequência
+        db.commit()
+        
+        # Formatar e retornar o codigo (apenas o número)
+        codigo_gerado = str(proximo_numero)
         
         logger.info(
             f"Codigo gerado: {codigo_gerado} (tipo: {tipo}, restaurante_id: {restaurante_id})"
@@ -81,6 +111,7 @@ def gerar_proximo_codigo(db: Session, tipo: TipoCodigo, restaurante_id: int) -> 
         return codigo_gerado
         
     except Exception as e:
+        db.rollback()
         logger.error(
             f"Erro ao gerar codigo para tipo {tipo} e restaurante {restaurante_id}: {str(e)}"
         )

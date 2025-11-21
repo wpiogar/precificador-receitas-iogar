@@ -1,6 +1,6 @@
 {
   "versao": "2.0.0",
-  "created_at": "2025-11-10T16:53:36.130525",
+  "created_at": "2025-11-21T15:07:54.798060",
   "descricao": "Logs de feedback do sistema de IA integrado",
   "logs": [
     {
@@ -837,6 +837,25 @@
       "taxonomia_correta": {
         "categoria": "Bebidas",
         "subcategoria": "Café E Chá",
+        "especificacao": null,
+        "variante": null
+      },
+      "resultado": "correcao_aplicada"
+    },
+    {
+      "timestamp": "2025-11-21T15:07:54.780060",
+      "nome_produto": "Teste Final",
+      "acao": "corrigir",
+      "classificacao_errada": {
+        "categoria": "Sem classificação",
+        "subcategoria": "A definir",
+        "especificacao": null,
+        "variante": null,
+        "nome_completo": "Sem classificação > A definir"
+      },
+      "taxonomia_correta": {
+        "categoria": "Carnes",
+        "subcategoria": "Suíno",
         "especificacao": null,
         "variante": null
       },

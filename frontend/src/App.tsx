@@ -258,9 +258,7 @@ const [formData, setFormData] = useState(() => {
     subgrupo: editingInsumo?.subgrupo || '',
     grupo: editingInsumo?.grupo || '',
     descricao: editingInsumo?.descricao || '',
-    preco_compra_total: editingInsumo?.preco_compra_total || 
-                        (editingInsumo?.preco_compra_real && editingInsumo?.quantidade ? 
-                        editingInsumo.preco_compra_real * editingInsumo.quantidade : 0),
+    preco_compra_total: editingInsumo?.preco_compra_real || 0,  // Usar o valor direto, SEM multiplicar
     preco_compra_real: 0,
     eh_fornecedor_anonimo: editingInsumo?.eh_fornecedor_anonimo !== undefined ? editingInsumo.eh_fornecedor_anonimo : true,
     fornecedor_insumo_id: editingInsumo?.fornecedor_insumo_id || null
@@ -469,13 +467,14 @@ const resetForm = useCallback(() => {
       preco_compra_real: parseFloat(precoCalculadoPorUnidade.toFixed(2)),
       
       quantidade: parseInt(formData.quantidade) || 1,
+      fator: parseFloat(formData.fator) || 1.0, 
       grupo: formData.grupo?.trim() || 'Geral',
       subgrupo: formData.subgrupo?.trim() || 'Geral',
       
       // ====================================================================
       // 🆕 VÍNCULO COM RESTAURANTE - NULL para global, ID para específico
       // ====================================================================
-      restaurante_id: insumoGlobal ? null : (restauranteSelecionado?.id || null),
+      restaurante_id: insumoGlobal ? null : (restauranteSelecionado || selectedRestaurante?.id || null),
       
       // ====================================================================
       // CAMPOS PARA COMPARAÇÃO DE PREÇOS
@@ -5748,24 +5747,24 @@ const fetchInsumos = async () => {
         // ============================================================================
         console.log('🔍 ===== DEBUG handleSaveInsumo =====');
         console.log('📥 dadosInsumo recebido:', dadosInsumo);
-        console.log('🏪 restauranteSelecionado:', restauranteSelecionado);
-        console.log('🌍 insumoGlobal:', insumoGlobal);
+        console.log('🏪 selectedRestaurante:', selectedRestaurante);
         console.log('🔍 selectedRestaurante:', selectedRestaurante);
         
         // Preparar dados
         const dadosParaEnvio = {
-          nome: dadosInsumo.nome || '',
-          unidade: dadosInsumo.unidade || 'kg',
-          preco_compra_real: dadosInsumo.preco_compra_real || null,
-          quantidade: dadosInsumo.quantidade || 0,
-          fator: dadosInsumo.fator || 1.0,
+        nome: dadosInsumo.nome || '',
+        unidade: dadosInsumo.unidade || 'kg',
+        preco_unitario: dadosInsumo.preco_compra_total || dadosInsumo.preco_compra_real || null,
+        quantidade: dadosInsumo.quantidade || 0,
+        fator: parseFloat(dadosInsumo.fator) || 1.0,
           
-          // CRITICAL: Garantir que restaurante_id seja um número ou null
-          restaurante_id: dadosInsumo.restaurante_id !== undefined 
+          // CRITICAL: Garantir que restaurante_id seja um número válido
+          // Prioridade: 1) dadosInsumo.restaurante_id, 2) selectedRestaurante
+          restaurante_id: dadosInsumo.restaurante_id !== undefined && dadosInsumo.restaurante_id !== null
             ? (typeof dadosInsumo.restaurante_id === 'object' 
                 ? dadosInsumo.restaurante_id?.id 
                 : dadosInsumo.restaurante_id)
-            : null,
+            : (selectedRestaurante?.id || null),
           
           // Outros campos
           eh_fornecedor_anonimo: ehFornecedorAnonimo,
@@ -5776,6 +5775,9 @@ const fetchInsumos = async () => {
         
         console.log('📤 dadosParaEnvio ANTES de enviar:', dadosParaEnvio);
         console.log('🔍 Tipo de restaurante_id:', typeof dadosParaEnvio.restaurante_id);
+        console.log('🔍 Fator enviado:', dadosParaEnvio.fator, 'Tipo:', typeof dadosParaEnvio.fator);
+        console.log('🔍 Preço enviado:', dadosParaEnvio.preco_unitario, 'Tipo:', typeof dadosParaEnvio.preco_unitario);
+        console.log('🔍 Quantidade enviada:', dadosParaEnvio.quantidade, 'Tipo:', typeof dadosParaEnvio.quantidade);
         console.log('=======================================');
 
         // 🆕 Log de mudança de preço (se insumo do fornecedor selecionado)
@@ -6068,16 +6070,35 @@ const fetchInsumos = async () => {
 
     // Função para editar insumo
     const handleEditInsumo = (insumo: Insumo) => {
+      console.log('========================================');
+      console.log('✏️ EDITANDO INSUMO - DEBUG COMPLETO');
+      console.log('========================================');
+      console.log('📦 Objeto insumo completo:', insumo);
+      console.log('📊 insumo.fator:', insumo.fator, 'Tipo:', typeof insumo.fator);
+      console.log('💰 insumo.preco_compra_real:', insumo.preco_compra_real);
+      console.log('💰 insumo.preco_compra:', insumo.preco_compra);
+      console.log('🔢 insumo.quantidade:', insumo.quantidade);
+      console.log('========================================');
+      
       setEditingInsumo(insumo);
-      setNovoInsumo({
+  
+      const dadosParaEdicao = {
         nome: insumo.nome,
         unidade: insumo.unidade,
-        preco_compra: insumo.preco_compra_real || 0,
-        fator: insumo.fator,
-        categoria: insumo.grupo || insumo.categoria || '',
-        quantidade: insumo.quantidade || 0,
-        codigo: insumo.codigo || ''
-      });
+        preco_compra_real: insumo.preco_compra_real || 0,
+        preco_compra_total: insumo.preco_compra_real || 0,
+        fator: Number(insumo.fator) || 1,
+        grupo: insumo.grupo || '',
+        subgrupo: insumo.subgrupo || '',
+        quantidade: insumo.quantidade || 1,
+        codigo: insumo.codigo || '',
+        restaurante_id: insumo.restaurante_id || selectedRestaurante?.id || null
+      };
+      
+      console.log('📝 Dados preparados para edição:', dadosParaEdicao);
+      console.log('========================================');
+      
+      setNovoInsumo(dadosParaEdicao);
       setShowInsumoForm(true);
     };
 
@@ -6270,19 +6291,79 @@ const fetchInsumos = async () => {
                             <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
                           </svg>
                         </button>
-                        {[...Array(totalPaginasInsumos)].map((_, idx) => (
-                          <button
-                            key={idx + 1}
-                            onClick={() => setPaginaAtualInsumos(idx + 1)}
-                            className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
-                              paginaAtualInsumos === idx + 1
-                                ? 'z-10 bg-green-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600'
-                                : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:outline-offset-0'
-                            }`}
-                          >
-                            {idx + 1}
-                          </button>
-                        ))}
+                        {(() => {
+                          // Lógica para mostrar apenas páginas próximas
+                          const maxPaginasVisiveis = 5;
+                          const metade = Math.floor(maxPaginasVisiveis / 2);
+                          let paginaInicio = Math.max(1, paginaAtualInsumos - metade);
+                          let paginaFim = Math.min(totalPaginasInsumos, paginaInicio + maxPaginasVisiveis - 1);
+                          
+                          // Ajustar início se estiver muito próximo do fim
+                          if (paginaFim - paginaInicio < maxPaginasVisiveis - 1) {
+                            paginaInicio = Math.max(1, paginaFim - maxPaginasVisiveis + 1);
+                          }
+                          
+                          const paginas = [];
+                          
+                          // Sempre mostrar primeira página
+                          if (paginaInicio > 1) {
+                            paginas.push(
+                              <button
+                                key={1}
+                                onClick={() => setPaginaAtualInsumos(1)}
+                                className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                              >
+                                1
+                              </button>
+                            );
+                            if (paginaInicio > 2) {
+                              paginas.push(
+                                <span key="dots-start" className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700">
+                                  ...
+                                </span>
+                              );
+                            }
+                          }
+                          
+                          // Páginas do meio
+                          for (let i = paginaInicio; i <= paginaFim; i++) {
+                            paginas.push(
+                              <button
+                                key={i}
+                                onClick={() => setPaginaAtualInsumos(i)}
+                                className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
+                                  paginaAtualInsumos === i
+                                    ? 'z-10 bg-green-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600'
+                                    : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50'
+                                }`}
+                              >
+                                {i}
+                              </button>
+                            );
+                          }
+                          
+                          // Sempre mostrar última página
+                          if (paginaFim < totalPaginasInsumos) {
+                            if (paginaFim < totalPaginasInsumos - 1) {
+                              paginas.push(
+                                <span key="dots-end" className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700">
+                                  ...
+                                </span>
+                              );
+                            }
+                            paginas.push(
+                              <button
+                                key={totalPaginasInsumos}
+                                onClick={() => setPaginaAtualInsumos(totalPaginasInsumos)}
+                                className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                              >
+                                {totalPaginasInsumos}
+                              </button>
+                            );
+                          }
+                          
+                          return paginas;
+                        })()}
                         <button
                           onClick={() => setPaginaAtualInsumos(Math.min(totalPaginasInsumos, paginaAtualInsumos + 1))}
                           disabled={paginaAtualInsumos === totalPaginasInsumos}
@@ -6306,11 +6387,11 @@ const fetchInsumos = async () => {
                     <tr>
                       <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Nome</th>
                       <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Categoria</th>
-                      <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Quantidade</th>
+                      <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Quantidade</th>                      
+                      <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Fator</th>
                       <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Unidade</th>
                       <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Preço Compra</th>
                       <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Valor/Unidade</th>
-                      {/* <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Fator</th> */}
                       <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Comparativo de Preços</th>
                       <th className="px-6 py-4 text-right text-sm font-medium text-gray-900">Ações</th>
                     </tr>
@@ -6346,27 +6427,32 @@ const fetchInsumos = async () => {
                         <td className="px-6 py-4 text-sm text-gray-600">
                           {insumo.quantidade ?? 0}
                         </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {insumo.fator !== null && insumo.fator !== undefined ? 
+                            parseFloat(parseFloat(insumo.fator).toFixed(2)) : 
+                            ''
+                          }
+                        </td>
                         <td className="px-6 py-4 text-sm text-gray-600">{insumo.unidade}</td>
                         <td className="px-6 py-4 text-sm font-medium text-gray-700">
                           {insumo.tipo_origem === 'fornecedor' ? '-' : 
-                            `R$ ${insumo.quantidade && insumo.preco_compra_real 
-                              ? (insumo.preco_compra_real * insumo.quantidade).toFixed(2) 
-                              : '0.00'}`
+                            `R$ ${insumo.preco_compra_real?.toFixed(2) || '0.00'}`
                           }
                         </td>
                         <td className="px-6 py-4 text-sm font-medium text-green-600">
                           R$ {insumo.tipo_origem === 'fornecedor' 
                             ? insumo.preco_compra_real?.toFixed(2) || '0.00'
-                            : insumo.preco_compra_real?.toFixed(2) || '0.00'
+                            : (() => {
+                                // Calcular preço unitário: (Preço Total ÷ Quantidade) ÷ Fator
+                                if (!insumo.preco_compra_real || !insumo.quantidade || insumo.quantidade <= 0) {
+                                  return '0.00';
+                                }
+                                const fator = parseFloat(insumo.fator) || 1.0;
+                                const precoUnitario = insumo.preco_compra_real / (insumo.quantidade * fator);
+                                return precoUnitario.toFixed(2);
+                              })()
                           }
                         </td>
-                        {/* COLUNA FATOR - DESABILITADA (17/11/2025) */}
-                        {/* <td className="px-6 py-4 text-sm text-gray-600">
-                          {insumo.fator !== null && insumo.fator !== undefined ? 
-                            parseFloat(parseFloat(insumo.fator).toFixed(2)) : 
-                            ''
-                          }
-                        </td> */}
                         <td className="px-6 py-4 text-sm">
                           <div className="space-y-1">
                             <div className="flex items-center justify-between">
@@ -6481,9 +6567,7 @@ const fetchInsumos = async () => {
                         <span className="text-xs text-gray-600">Preço Compra Total:</span>
                         <span className="text-sm font-semibold text-gray-900">
                           {insumo.tipo_origem === 'fornecedor' ? '-' : 
-                            `R$ ${insumo.quantidade && insumo.preco_compra_real 
-                              ? (insumo.preco_compra_real * insumo.quantidade).toFixed(2) 
-                              : '0.00'}`
+                            `R$ ${insumo.preco_compra_real?.toFixed(2) || '0.00'}`
                           }
                         </span>
                       </div>
@@ -6492,7 +6576,15 @@ const fetchInsumos = async () => {
                         <span className="text-sm font-bold text-green-600">
                           R$ {insumo.tipo_origem === 'fornecedor' 
                             ? insumo.preco_compra_real?.toFixed(2) || '0.00'
-                            : insumo.preco_compra_real?.toFixed(2) || '0.00'
+                            : (() => {
+                                // Calcular preço unitário: (Preço Total ÷ Quantidade) ÷ Fator
+                                if (!insumo.preco_compra_real || !insumo.quantidade || insumo.quantidade <= 0) {
+                                  return '0.00';
+                                }
+                                const fator = parseFloat(insumo.fator) || 1.0;
+                                const precoUnitario = insumo.preco_compra_real / (insumo.quantidade * fator);
+                                return precoUnitario.toFixed(2);
+                              })()
                           }
                         </span>
                       </div>
@@ -6594,19 +6686,79 @@ const fetchInsumos = async () => {
                             <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
                           </svg>
                         </button>
-                        {[...Array(totalPaginasInsumos)].map((_, idx) => (
-                          <button
-                            key={idx + 1}
-                            onClick={() => setPaginaAtualInsumos(idx + 1)}
-                            className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
-                              paginaAtualInsumos === idx + 1
-                                ? 'z-10 bg-green-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600'
-                                : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:outline-offset-0'
-                            }`}
-                          >
-                            {idx + 1}
-                          </button>
-                        ))}
+                        {(() => {
+                          // Lógica para mostrar apenas páginas próximas
+                          const maxPaginasVisiveis = 5;
+                          const metade = Math.floor(maxPaginasVisiveis / 2);
+                          let paginaInicio = Math.max(1, paginaAtualInsumos - metade);
+                          let paginaFim = Math.min(totalPaginasInsumos, paginaInicio + maxPaginasVisiveis - 1);
+                          
+                          // Ajustar início se estiver muito próximo do fim
+                          if (paginaFim - paginaInicio < maxPaginasVisiveis - 1) {
+                            paginaInicio = Math.max(1, paginaFim - maxPaginasVisiveis + 1);
+                          }
+                          
+                          const paginas = [];
+                          
+                          // Sempre mostrar primeira página
+                          if (paginaInicio > 1) {
+                            paginas.push(
+                              <button
+                                key={1}
+                                onClick={() => setPaginaAtualInsumos(1)}
+                                className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                              >
+                                1
+                              </button>
+                            );
+                            if (paginaInicio > 2) {
+                              paginas.push(
+                                <span key="dots-start" className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700">
+                                  ...
+                                </span>
+                              );
+                            }
+                          }
+                          
+                          // Páginas do meio
+                          for (let i = paginaInicio; i <= paginaFim; i++) {
+                            paginas.push(
+                              <button
+                                key={i}
+                                onClick={() => setPaginaAtualInsumos(i)}
+                                className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
+                                  paginaAtualInsumos === i
+                                    ? 'z-10 bg-green-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600'
+                                    : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50'
+                                }`}
+                              >
+                                {i}
+                              </button>
+                            );
+                          }
+                          
+                          // Sempre mostrar última página
+                          if (paginaFim < totalPaginasInsumos) {
+                            if (paginaFim < totalPaginasInsumos - 1) {
+                              paginas.push(
+                                <span key="dots-end" className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700">
+                                  ...
+                                </span>
+                              );
+                            }
+                            paginas.push(
+                              <button
+                                key={totalPaginasInsumos}
+                                onClick={() => setPaginaAtualInsumos(totalPaginasInsumos)}
+                                className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                              >
+                                {totalPaginasInsumos}
+                              </button>
+                            );
+                          }
+                          
+                          return paginas;
+                        })()}
                         <button
                           onClick={() => setPaginaAtualInsumos(Math.min(totalPaginasInsumos, paginaAtualInsumos + 1))}
                           disabled={paginaAtualInsumos === totalPaginasInsumos}

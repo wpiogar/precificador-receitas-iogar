@@ -541,9 +541,13 @@ def create_insumo(db: Session, insumo: InsumoCreate) -> Insumo:
                 )
     
     # Converter preço de reais para centavos
+    # Priorizar preco_unitario se fornecido, senão usar preco_compra_real
     preco_centavos = None
-    if insumo.preco_compra_real is not None:
-        preco_centavos = int(insumo.preco_compra_real * 100)
+    preco_para_usar = insumo.preco_unitario if hasattr(insumo, 'preco_unitario') and insumo.preco_unitario else insumo.preco_compra_real
+    
+    if preco_para_usar is not None:
+        preco_centavos = int(preco_para_usar * 100)
+        print(f"💰 Preço convertido: R$ {preco_para_usar} = {preco_centavos} centavos")
     
     # ============================================================================
     # CORRIGIR FATOR: Copiar automaticamente do fornecedor_insumo se fornecido
@@ -556,29 +560,43 @@ def create_insumo(db: Session, insumo: InsumoCreate) -> Insumo:
     print(f"   fornecedor_insumo_id: {insumo.fornecedor_insumo_id}")
     print(f"   restaurante_id: {insumo.restaurante_id}")
 
-    # Criar objeto do modelo - campo fator removido
+    # DEBUG: Verificar valor do fator recebido
+    fator_recebido = insumo.fator if hasattr(insumo, 'fator') else 1.0
+    print(f"🔍 DEBUG FATOR - Valor recebido: {fator_recebido}")
+    print(f"🔍 DEBUG FATOR - Tipo: {type(fator_recebido)}")
+    
+    # Criar objeto do modelo com fator
     db_insumo = Insumo(
         grupo=insumo.grupo,
         subgrupo=insumo.subgrupo,
         codigo=insumo.codigo.upper() if insumo.codigo else None,
         nome=insumo.nome,
         quantidade=insumo.quantidade,
-        # ====================================================================
-        # CAMPO FATOR - DESABILITADO (17/11/2025)
-        # ====================================================================
-        # fator=insumo.fator if hasattr(insumo, 'fator') else 1.0,
+        fator=fator_recebido,
         unidade=insumo.unidade,
         preco_compra=preco_centavos,
         restaurante_id=insumo.restaurante_id,  # Campo obrigatório
         fornecedor_insumo_id=fornecedor_insumo_id_final,
         eh_fornecedor_anonimo=False if fornecedor_insumo_id_final else True
     )
+    
+    # DEBUG: Verificar objeto antes de salvar
+    print(f"🔍 DEBUG ANTES DE SALVAR:")
+    print(f"   db_insumo.fator: {db_insumo.fator}")
+    print(f"   db_insumo.preco_compra: {db_insumo.preco_compra}")
+    print(f"   db_insumo.quantidade: {db_insumo.quantidade}")
 
     try:
         # Salvar no banco
         db.add(db_insumo)
         db.commit()
         db.refresh(db_insumo)
+        
+        # DEBUG: Verificar objeto após salvar
+        print(f"🔍 DEBUG APÓS SALVAR:")
+        print(f"   db_insumo.fator: {db_insumo.fator}")
+        print(f"   db_insumo.preco_compra: {db_insumo.preco_compra}")
+        
         return db_insumo
         
     except Exception as e:

@@ -38,7 +38,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
         <div role="status" className="flex justify-center mb-4">
           <svg 
             aria-hidden="true" 
-            className={`${sizeClasses[size]} text-gray-200 animate-spin dark:text-gray-600 fill-blue-600`}
+            className={`${sizeClasses[size]} text-gray-200 animate-spin dark:text-gray-600 fill-green-600`}
             viewBox="0 0 100 101" 
             fill="none" 
             xmlns="http://www.w3.org/2000/svg"

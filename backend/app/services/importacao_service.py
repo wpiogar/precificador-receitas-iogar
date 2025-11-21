@@ -36,7 +36,8 @@ MAPEAMENTO_COLUNAS = {
     'NomeProduto': 'nome',
     'PrecoCompra': 'preco_compra_real',
     'Unidade': 'unidade',
-    'Fator': 'quantidade'
+    'Fator': 'fator',
+    'Quantidade': 'quantidade'
 }
 
 CONVERSAO_UNIDADES = {
@@ -191,15 +192,15 @@ def extrair_dados_linha(row, colunas_mapeadas: Dict[str, int]) -> Dict[str, Any]
             dados['unidade'] = converter_unidade(unidade_raw)
     
     # Extrair quantidade (se mapeado)
-    if 'quantidade' in colunas_mapeadas:
-        idx = colunas_mapeadas['quantidade']
+    if 'fator' in colunas_mapeadas:
+        idx = colunas_mapeadas['fator']
         if idx < len(row):
-            qtd_cell = row[idx]
-            valor = qtd_cell.value if hasattr(qtd_cell, 'value') else qtd_cell
+            fator_cell = row[idx]
+            valor = fator_cell.value if hasattr(fator_cell, 'value') else fator_cell
             try:
-                dados['quantidade'] = float(valor) if valor else 1.0
+                dados['fator'] = float(valor) if valor else 1.0
             except (ValueError, TypeError):
-                dados['quantidade'] = 1.0
+                dados['fator'] = 1.0
     
     # Extrair grupo/categoria (se mapeado)
     if 'grupo' in colunas_mapeadas:
@@ -584,6 +585,7 @@ class ImportacaoService:
                             codigo=dados['codigo'],
                             nome=dados['nome'],
                             quantidade=float(quantidade),
+                            fator=float(dados.get('fator', 1.0)),  # Adicionar fator da importação
                             unidade=dados['unidade'],
                             preco_compra=preco_centavos,
                             grupo='',

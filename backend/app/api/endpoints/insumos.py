@@ -17,6 +17,7 @@ from app.schemas.insumo import (
     InsumoUpdate,
     InsumoResponse,
     InsumoListResponse,
+    InsumoListPaginadaResponse,
     InsumoFilter
 )
 
@@ -139,6 +140,102 @@ def contar_insumos(
     total = crud_insumo.count_insumos(db=db, filters=filters)
 
     return {"total": total}
+
+# ===================================================================================================
+# Endpoint de listagem paginada (server-side pagination)
+# ===================================================================================================
+
+@router.get("/paginado", response_model=InsumoListPaginadaResponse, summary="Listar insumos com paginação server-side")
+def listar_insumos_paginado(
+    # Parâmetros de paginação
+    page: int = Query(1, ge=1, description="Número da página (começa em 1)"),
+    per_page: int = Query(20, ge=1, le=100, description="Registros por página (1-100)"),
+    
+    # Filtros opcionais
+    grupo: Optional[str] = Query(None, description="Filtrar por grupo"),
+    subgrupo: Optional[str] = Query(None, description="Filtrar por subgrupo"),
+    codigo: Optional[str] = Query(None, description="Filtrar por código"),
+    nome: Optional[str] = Query(None, description="Filtrar por nome"),
+    unidade: Optional[str] = Query(None, description="Filtrar por unidade"),
+    preco_min: Optional[float] = Query(None, ge=0, description="Preço mínimo"),
+    preco_max: Optional[float] = Query(None, ge=0, description="Preço máximo"),
+    
+    # Filtros de restaurante
+    restaurante_id: Optional[int] = Query(None, description="Filtrar por restaurante específico"),
+    incluir_globais: bool = Query(False, description="Incluir insumos globais junto com insumos do restaurante"),
+    
+    # Dependência do banco de dados
+    db: Session = Depends(get_db)
+):
+    """
+    Lista insumos com paginação server-side.
+    
+    Diferente do endpoint /api/v1/insumos/ que retorna lista simples,
+    este endpoint retorna dados paginados com metadados de navegação.
+    
+    Parâmetros de paginação:
+    - page: Número da página (começa em 1)
+    - per_page: Registros por página (padrão: 20, máximo: 100)
+    
+    Retorna:
+    - data: Lista de insumos da página atual
+    - total: Total de registros no banco
+    - page: Página atual
+    - pages: Total de páginas
+    - per_page: Registros por página
+    """
+    
+    # Calcular skip baseado na página
+    skip = (page - 1) * per_page
+    
+    # Criar objeto de filtros
+    filters = InsumoFilter(
+        grupo=grupo,
+        subgrupo=subgrupo,
+        codigo=codigo,
+        nome=nome,
+        unidade=unidade,
+        preco_min=preco_min,
+        preco_max=preco_max,
+        skip=skip,
+        limit=per_page
+    )
+    
+    # Buscar insumos com filtros
+    insumos = crud_insumo.get_insumos(
+        db=db,
+        skip=skip,
+        limit=per_page,
+        filters=filters,
+        restaurante_id=restaurante_id,
+        incluir_globais=incluir_globais
+    )
+    
+    # Contar total de registros com os mesmos filtros
+    total = crud_insumo.count_insumos(
+        db=db,
+        filters=filters
+    )
+    
+    # Calcular total de páginas
+    import math
+    total_pages = math.ceil(total / per_page) if total > 0 else 1
+    
+    # Converter preços para reais
+    for insumo in insumos:
+        if hasattr(insumo, 'preco_compra') and insumo.preco_compra is not None:
+            insumo.preco_compra_real = insumo.preco_compra_real
+        else:
+            insumo.preco_compra_real = None
+    
+    # Retornar resposta paginada
+    return InsumoListPaginadaResponse(
+        data=insumos,
+        total=total,
+        page=page,
+        pages=total_pages,
+        per_page=per_page
+    )
 
 @router.get("/search", response_model=List[InsumoListResponse], summary="Buscar insumos")
 def buscar_insumos(

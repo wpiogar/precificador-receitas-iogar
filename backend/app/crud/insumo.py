@@ -389,20 +389,47 @@ def count_insumos_sem_taxonomia(db: Session):
         )
     ).count()
 
-def count_insumos(db: Session, filters: Optional[InsumoFilter] = None) -> int:
+def count_insumos(
+    db: Session,
+    filters: Optional[InsumoFilter] = None,
+    restaurante_id: Optional[int] = None,
+    incluir_globais: bool = False
+) -> int:
     """
     Conta o total de insumos (com filtros opcionais).
     
     Args:
         db (Session): Sessão do banco de dados
         filters (InsumoFilter): Filtros de busca
+        restaurante_id (int, opcional): ID do restaurante para filtrar insumos específicos
+        incluir_globais (bool): Se True, inclui insumos globais junto com os do restaurante
         
     Returns:
         int: Número total de insumos
         
-    IMPORTANTE: Conta apenas insumos com restaurante_id válido.
+    Regras de Filtro por Restaurante:
+        - Se restaurante_id = None: retorna APENAS insumos globais (restaurante_id IS NULL)
+        - Se restaurante_id fornecido e incluir_globais = False: retorna APENAS insumos daquele restaurante
+        - Se restaurante_id fornecido e incluir_globais = True: retorna insumos do restaurante + globais
     """
-    query = db.query(Insumo).filter(Insumo.restaurante_id.isnot(None))
+    query = db.query(Insumo)
+    
+    # Aplicar filtros de restaurante (mesma lógica do get_insumos)
+    if restaurante_id is not None:
+        if incluir_globais:
+            # Incluir insumos do restaurante OU globais
+            query = query.filter(
+                or_(
+                    Insumo.restaurante_id == restaurante_id,
+                    Insumo.restaurante_id.is_(None)
+                )
+            )
+        else:
+            # Apenas insumos do restaurante específico
+            query = query.filter(Insumo.restaurante_id == restaurante_id)
+    else:
+        # Se não houver restaurante selecionado, mostrar apenas globais
+        query = query.filter(Insumo.restaurante_id.is_(None))
 
     # Aplicar os mesmos filtros da função get_insumos
     if filters:

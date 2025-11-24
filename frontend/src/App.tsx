@@ -1984,6 +1984,11 @@ const FoodCostSystem: React.FC = () => {
   }, [activeTab]);
   const [insumos, setInsumos] = useState<Insumo[]>([]);
   const [incluirInsumosGlobais, setIncluirInsumosGlobais] = useState(false);
+  // Estados de paginação para insumos (server-side)
+  const [paginaAtualInsumos, setPaginaAtualInsumos] = useState(1);
+  const itensPorPaginaInsumos = 20;
+  const [totalInsumosBackend, setTotalInsumosBackend] = useState(0);
+  const [totalPaginasBackend, setTotalPaginasBackend] = useState(1);
   const [receitas, setReceitas] = useState<Receita[]>([]);
   const [restaurantes, setRestaurantes] = useState<RestauranteGrid[]>([]);
   const [restaurantesExpandidos, setRestaurantesExpandidos] = useState<Set<number>>(new Set());
@@ -2179,6 +2184,16 @@ const FoodCostSystem: React.FC = () => {
     }
   }, [selectedRestaurante]);
 
+  // ===================================================================================================
+  // RECARREGAR INSUMOS QUANDO MUDAR A PÁGINA (PAGINAÇÃO SERVER-SIDE)
+  // ===================================================================================================
+  useEffect(() => {
+    if (selectedRestaurante && selectedRestaurante.id) {
+      console.log(`📄 Mudança de página detectada: ${paginaAtualInsumos}`);
+      fetchInsumos();
+    }
+  }, [paginaAtualInsumos]);
+
   const handleCriarRestaurante = async (dadosRestaurante) => {
     if (!dadosRestaurante.nome.trim() || !dadosRestaurante.cnpj.trim()) {
       showErrorPopup(
@@ -2287,9 +2302,12 @@ const fetchInsumos = async () => {
     setLoading(true);
     
     // ========================================================================
-    // BUSCAR INSUMOS DA TABELA PRINCIPAL
+    // BUSCAR INSUMOS DA TABELA PRINCIPAL COM PAGINAÇÃO SERVER-SIDE
     // ========================================================================
-    const params: any = {};
+    const params: any = {
+      page: paginaAtualInsumos,
+      per_page: itensPorPaginaInsumos
+    };
 
     // Adicionar filtro de restaurante se houver um selecionado
     if (selectedRestaurante) {
@@ -2301,90 +2319,32 @@ const fetchInsumos = async () => {
       }
     }
 
-    console.log('🔍 Buscando insumos com parâmetros:', params);
+    console.log('🔍 Buscando insumos com parâmetros (paginação server-side):', params);
 
-    const response = await apiService.getInsumos(params);
+    const response = await apiService.getInsumosPaginados(params);
     let insumosPrincipais = [];
     
-    if (response.data) {
-      insumosPrincipais = response.data.map(insumo => ({
+    if (response.data && response.data.data) {
+      // A resposta paginada vem com estrutura: { data: [...], total: X, page: Y, ... }
+      insumosPrincipais = response.data.data.map(insumo => ({
         ...insumo,
-        tipo_origem: 'sistema', // Identificar como insumo do sistema
+        tipo_origem: 'sistema',
         tem_fornecedor: false,
         restaurante_id: insumo.restaurante_id
       }));
+      
+      // Atualizar informações de paginação
+      setTotalInsumosBackend(response.data.total);
+      setTotalPaginasBackend(response.data.pages);
+      console.log(`📊 Paginação: Página ${response.data.page} de ${response.data.pages} | Total: ${response.data.total} insumos`);
     } else if (response.error) {
       console.error('Erro ao buscar insumos principais:', response.error);
     }
 
-    // ========================================================================
-    // BUSCAR INSUMOS DE TODOS OS FORNECEDORES
-    // ========================================================================
-    let insumosFornecedores = [];
+    // Atualizar estado com insumos paginados
+    setInsumos(insumosPrincipais);
     
-    try {
-      // Buscar todos os fornecedores primeiro
-      const fornecedoresResponse = await apiService.getFornecedores();
-      
-      if (fornecedoresResponse.data && fornecedoresResponse.data.fornecedores) {
-        // Para cada fornecedor, buscar seus insumos
-        const promises = fornecedoresResponse.data.fornecedores.map(async (fornecedor) => {
-          try {
-            const insumosFornResponse = await apiService.getFornecedorInsumos(fornecedor.id);
-            
-            if (insumosFornResponse.data && insumosFornResponse.data.insumos) {
-              return insumosFornResponse.data.insumos.map(insumo => ({
-                // Mapear campos do fornecedor para formato do grid principal
-                id: `fornecedor_${insumo.id}`, // ID único para evitar conflitos
-                id_original: insumo.id,
-                nome: insumo.nome,
-                unidade: insumo.unidade,
-                preco_compra_real: insumo.preco_unitario,
-                codigo: insumo.codigo,
-                // Campos que ficam vazios para insumos de fornecedor
-                fator: insumo.fator || null,
-                quantidade: insumo.quantidade || 1,
-                grupo: null,
-                subgrupo: null,
-                descricao: insumo.descricao,
-                // Campos específicos para identificar origem
-                restaurante_id: null,
-                tipo_origem: 'fornecedor',
-                tem_fornecedor: true,
-                fornecedor_id: insumo.fornecedor_id,
-                fornecedor_nome: fornecedor.nome_razao_social
-              }));
-            }
-            return [];
-          } catch (error) {
-            console.error(`Erro ao buscar insumos do fornecedor ${fornecedor.id}:`, error);
-            return [];
-          }
-        });
-
-        // Aguardar todas as buscas e combinar resultados
-        const resultados = await Promise.all(promises);
-        insumosFornecedores = resultados.flat();
-      }
-    } catch (error) {
-      console.error('Erro ao buscar insumos de fornecedores:', error);
-    }
-
-    // ========================================================================
-    // COMBINAR E ORGANIZAR TODOS OS INSUMOS
-    // ========================================================================
-    const todosinsumos = [
-      ...insumosPrincipais,
-      ...insumosFornecedores
-    ];
-
-    // Ordenar por nome
-    todosinsumos.sort((a, b) => a.nome.localeCompare(b.nome));
-
-    // Atualizar estado
-    setInsumos(todosinsumos);
-    
-    console.log(`✅ Insumos carregados: ${insumosPrincipais.length} do sistema + ${insumosFornecedores.length} de fornecedores = ${todosinsumos.length} total`);
+    console.log(`✅ Insumos carregados: ${insumosPrincipais.length} insumos da página ${response.data?.page || 1}`);
 
   } catch (error) {
     console.error('Erro geral ao buscar insumos:', error);
@@ -3509,7 +3469,7 @@ const fetchInsumos = async () => {
   // ============================================================================
   const Dashboard = () => {
     // Cálculos das estatísticas em tempo real
-    const totalInsumos = insumos.length;
+    const totalInsumos = totalInsumosBackend;
     const totalRestaurantes = restaurantes.length;
     const totalReceitas = receitas.length;
 
@@ -5678,12 +5638,6 @@ const fetchInsumos = async () => {
     const [buscaInsumo, setBuscaInsumo] = useState('');
     const [searchTerm, setSearchTerm] = useState<string>('');
 
-    // ============================================================================
-    // ESTADOS DE PAGINAÇÃO PARA INSUMOS
-    // ============================================================================
-    const [paginaAtualInsumos, setPaginaAtualInsumos] = useState(1);
-    const itensPorPaginaInsumos = 20;
-
     const [editandoFornecedor, setEditandoFornecedor] = useState(null);
 
     // Estado para modal de confirmação de exclusão
@@ -5730,12 +5684,13 @@ const fetchInsumos = async () => {
     });
 
     // ============================================================================
-    // CÁLCULO DE PAGINAÇÃO PARA INSUMOS
+    // PAGINAÇÃO SERVER-SIDE - OS DADOS JÁ VÊM PAGINADOS DO BACKEND
     // ============================================================================
-    const indiceInicialInsumos = (paginaAtualInsumos - 1) * itensPorPaginaInsumos;
-    const indiceFinalInsumos = indiceInicialInsumos + itensPorPaginaInsumos;
-    const insumosPaginados = insumosFiltrados.slice(indiceInicialInsumos, indiceFinalInsumos);
-    const totalPaginasInsumos = Math.ceil(insumosFiltrados.length / itensPorPaginaInsumos);
+    // Não precisamos mais fazer slice() - os dados já vêm filtrados do servidor
+    const insumosPaginados = insumosFiltrados;
+    
+    // Total de páginas vem do backend (server-side pagination)
+    const totalPaginasInsumos = totalPaginasBackend;
 
     // Função atualizada para salvar insumo com nova lógica de fornecedor
     const handleSaveInsumo = async (dadosInsumo) => {
@@ -6272,11 +6227,12 @@ const fetchInsumos = async () => {
                   <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
                     <div>
                       <p className="text-sm text-gray-700">
-                        Mostrando <span className="font-medium">{indiceInicialInsumos + 1}</span> a{' '}
+                        Mostrando 
+                        <span className="font-medium">{(paginaAtualInsumos - 1) * itensPorPaginaInsumos + 1}</span> a{' '}
                         <span className="font-medium">
-                          {Math.min(indiceFinalInsumos, insumosFiltrados.length)}
+                          {Math.min(paginaAtualInsumos * itensPorPaginaInsumos, totalInsumosBackend)}
                         </span>{' '}
-                        de <span className="font-medium">{insumosFiltrados.length}</span> insumos
+                        de <span className="font-medium">{totalInsumosBackend}</span> insumos
                       </p>
                     </div>
                     <div>
@@ -6667,11 +6623,12 @@ const fetchInsumos = async () => {
                   <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
                     <div>
                       <p className="text-sm text-gray-700">
-                        Mostrando <span className="font-medium">{indiceInicialInsumos + 1}</span> a{' '}
+                        Mostrando 
+                        <span className="font-medium">{(paginaAtualInsumos - 1) * itensPorPaginaInsumos + 1}</span> a{' '}
                         <span className="font-medium">
-                          {Math.min(indiceFinalInsumos, insumosFiltrados.length)}
+                          {Math.min(paginaAtualInsumos * itensPorPaginaInsumos, totalInsumosBackend)}
                         </span>{' '}
-                        de <span className="font-medium">{insumosFiltrados.length}</span> insumos
+                        de <span className="font-medium">{totalInsumosBackend}</span> insumos
                       </p>
                     </div>
                     <div>

@@ -214,7 +214,9 @@ def listar_insumos_paginado(
     # Contar total de registros com os mesmos filtros
     total = crud_insumo.count_insumos(
         db=db,
-        filters=filters
+        filters=filters,
+        restaurante_id=restaurante_id,
+        incluir_globais=incluir_globais
     )
     
     # Calcular total de páginas

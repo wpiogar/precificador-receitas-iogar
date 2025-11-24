@@ -271,6 +271,80 @@ async refreshAccessToken(): Promise<string | null> {
     return this.request<any[]>(url);
   }
 
+  // Listar insumos com paginação server-side
+  async getInsumosPaginados(params: {
+    page?: number;
+    per_page?: number;
+    restaurante_id?: number;
+    incluir_globais?: boolean;
+    grupo?: string;
+    subgrupo?: string;
+    codigo?: string;
+    nome?: string;
+    unidade?: string;
+    preco_min?: number;
+    preco_max?: number;
+  } = {}): Promise<ApiResponse<{
+    data: any[];
+    total: number;
+    page: number;
+    pages: number;
+    per_page: number;
+  }>> {
+    // Construir query string com parâmetros de paginação
+    const queryParams = new URLSearchParams();
+    
+    // Parâmetros de paginação
+    if (params.page) {
+      queryParams.append('page', params.page.toString());
+    }
+    if (params.per_page) {
+      queryParams.append('per_page', params.per_page.toString());
+    }
+    
+    // Parâmetros de filtro de restaurante
+    if (params.restaurante_id) {
+      queryParams.append('restaurante_id', params.restaurante_id.toString());
+    }
+    if (params.incluir_globais !== undefined) {
+      queryParams.append('incluir_globais', params.incluir_globais.toString());
+    }
+    
+    // Parâmetros de filtros adicionais
+    if (params.grupo) {
+      queryParams.append('grupo', params.grupo);
+    }
+    if (params.subgrupo) {
+      queryParams.append('subgrupo', params.subgrupo);
+    }
+    if (params.codigo) {
+      queryParams.append('codigo', params.codigo);
+    }
+    if (params.nome) {
+      queryParams.append('nome', params.nome);
+    }
+    if (params.unidade) {
+      queryParams.append('unidade', params.unidade);
+    }
+    if (params.preco_min !== undefined) {
+      queryParams.append('preco_min', params.preco_min.toString());
+    }
+    if (params.preco_max !== undefined) {
+      queryParams.append('preco_max', params.preco_max.toString());
+    }
+    
+    const url = `/api/v1/insumos/paginado?${queryParams.toString()}`;
+    console.log('📡 API getInsumosPaginados:', url);
+    
+    return this.request<{
+      data: any[];
+      total: number;
+      page: number;
+      pages: number;
+      per_page: number;
+    }>(url);
+  }
+
   // Buscar insumos disponíveis (inclui receitas processadas)
   async getInsumosDisponiveis(termo?: string): Promise<ApiResponse<any[]>> {
     const query = termo ? `?termo=${encodeURIComponent(termo)}` : '';

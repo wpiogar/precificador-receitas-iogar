@@ -422,3 +422,24 @@ class InsumoFilter(BaseModel):
     # Paginação
     skip: int = Field(0, ge=0, description="Registros para pular")
     limit: int = Field(100, ge=1, le=1000, description="Limite de registros")
+
+
+# ===================================================================================================
+# Schema para resposta paginada
+# ===================================================================================================
+
+class InsumoListPaginadaResponse(BaseModel):
+    """
+    Schema de resposta para listagem paginada de insumos.
+    
+    Retorna dados paginados com metadados de navegação para implementar
+    paginação server-side no frontend.
+    """
+    data: List[InsumoListResponse] = Field(description="Lista de insumos da página atual")
+    total: int = Field(description="Total de registros no banco de dados")
+    page: int = Field(description="Página atual")
+    pages: int = Field(description="Total de páginas disponíveis")
+    per_page: int = Field(description="Registros por página")
+    
+    class Config:
+        from_attributes = True

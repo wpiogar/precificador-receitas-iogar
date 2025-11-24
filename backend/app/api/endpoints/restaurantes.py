@@ -202,6 +202,11 @@ def criar_restaurante(
     - Define localização completa
     """
     try:
+        # ===========================================================================
+        # Normalizar tipo de estabelecimento para maiúsculo antes de salvar
+        # ===========================================================================
+        restaurante.tipo = restaurante.tipo.upper()
+        
         restaurante_criado = crud_receita.create_restaurante(db, restaurante)
         
         # Calcular quantidade de unidades (sempre 1 para novo restaurante)

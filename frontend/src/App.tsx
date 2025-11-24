@@ -1205,6 +1205,8 @@ const FormularioRestauranteIsolado = React.memo(({
   isVisible,
   editingRestaurante,
   tiposEstabelecimento,
+  estadosBrasil,
+  cidadesPorEstado,
   onClose,
   onSave,
   loading
@@ -1229,11 +1231,44 @@ const FormularioRestauranteIsolado = React.memo(({
   const [cnpjValido, setCnpjValido] = useState(true);
 
   // ============================================================================
+  // Estado para cidades filtradas baseadas no estado selecionado
+  // ============================================================================
+  const [cidadesFiltradas, setCidadesFiltradas] = useState<string[]>([]);
+
+
+  // ============================================================================
   // FUNÇÕES LOCAIS (igual FormularioInsumoIsolado)
   // ============================================================================
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
+
+  // ============================================================================
+  // Função para lidar com mudança de estado e atualizar cidades
+  // ============================================================================
+  const handleEstadoChange = (siglaEstado: string) => {
+    // Atualizar estado selecionado
+    setFormData(prev => ({ 
+      ...prev, 
+      estado: siglaEstado,
+      cidade: '' // Limpar cidade ao trocar estado
+    }));
+    
+    // Atualizar lista de cidades disponíveis
+    const cidades = cidadesPorEstado[siglaEstado] || [];
+    setCidadesFiltradas(cidades);
+  };
+
+  // ============================================================================
+  // Effect para carregar cidades quando editando restaurante com estado já definido
+  // ============================================================================
+  React.useEffect(() => {
+    if (editingRestaurante?.estado) {
+      const cidades = cidadesPorEstado[editingRestaurante.estado] || [];
+      setCidadesFiltradas(cidades);
+    }
+  }, [editingRestaurante, cidadesPorEstado]);
+
 
   const validarCNPJ = (cnpj) => {
     const numero = cnpj.replace(/\D/g, '');
@@ -1389,7 +1424,9 @@ const FormularioRestauranteIsolado = React.memo(({
               required
             >
               {tiposEstabelecimento.map(tipo => (
-                <option key={tipo} value={tipo}>{tipo}</option>
+                <option key={tipo.value} value={tipo.value}>
+                  {tipo.label}
+                </option>
               ))}
             </select>
           </div>
@@ -1408,7 +1445,7 @@ const FormularioRestauranteIsolado = React.memo(({
             />
           </div>
 
-          {/* Bairro, Cidade, Estado */}
+          {/* Bairro */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1422,32 +1459,46 @@ const FormularioRestauranteIsolado = React.memo(({
                 placeholder="Bairro"
               />
             </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Cidade
-              </label>
-              <input
-                type="text"
-                value={formData.cidade}
-                onChange={(e) => handleChange('cidade', e.target.value)}
-                className="w-full px-4 py-3 bg-white border-2 border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
-                placeholder="Cidade"
-              />
-            </div>
-            
+
+            {/* Estado */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Estado
               </label>
-              <input
-                type="text"
+              <select
                 value={formData.estado}
-                onChange={(e) => handleChange('estado', e.target.value)}
+                onChange={(e) => handleEstadoChange(e.target.value)}
                 className="w-full px-4 py-3 bg-white border-2 border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
-                placeholder="UF"
-                maxLength={2}
-              />
+              >
+                <option value="">Selecione o estado</option>
+                {estadosBrasil.map(estado => (
+                  <option key={estado.sigla} value={estado.sigla}>
+                    {estado.nome} ({estado.sigla})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Cidade */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Cidade
+              </label>
+              <select
+                value={formData.cidade}
+                onChange={(e) => handleChange('cidade', e.target.value)}
+                className="w-full px-4 py-3 bg-white border-2 border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
+                disabled={!formData.estado}
+              >
+                <option value="">
+                  {formData.estado ? 'Selecione a cidade' : 'Selecione primeiro o estado'}
+                </option>
+                {cidadesFiltradas.map(cidade => (
+                  <option key={cidade} value={cidade}>
+                    {cidade}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -1568,12 +1619,71 @@ const FormularioUnidadeIsolado = React.memo<FormularioUnidadeIsoladoProps>(({
     tem_delivery: restauranteMatriz?.tem_delivery || false
   });
 
-  // Estados brasileiros para dropdown (mesma lista do componente principal)
+  // ============================================================================
+  // DADOS DE ESTADOS E CIDADES DO BRASIL
+  // ============================================================================
+
+  // Lista de estados brasileiros
   const ESTADOS_BRASIL = [
-    'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
-    'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN',
-    'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
+    { sigla: 'AC', nome: 'Acre' },
+    { sigla: 'AL', nome: 'Alagoas' },
+    { sigla: 'AP', nome: 'Amapá' },
+    { sigla: 'AM', nome: 'Amazonas' },
+    { sigla: 'BA', nome: 'Bahia' },
+    { sigla: 'CE', nome: 'Ceará' },
+    { sigla: 'DF', nome: 'Distrito Federal' },
+    { sigla: 'ES', nome: 'Espírito Santo' },
+    { sigla: 'GO', nome: 'Goiás' },
+    { sigla: 'MA', nome: 'Maranhão' },
+    { sigla: 'MT', nome: 'Mato Grosso' },
+    { sigla: 'MS', nome: 'Mato Grosso do Sul' },
+    { sigla: 'MG', nome: 'Minas Gerais' },
+    { sigla: 'PA', nome: 'Pará' },
+    { sigla: 'PB', nome: 'Paraíba' },
+    { sigla: 'PR', nome: 'Paraná' },
+    { sigla: 'PE', nome: 'Pernambuco' },
+    { sigla: 'PI', nome: 'Piauí' },
+    { sigla: 'RJ', nome: 'Rio de Janeiro' },
+    { sigla: 'RN', nome: 'Rio Grande do Norte' },
+    { sigla: 'RS', nome: 'Rio Grande do Sul' },
+    { sigla: 'RO', nome: 'Rondônia' },
+    { sigla: 'RR', nome: 'Roraima' },
+    { sigla: 'SC', nome: 'Santa Catarina' },
+    { sigla: 'SP', nome: 'São Paulo' },
+    { sigla: 'SE', nome: 'Sergipe' },
+    { sigla: 'TO', nome: 'Tocantins' }
   ];
+
+  // Principais cidades por estado
+  const CIDADES_POR_ESTADO: Record<string, string[]> = {
+    'SP': ['São Paulo', 'Campinas', 'Santos', 'São José dos Campos', 'Ribeirão Preto', 'Sorocaba', 'Guarulhos', 'São Bernardo do Campo', 'Santo André', 'Osasco'],
+    'RJ': ['Rio de Janeiro', 'Niterói', 'São Gonçalo', 'Duque de Caxias', 'Nova Iguaçu', 'Petrópolis', 'Volta Redonda', 'Belford Roxo', 'Campos dos Goytacazes', 'São João de Meriti'],
+    'MG': ['Belo Horizonte', 'Uberlândia', 'Contagem', 'Juiz de Fora', 'Betim', 'Montes Claros', 'Ribeirão das Neves', 'Uberaba', 'Governador Valadares', 'Ipatinga'],
+    'BA': ['Salvador', 'Feira de Santana', 'Vitória da Conquista', 'Camaçari', 'Itabuna', 'Juazeiro', 'Lauro de Freitas', 'Ilhéus', 'Jequié', 'Teixeira de Freitas'],
+    'PR': ['Curitiba', 'Londrina', 'Maringá', 'Ponta Grossa', 'Cascavel', 'Foz do Iguaçu', 'São José dos Pinhais', 'Colombo', 'Guarapuava', 'Paranaguá'],
+    'RS': ['Porto Alegre', 'Caxias do Sul', 'Pelotas', 'Canoas', 'Santa Maria', 'Gravataí', 'Viamão', 'Novo Hamburgo', 'São Leopoldo', 'Rio Grande'],
+    'SC': ['Florianópolis', 'Joinville', 'Blumenau', 'São José', 'Criciúma', 'Chapecó', 'Itajaí', 'Jaraguá do Sul', 'Lages', 'Palhoça'],
+    'CE': ['Fortaleza', 'Caucaia', 'Juazeiro do Norte', 'Maracanaú', 'Sobral', 'Crato', 'Itapipoca', 'Maranguape', 'Iguatu', 'Quixadá'],
+    'PE': ['Recife', 'Jaboatão dos Guararapes', 'Olinda', 'Caruaru', 'Petrolina', 'Paulista', 'Cabo de Santo Agostinho', 'Camaragibe', 'Garanhuns', 'Vitória de Santo Antão'],
+    'GO': ['Goiânia', 'Aparecida de Goiânia', 'Anápolis', 'Rio Verde', 'Luziânia', 'Águas Lindas de Goiás', 'Valparaíso de Goiás', 'Trindade', 'Formosa', 'Novo Gama'],
+    'AM': ['Manaus', 'Parintins', 'Itacoatiara', 'Manacapuru', 'Coari', 'Tefé', 'Tabatinga', 'Maués', 'Humaitá', 'São Gabriel da Cachoeira'],
+    'PA': ['Belém', 'Ananindeua', 'Santarém', 'Marabá', 'Castanhal', 'Parauapebas', 'Itaituba', 'Cametá', 'Bragança', 'Abaetetuba'],
+    'ES': ['Vitória', 'Vila Velha', 'Serra', 'Cariacica', 'Linhares', 'Cachoeiro de Itapemirim', 'São Mateus', 'Colatina', 'Guarapari', 'Aracruz'],
+    'DF': ['Brasília', 'Ceilândia', 'Taguatinga', 'Samambaia', 'Planaltina', 'Águas Claras', 'Gama', 'Santa Maria', 'São Sebastião', 'Recanto das Emas'],
+    'MT': ['Cuiabá', 'Várzea Grande', 'Rondonópolis', 'Sinop', 'Tangará da Serra', 'Cáceres', 'Sorriso', 'Lucas do Rio Verde', 'Barra do Garças', 'Primavera do Leste'],
+    'MS': ['Campo Grande', 'Dourados', 'Três Lagoas', 'Corumbá', 'Ponta Porã', 'Aquidauana', 'Nova Andradina', 'Sidrolândia', 'Naviraí', 'Maracaju'],
+    'MA': ['São Luís', 'Imperatriz', 'São José de Ribamar', 'Timon', 'Caxias', 'Codó', 'Paço do Lumiar', 'Açailândia', 'Bacabal', 'Balsas'],
+    'RN': ['Natal', 'Mossoró', 'Parnamirim', 'São Gonçalo do Amarante', 'Macaíba', 'Ceará-Mirim', 'Caicó', 'Assu', 'Currais Novos', 'Nova Cruz'],
+    'PB': ['João Pessoa', 'Campina Grande', 'Santa Rita', 'Patos', 'Bayeux', 'Sousa', 'Cajazeiras', 'Guarabira', 'Monteiro', 'Pombal'],
+    'AL': ['Maceió', 'Arapiraca', 'Rio Largo', 'Palmeira dos Índios', 'União dos Palmares', 'Penedo', 'Delmiro Gouveia', 'Santana do Ipanema', 'Coruripe', 'São Miguel dos Campos'],
+    'PI': ['Teresina', 'Parnaíba', 'Picos', 'Piripiri', 'Floriano', 'Campo Maior', 'Barras', 'Altos', 'Esperantina', 'Pedro II'],
+    'SE': ['Aracaju', 'Nossa Senhora do Socorro', 'Lagarto', 'Itabaiana', 'Estância', 'Tobias Barreto', 'Simão Dias', 'Propriá', 'Barra dos Coqueiros', 'Laranjeiras'],
+    'AC': ['Rio Branco', 'Cruzeiro do Sul', 'Sena Madureira', 'Tarauacá', 'Feijó', 'Senador Guiomard', 'Brasiléia', 'Plácido de Castro', 'Xapuri', 'Epitaciolândia'],
+    'AP': ['Macapá', 'Santana', 'Laranjal do Jari', 'Oiapoque', 'Mazagão', 'Porto Grande', 'Tartarugalzinho', 'Pedra Branca do Amapari', 'Vitória do Jari', 'Ferreira Gomes'],
+    'RO': ['Porto Velho', 'Ji-Paraná', 'Ariquemes', 'Vilhena', 'Cacoal', 'Jaru', 'Pimenta Bueno', 'Rolim de Moura', 'Guajará-Mirim', 'Espigão do Oeste'],
+    'RR': ['Boa Vista', 'Rorainópolis', 'Caracaraí', 'Alto Alegre', 'Mucajaí', 'Bonfim', 'Cantá', 'Normandia', 'Pacaraima', 'São João da Baliza'],
+    'TO': ['Palmas', 'Araguaína', 'Gurupi', 'Porto Nacional', 'Paraíso do Tocantins', 'Colinas do Tocantins', 'Guaraí', 'Tocantinópolis', 'Araguatins', 'Miracema do Tocantins']
+  };
 
   // ============================================================================
   // FUNÇÕES DE MANIPULAÇÃO DO FORMULÁRIO
@@ -1992,7 +2102,6 @@ const FoodCostSystem: React.FC = () => {
   const [receitas, setReceitas] = useState<Receita[]>([]);
   const [restaurantes, setRestaurantes] = useState<RestauranteGrid[]>([]);
   const [restaurantesExpandidos, setRestaurantesExpandidos] = useState<Set<number>>(new Set());
-  const [tiposEstabelecimento, setTiposEstabelecimento] = useState<string[]>([]);
   const [selectedRestaurante, setSelectedRestaurante] = useState<Restaurante | null>(null);
   const [showRestauranteForm, setShowRestauranteForm] = useState<boolean>(false);
   const [showUnidadeForm, setShowUnidadeForm] = useState<boolean>(false);
@@ -2111,28 +2220,90 @@ const FoodCostSystem: React.FC = () => {
   const [showClassificacaoPopup, setShowClassificacaoPopup] = useState<boolean>(false);
   const [insumoRecemCriado, setInsumoRecemCriado] = useState<{id: number, nome: string} | null>(null);
   
-  // Constantes para tipos de estabelecimento com ícones
-  const TIPOS_ESTABELECIMENTO: TipoEstabelecimento[] = [
-    { value: 'restaurante', label: 'Restaurante', icon: 'utensils' },
-    { value: 'bar', label: 'Bar', icon: 'wine' },
-    { value: 'pub', label: 'Pub', icon: 'beer' },
-    { value: 'quiosque', label: 'Quiosque', icon: 'store' },
-    { value: 'lanchonete', label: 'Lanchonete', icon: 'sandwich' },
-    { value: 'cafeteria', label: 'Cafeteria', icon: 'coffee' },
-    { value: 'pizzaria', label: 'Pizzaria', icon: 'pizza' },
-    { value: 'hamburgueria', label: 'Hamburgueria', icon: 'burger' },
-    { value: 'churrascaria', label: 'Churrascaria', icon: 'meat' },
-    { value: 'bistro', label: 'Bistrô', icon: 'chef-hat' },
-    { value: 'fast_food', label: 'Fast Food', icon: 'zap' },
-    { value: 'food_truck', label: 'Food Truck', icon: 'truck' }
-  ];
+// ============================================================================
+// CONSTANTES - TIPOS DE ESTABELECIMENTO
+// ============================================================================
+const TIPOS_ESTABELECIMENTO: TipoEstabelecimento[] = [
+  { value: 'restaurante', label: 'Restaurante', icon: 'utensils' },
+  { value: 'bar', label: 'Bar', icon: 'wine' },
+  { value: 'pub', label: 'Pub', icon: 'beer' },
+  { value: 'quiosque', label: 'Quiosque', icon: 'store' },
+  { value: 'lanchonete', label: 'Lanchonete', icon: 'sandwich' },
+  { value: 'cafeteria', label: 'Cafeteria', icon: 'coffee' },
+  { value: 'pizzaria', label: 'Pizzaria', icon: 'pizza' },
+  { value: 'hamburgueria', label: 'Hamburgueria', icon: 'burger' },
+  { value: 'churrascaria', label: 'Churrascaria', icon: 'meat' },
+  { value: 'bistro', label: 'Bistrô', icon: 'chef-hat' },
+  { value: 'fast_food', label: 'Fast Food', icon: 'zap' },
+  { value: 'food_truck', label: 'Food Truck', icon: 'truck' }
+];
+
+// ============================================================================
+// CONSTANTES - ESTADOS E CIDADES DO BRASIL
+// ============================================================================
+
+// Lista de estados brasileiros
+const ESTADOS_BRASIL = [
+  { sigla: 'AC', nome: 'Acre' },
+  { sigla: 'AL', nome: 'Alagoas' },
+  { sigla: 'AP', nome: 'Amapá' },
+  { sigla: 'AM', nome: 'Amazonas' },
+  { sigla: 'BA', nome: 'Bahia' },
+  { sigla: 'CE', nome: 'Ceará' },
+  { sigla: 'DF', nome: 'Distrito Federal' },
+  { sigla: 'ES', nome: 'Espírito Santo' },
+  { sigla: 'GO', nome: 'Goiás' },
+  { sigla: 'MA', nome: 'Maranhão' },
+  { sigla: 'MT', nome: 'Mato Grosso' },
+  { sigla: 'MS', nome: 'Mato Grosso do Sul' },
+  { sigla: 'MG', nome: 'Minas Gerais' },
+  { sigla: 'PA', nome: 'Pará' },
+  { sigla: 'PB', nome: 'Paraíba' },
+  { sigla: 'PR', nome: 'Paraná' },
+  { sigla: 'PE', nome: 'Pernambuco' },
+  { sigla: 'PI', nome: 'Piauí' },
+  { sigla: 'RJ', nome: 'Rio de Janeiro' },
+  { sigla: 'RN', nome: 'Rio Grande do Norte' },
+  { sigla: 'RS', nome: 'Rio Grande do Sul' },
+  { sigla: 'RO', nome: 'Rondônia' },
+  { sigla: 'RR', nome: 'Roraima' },
+  { sigla: 'SC', nome: 'Santa Catarina' },
+  { sigla: 'SP', nome: 'São Paulo' },
+  { sigla: 'SE', nome: 'Sergipe' },
+  { sigla: 'TO', nome: 'Tocantins' }
+];
+
+// Principais cidades por estado
+const CIDADES_POR_ESTADO: Record<string, string[]> = {
+  'SP': ['São Paulo', 'Campinas', 'Santos', 'São José dos Campos', 'Ribeirão Preto', 'Sorocaba'],
+  'RJ': ['Rio de Janeiro', 'Niterói', 'São Gonçalo', 'Duque de Caxias', 'Nova Iguaçu', 'Petrópolis'],
+  'MG': ['Belo Horizonte', 'Uberlândia', 'Contagem', 'Juiz de Fora', 'Betim', 'Montes Claros'],
+  'BA': ['Salvador', 'Feira de Santana', 'Vitória da Conquista', 'Camaçari', 'Itabuna', 'Juazeiro'],
+  'PR': ['Curitiba', 'Londrina', 'Maringá', 'Ponta Grossa', 'Cascavel', 'Foz do Iguaçu'],
+  'RS': ['Porto Alegre', 'Caxias do Sul', 'Pelotas', 'Canoas', 'Santa Maria', 'Gravataí'],
+  'SC': ['Florianópolis', 'Joinville', 'Blumenau', 'São José', 'Criciúma', 'Chapecó'],
+  'CE': ['Fortaleza', 'Caucaia', 'Juazeiro do Norte', 'Maracanaú', 'Sobral', 'Crato'],
+  'PE': ['Recife', 'Jaboatão dos Guararapes', 'Olinda', 'Caruaru', 'Petrolina', 'Paulista'],
+  'GO': ['Goiânia', 'Aparecida de Goiânia', 'Anápolis', 'Rio Verde', 'Luziânia', 'Águas Lindas de Goiás'],
+  'AM': ['Manaus', 'Parintins', 'Itacoatiara', 'Manacapuru', 'Coari', 'Tefé'],
+  'PA': ['Belém', 'Ananindeua', 'Santarém', 'Marabá', 'Castanhal', 'Parauapebas'],
+  'ES': ['Vitória', 'Vila Velha', 'Serra', 'Cariacica', 'Linhares', 'Cachoeiro de Itapemirim'],
+  'DF': ['Brasília'],
+  'MT': ['Cuiabá', 'Várzea Grande', 'Rondonópolis', 'Sinop', 'Tangará da Serra', 'Cáceres'],
+  'MS': ['Campo Grande', 'Dourados', 'Três Lagoas', 'Corumbá', 'Ponta Porã', 'Aquidauana'],
+  'MA': ['São Luís', 'Imperatriz', 'São José de Ribamar', 'Timon', 'Caxias', 'Codó'],
+  'RN': ['Natal', 'Mossoró', 'Parnamirim', 'São Gonçalo do Amarante', 'Macaíba', 'Ceará-Mirim'],
+  'PB': ['João Pessoa', 'Campina Grande', 'Santa Rita', 'Patos', 'Bayeux', 'Sousa'],
+  'AL': ['Maceió', 'Arapiraca', 'Rio Largo', 'Palmeira dos Índios', 'União dos Palmares', 'Penedo'],
+  'PI': ['Teresina', 'Parnaíba', 'Picos', 'Piripiri', 'Floriano', 'Campo Maior'],
+  'SE': ['Aracaju', 'Nossa Senhora do Socorro', 'Lagarto', 'Itabaiana', 'Estância', 'Tobias Barreto'],
+  'AC': ['Rio Branco', 'Cruzeiro do Sul', 'Sena Madureira', 'Tarauacá', 'Feijó', 'Senador Guiomard'],
+  'AP': ['Macapá', 'Santana', 'Laranjal do Jari', 'Oiapoque', 'Mazagão', 'Porto Grande'],
+  'RO': ['Porto Velho', 'Ji-Paraná', 'Ariquemes', 'Vilhena', 'Cacoal', 'Jaru'],
+  'RR': ['Boa Vista', 'Rorainópolis', 'Caracaraí', 'Alto Alegre', 'Mucajaí', 'Bonfim'],
+  'TO': ['Palmas', 'Araguaína', 'Gurupi', 'Porto Nacional', 'Paraíso do Tocantins', 'Colinas do Tocantins']
+};
   
-  // Estados brasileiros para dropdown
-  const ESTADOS_BRASIL = [
-    'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
-    'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN',
-    'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
-  ];
   const [showReceitaForm, setShowReceitaForm] = useState<boolean>(false);
   const [editingInsumo, setEditingInsumo] = useState<Insumo | null>(null);
   const [selectedReceita, setSelectedReceita] = useState<Receita | null>(null);
@@ -3099,26 +3270,6 @@ const fetchInsumos = async () => {
     }
   };
 
-  // ===================================================================================================
-  // FUNÇÃO PARA CARREGAMENTO DE TIPOS DE ESTABELECIMENTO
-  // ===================================================================================================
-
-  const carregarTiposEstabelecimento = async () => {
-    try {
-      const response = await fetch(`${API_BASE}/api/v1/restaurantes/tipos`);
-      if (response.ok) {
-        const data = await response.json();
-        setTiposEstabelecimento(data || []);
-      } else {
-        console.warn('API de tipos não disponível, usando fallback local');
-        setTiposEstabelecimento(TIPOS_ESTABELECIMENTO.map(t => t.value));
-      }
-    } catch (error) {
-      console.error('Erro ao carregar tipos de estabelecimento:', error);
-      setTiposEstabelecimento(TIPOS_ESTABELECIMENTO.map(t => t.value));
-    }
-  };
-
   // Carrega os dados quando o componente é montado
   useEffect(() => {
     const initializeApp = async () => {
@@ -3131,7 +3282,6 @@ const fetchInsumos = async () => {
           await fetchReceitas();
           await carregarFornecedoresDisponiveis();
           await carregarEstados();
-          await carregarTiposEstabelecimento();
         } else {
           console.error('❌ Falha na conexão com a API');
           
@@ -8012,7 +8162,9 @@ const fetchInsumos = async () => {
       <FormularioRestauranteIsolado 
         isVisible={showRestauranteForm}
         editingRestaurante={editingRestaurante}
-        tiposEstabelecimento={tiposEstabelecimento}
+        tiposEstabelecimento={TIPOS_ESTABELECIMENTO}
+        estadosBrasil={ESTADOS_BRASIL}
+        cidadesPorEstado={CIDADES_POR_ESTADO}
         onClose={() => {
           setShowRestauranteForm(false);
           setEditingRestaurante(null);
@@ -8025,7 +8177,7 @@ const fetchInsumos = async () => {
           }
         }}
         loading={loading}
-      /> 
+      />
     </>
   )} 
 

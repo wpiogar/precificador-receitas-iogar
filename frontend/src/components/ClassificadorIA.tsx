@@ -89,18 +89,19 @@ const InsumosSemClassificacao: React.FC = () => {
   const [itensPorPagina] = useState(20);
 
   // Calcular índices para paginação
-  const indexUltimoInsumo = paginaAtual * itensPorPagina;
-  const indexPrimeiroInsumo = indexUltimoInsumo - itensPorPagina;
-  const insumosPaginados = insumosSemClassificacao.slice(indexPrimeiroInsumo, indexUltimoInsumo);
-  const totalPaginas = Math.ceil(insumosSemClassificacao.length / itensPorPagina);
+  const insumosPaginados = insumosSemClassificacao;
+  const totalPaginas = Math.ceil(totalInsumosSemClassificacao / itensPorPagina);
 
 
   // Função para carregar insumos sem classificação
   const carregarInsumosSemClassificacao = async () => {
     setCarregandoInsumos(true);
     try {
-      // Carregar TODOS os insumos sem classificação (limite alto)
-      const response = await fetch(`${API_BASE_URL}/api/v1/insumos/sem-classificacao?skip=0&limit=1000`);
+      // Calcular skip baseado na página atual
+      const skip = (paginaAtual - 1) * itensPorPagina;
+      
+      // Carregar apenas a página atual
+      const response = await fetch(`${API_BASE_URL}/api/v1/insumos/sem-classificacao?skip=${skip}&limit=${itensPorPagina}`);
       if (response.ok) {
         const insumos = await response.json();
         console.log('✅ Insumos sem classificacao carregados:', insumos.length);
@@ -129,6 +130,11 @@ const InsumosSemClassificacao: React.FC = () => {
   useEffect(() => {
     carregarInsumosSemClassificacao();
   }, []);
+
+  // Recarregar quando mudar a página
+  useEffect(() => {
+    carregarInsumosSemClassificacao();
+  }, [paginaAtual]);
 
   // Estados para controle do popup de classificação manual
   const [popupClassificacaoVisivel, setPopupClassificacaoVisivel] = useState(false);
@@ -215,20 +221,78 @@ const InsumosSemClassificacao: React.FC = () => {
               </svg>
             </button>
 
-            {/* Números das páginas */}
-            {[...Array(totalPaginas)].map((_, idx) => (
-              <button
-                key={idx + 1}
-                onClick={() => setPaginaAtual(idx + 1)}
-                className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
-                  paginaAtual === idx + 1
-                    ? 'z-10 bg-green-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600'
-                    : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:outline-offset-0'
-                }`}
-              >
-                {idx + 1}
-              </button>
-            ))}
+            {/* Números das páginas - mostrar apenas páginas próximas */}
+            {(() => {
+              const maxPaginasVisiveis = 5;
+              const metade = Math.floor(maxPaginasVisiveis / 2);
+              let paginaInicio = Math.max(1, paginaAtual - metade);
+              let paginaFim = Math.min(totalPaginas, paginaInicio + maxPaginasVisiveis - 1);
+              
+              if (paginaFim - paginaInicio < maxPaginasVisiveis - 1) {
+                paginaInicio = Math.max(1, paginaFim - maxPaginasVisiveis + 1);
+              }
+              
+              const paginas = [];
+              
+              // Sempre mostrar primeira página
+              if (paginaInicio > 1) {
+                paginas.push(
+                  <button
+                    key={1}
+                    onClick={() => setPaginaAtual(1)}
+                    className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                  >
+                    1
+                  </button>
+                );
+                if (paginaInicio > 2) {
+                  paginas.push(
+                    <span key="dots-start" className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700">
+                      ...
+                    </span>
+                  );
+                }
+              }
+              
+              // Páginas do meio
+              for (let i = paginaInicio; i <= paginaFim; i++) {
+                paginas.push(
+                  <button
+                    key={i}
+                    onClick={() => setPaginaAtual(i)}
+                    className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
+                      paginaAtual === i
+                        ? 'z-10 bg-green-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600'
+                        : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    {i}
+                  </button>
+                );
+              }
+              
+              // Sempre mostrar última página
+              if (paginaFim < totalPaginas) {
+                if (paginaFim < totalPaginas - 1) {
+                  paginas.push(
+                    <span key="dots-end" className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700">
+                      ...
+                    </span>
+                  );
+                }
+                paginas.push(
+                  <button
+                    key={totalPaginas}
+                    onClick={() => setPaginaAtual(totalPaginas)}
+                    className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                  >
+                    {totalPaginas}
+                  </button>
+                );
+              }
+              
+              return paginas;
+            })()}
 
             {/* Botão Próxima */}
             <button
@@ -309,7 +373,7 @@ const InsumosSemClassificacao: React.FC = () => {
             🔄 Atualizar Lista
           </button>
           <div className="text-xs text-gray-500">
-            Mostrando {indexPrimeiroInsumo + 1} a {Math.min(indexUltimoInsumo, insumosSemClassificacao.length)} de {insumosSemClassificacao.length} insumos
+            Mostrando {(paginaAtual - 1) * itensPorPagina + 1} a {Math.min(paginaAtual * itensPorPagina, totalInsumosSemClassificacao)} de {totalInsumosSemClassificacao} insumos
           </div>
         </div>
 
@@ -328,20 +392,78 @@ const InsumosSemClassificacao: React.FC = () => {
               </svg>
             </button>
 
-            {/* Números das páginas */}
-            {[...Array(totalPaginas)].map((_, idx) => (
-              <button
-                key={idx + 1}
-                onClick={() => setPaginaAtual(idx + 1)}
-                className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
-                  paginaAtual === idx + 1
-                    ? 'z-10 bg-green-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600'
-                    : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:outline-offset-0'
-                }`}
-              >
-                {idx + 1}
-              </button>
-            ))}
+            {/* Números das páginas - mostrar apenas páginas próximas */}
+            {(() => {
+              const maxPaginasVisiveis = 5;
+              const metade = Math.floor(maxPaginasVisiveis / 2);
+              let paginaInicio = Math.max(1, paginaAtual - metade);
+              let paginaFim = Math.min(totalPaginas, paginaInicio + maxPaginasVisiveis - 1);
+              
+              if (paginaFim - paginaInicio < maxPaginasVisiveis - 1) {
+                paginaInicio = Math.max(1, paginaFim - maxPaginasVisiveis + 1);
+              }
+              
+              const paginas = [];
+              
+              // Sempre mostrar primeira página
+              if (paginaInicio > 1) {
+                paginas.push(
+                  <button
+                    key={1}
+                    onClick={() => setPaginaAtual(1)}
+                    className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                  >
+                    1
+                  </button>
+                );
+                if (paginaInicio > 2) {
+                  paginas.push(
+                    <span key="dots-start" className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700">
+                      ...
+                    </span>
+                  );
+                }
+              }
+              
+              // Páginas do meio
+              for (let i = paginaInicio; i <= paginaFim; i++) {
+                paginas.push(
+                  <button
+                    key={i}
+                    onClick={() => setPaginaAtual(i)}
+                    className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
+                      paginaAtual === i
+                        ? 'z-10 bg-green-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600'
+                        : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    {i}
+                  </button>
+                );
+              }
+              
+              // Sempre mostrar última página
+              if (paginaFim < totalPaginas) {
+                if (paginaFim < totalPaginas - 1) {
+                  paginas.push(
+                    <span key="dots-end" className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700">
+                      ...
+                    </span>
+                  );
+                }
+                paginas.push(
+                  <button
+                    key={totalPaginas}
+                    onClick={() => setPaginaAtual(totalPaginas)}
+                    className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                  >
+                    {totalPaginas}
+                  </button>
+                );
+              }
+              
+              return paginas;
+            })()}
 
             {/* Botão Próxima */}
             <button

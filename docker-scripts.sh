@@ -215,7 +215,7 @@ backup() {
     backup_file="backups/foodcost_backup_$(date +%Y%m%d_%H%M%S).sql"
     
     # Executar backup
-    docker-compose exec database pg_dump -U foodcost_user foodcost_db > "$backup_file"
+    docker-compose exec -T db pg_dump -U postgres food_cost_db > "$backup_file"
     
     if [ $? -eq 0 ]; then
         print_success "Backup criado: $backup_file"

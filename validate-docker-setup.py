@@ -124,7 +124,7 @@ class DockerValidator:
         try:
             # Carregar variáveis do .env
             env_vars = {}
-            with open('.env', 'r') as f:
+            with open('.env', 'r', encoding='utf-8') as f:
                 for line in f:
                     line = line.strip()
                     if line and not line.startswith('#') and '=' in line:
@@ -134,10 +134,9 @@ class DockerValidator:
             # Verificar variáveis obrigatórias
             required_vars = [
                 'DATABASE_URL',
-                'DB_NAME',
-                'DB_USER', 
-                'DB_PASSWORD',
-                'REDIS_PASSWORD',
+                'POSTGRES_DB',
+                'POSTGRES_USER', 
+                'POSTGRES_PASSWORD',
                 'SECRET_KEY'
             ]
             
@@ -182,7 +181,7 @@ class DockerValidator:
         for dockerfile in dockerfiles:
             if os.path.exists(dockerfile):
                 try:
-                    with open(dockerfile, 'r') as f:
+                    with open(dockerfile, 'r', encoding='utf-8') as f:
                         content = f.read()
                         
                     # Verificações básicas

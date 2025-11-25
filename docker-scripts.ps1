@@ -219,7 +219,7 @@ function Invoke-Backup {
     $backupFile = "backups\foodcost_backup_$timestamp.sql"
     
     # Executar backup
-    & docker-compose exec database pg_dump -U foodcost_user foodcost_db | Out-File -FilePath $backupFile -Encoding UTF8
+    & docker-compose exec -T db pg_dump -U $env:POSTGRES_USER $env:POSTGRES_DB | Out-File -FilePath $backupFile -Encoding UTF8
     
     if ($LASTEXITCODE -eq 0) {
         Write-Success "Backup criado: $backupFile"

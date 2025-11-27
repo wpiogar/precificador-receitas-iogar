@@ -35,7 +35,7 @@ import {
   Users, ChefHat, Utensils, Plus, Search, Edit, Edit2, Edit3, Trash, Trash2, Save,
   X, Check, AlertCircle, BarChart3, Settings, Zap, FileText,
   Upload, Activity, Brain, Monitor, Shield, Database, LinkIcon,
-  Target, Eye, ChevronDown, ChevronRight, Copy, AlertTriangle, Store, FileSpreadsheet
+  Target, Eye, ChevronDown, ChevronRight, Copy, AlertTriangle, Store, FileSpreadsheet, Upload
 } from 'lucide-react';
 
 // Logo após os outros imports de componentes
@@ -67,6 +67,7 @@ import { useAuth } from './contexts/AuthContext';
 import iogarLogo from './image/iogar_logo.png';
 import LimpezaDados from './components/LimpezaDados';
 import ImportacaoInsumos from './components/ImportacaoInsumos';
+import ImportacaoReceitas from './components/ImportacaoReceitas';
 
 
 // ===================================================================================================
@@ -2128,6 +2129,7 @@ const FoodCostSystem: React.FC = () => {
     restauranteId: number | null;
     isGlobal: boolean;
   } | null>(null);
+  const [mostrarImportacaoReceitas, setMostrarImportacaoReceitas] = useState(false);
 
   // ============================================================================
   // ESTADOS - GERENCIAMENTO DE USUÁRIOS (ADMIN)
@@ -3950,7 +3952,7 @@ const fetchInsumos = async () => {
                   </svg>
                   <div>
                     <p className="text-sm font-medium text-blue-900">Código Automático</p>
-                    <p className="text-xs text-blue-600">Será gerado automaticamente: 5000-5999</p>
+                    <p className="text-xs text-blue-600">Será gerado automaticamente: 5000-7999</p>
                   </div>
                 </div>
               </div>
@@ -8278,7 +8280,6 @@ const fetchInsumos = async () => {
   // ============================================================================
   // COMPONENTE GESTÃO DE RECEITAS
   // ============================================================================
-  // ===================================================================================================
 
   // Converter receitas apenas quando necessário
   const converterReceitasParaGrid = (receitasBackend: any[]) => {
@@ -8884,6 +8885,24 @@ const Receitas = React.memo(() => {
           >
             Carregar Receitas
           </button>
+        </div>
+      </div>
+
+      {/* HEADER DA SEÇÃO DE RECEITAS */}
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-2xl font-bold text-gray-900">Receitas</h2>
+        
+        <div className="flex space-x-3">
+          {/* NOVO BOTÃO - Importar Receitas */}
+          <button
+            onClick={() => setMostrarImportacaoReceitas(true)}
+            className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-green-500 to-pink-500 text-white rounded-lg hover:from-green-600 hover:to-pink-600 transition-all shadow-md"
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Importar Dados
+          </button>
+          
+          {/* Outros botões existentes (se houver) */}
         </div>
       </div>
       
@@ -10301,7 +10320,7 @@ const cancelarExclusao = () => {
                         </svg>
                         <div>
                           <p className="text-sm font-semibold text-blue-900">Código Automático</p>
-                          <p className="text-xs text-blue-600">Será gerado automaticamente: 5000-5999</p>
+                          <p className="text-xs text-blue-600">Será gerado automaticamente: 5000-7999</p>
                         </div>
                       </div>
                     </div>
@@ -10489,7 +10508,7 @@ const cancelarExclusao = () => {
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-blue-900">Código Automático</p>
-                        <p className="text-xs text-blue-600">Será gerado automaticamente: 5000-5999</p>
+                        <p className="text-xs text-blue-600">Será gerado automaticamente: 5000-7999</p>
                       </div>
                     </div>
                   </div>
@@ -11503,11 +11522,24 @@ return (  //RETORN DO COMPONENTE PRINCIPAL
             });
             setMostrarModalSelecaoImportacao(false);
             // TODO: Abrir modal de importação de receitas quando implementado
-            alert('Modal de importação de receitas será implementado em breve!');
+            setMostrarImportacaoReceitas(true);
           }}
           restauranteSelecionado={selectedRestaurante}
           restaurantesDisponiveis={restaurantes}
           userRole={user?.role || ''}
+        />
+      )}
+
+      {/* MODAL DE IMPORTAÇÃO DE RECEITAS */}
+      {mostrarImportacaoReceitas && (
+        <ImportacaoReceitas
+          restauranteId={selectedRestaurante?.id || 1}
+          onClose={() => setMostrarImportacaoReceitas(false)}
+          onSuccess={() => {
+            setMostrarImportacaoReceitas(false);
+            // Recarregar receitas após importação
+            fetchReceitas();
+          }}
         />
       )}
 

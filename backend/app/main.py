@@ -104,6 +104,15 @@ try:
     except ImportError as e:
         print(f"⚠️  Módulo importacoes não encontrado: {e}")
         HAS_IMPORTACOES = False
+
+    # Tentar importar o módulo importacao_receitas
+    try:
+        from app.api.endpoints import importacao_receitas
+        HAS_IMPORTACAO_RECEITAS = True
+        print("[OK] Módulo importacao_receitas importado com sucesso")
+    except ImportError as e:
+        print(f"⚠️  Módulo importacao_receitas não encontrado: {e}")
+        HAS_IMPORTACAO_RECEITAS = False
         
 except ImportError as e:
     print(f"❌ Erro ao importar endpoints: {e}")
@@ -284,10 +293,10 @@ async def options_handler(request: Request, path: str):
     )
 
 
-#   ===================================================================================================
-#   Configuração de CORS para permitir acesso do frontend
-#   ===================================================================================================
-#   Configuração do backend para produção
+# ===================================================================================================
+# Configuração de CORS para permitir acesso do frontend
+# ===================================================================================================
+# Configuração do backend para produção
 from fastapi.middleware.cors import CORSMiddleware
 import os
 
@@ -383,9 +392,9 @@ def test_cors():
         "status": "success"
     }
 
-#   ===================================================================================================
-#   Endpoints básicos de status e saúde
-#   ===================================================================================================
+# ===================================================================================================
+# Endpoints básicos de status e saúde
+# ===================================================================================================
 
 @app.get("/", summary="Status da API")
 def root():
@@ -1169,12 +1178,12 @@ if HAS_IMPORTACOES:
 else:
     print("[AVISO] Router importacoes não incluído (módulo não disponível)")
 
-# Router para importação de insumos via Excel/TOTVS (Sistema de Automação)
-if HAS_IMPORTACOES:
+# Router para importação de receitas via Excel/TOTVS (Sistema de Automação)
+if HAS_IMPORTACAO_RECEITAS:
     app.include_router(
-        importacoes.router,
-        prefix="/api/v1/importacoes",
-        tags=["importacoes"],
+        importacao_receitas.router,
+        prefix="/api/v1/importacao-receitas",
+        tags=["importacao-receitas"],
         responses={
             404: {"description": "Importação não encontrada"},
             422: {"description": "Erro de validação"},
@@ -1182,9 +1191,9 @@ if HAS_IMPORTACOES:
             500: {"description": "Erro interno do servidor"}
         }
     )
-    print("✅ Router importacoes incluído com sucesso")
+    print("✅ Router importacao_receitas incluído com sucesso")
 else:
-    print("[AVISO] Router importacoes não incluído (módulo não disponível)")
+    print("[AVISO] Router importacao_receitas não incluído (módulo não disponível)")
 
 #   ===================================================================================================
 #   Middleware para logging de requisições

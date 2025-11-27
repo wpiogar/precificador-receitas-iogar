@@ -33,9 +33,13 @@ logger = logging.getLogger(__name__)
 
 MAPEAMENTO_COLUNAS = {
     'CodigoProduto': 'codigo',
+    'Código': 'codigo',  
     'NomeProduto': 'nome',
+    'Produto': 'nome',  
     'PrecoCompra': 'preco_compra_real',
+    'Preço Compra': 'preco_compra_real',  
     'Unidade': 'unidade',
+    'Un': 'unidade',  
     'Fator': 'fator',
     'Quantidade': 'quantidade'
 }
@@ -111,6 +115,82 @@ def encontrar_linha_cabecalho(worksheet) -> Optional[int]:
     logger.warning("Cabeçalho não identificado automaticamente, usando linha 1")
     return 1
 
+def encontrar_coluna_real_com_dados(row, idx_inicial: int, validador=None) -> int:
+    """
+    Quando uma coluna está mesclada, encontra qual coluna tem os dados reais.
+    
+    Args:
+        row: Linha do Excel
+        idx_inicial: Índice inicial da coluna mapeada
+        validador: Função opcional para validar se o valor é válido
+        
+    Returns:
+        int: Índice da coluna que contém os dados reais
+        
+    Exemplos:
+        - Cabeçalho "Código" mesclado em A-B-C, mas dados em C
+        - Retorna índice 2 (coluna C)
+    """
+    # Converter row em lista
+    if not isinstance(row, (list, tuple)):
+        row = list(row)
+    
+    # Tentar até 3 colunas à frente do índice inicial
+    for offset in range(4):  # Tenta idx, idx+1, idx+2, idx+3
+        idx_teste = idx_inicial + offset
+        
+        if idx_teste >= len(row):
+            break
+        
+        cell = row[idx_teste]
+        valor = cell.value if hasattr(cell, 'value') else cell
+        
+        # Ignorar valores vazios
+        if not valor or str(valor).strip() in ['', 'None', 'none']:
+            continue
+        
+        # Se tem validador, usar ele
+        if validador:
+            if validador(valor):
+                logger.info(f"Coluna real encontrada: índice {idx_teste} (offset +{offset})")
+                return idx_teste
+        else:
+            # Sem validador, retornar primeiro valor não vazio
+            logger.info(f"Coluna real encontrada: índice {idx_teste} (offset +{offset})")
+            return idx_teste
+    
+    # Se não encontrou, retornar índice original
+    return idx_inicial
+
+def validar_codigo_insumo(valor) -> bool:
+    """
+    Valida se um valor é um código de insumo válido (numérico entre 5000-7999).
+    
+    Args:
+        valor: Valor a validar
+        
+    Returns:
+        bool: True se for código válido, False caso contrário
+    """
+    try:
+        # Converter para string e limpar
+        codigo_str = str(valor).strip()
+        
+        # Remover .0 se houver (ex: 5228.0 -> 5228)
+        if '.' in codigo_str:
+            codigo_float = float(codigo_str)
+            if codigo_float == int(codigo_float):
+                codigo_str = str(int(codigo_float))
+        
+        # Converter para inteiro
+        codigo_num = int(codigo_str)
+        
+        # Validar faixa
+        return 5000 <= codigo_num <= 7999
+        
+    except (ValueError, TypeError):
+        return False
+
 
 def extrair_dados_linha(row, colunas_mapeadas: Dict[str, int]) -> Dict[str, Any]:
     """
@@ -131,9 +211,14 @@ def extrair_dados_linha(row, colunas_mapeadas: Dict[str, int]) -> Dict[str, Any]
     
     # ====================================================================
     # Extrair código - LIMPAR formato decimal do Excel (5228.0 -> 5228)
+    # Detecta automaticamente a coluna real em caso de células mescladas
     # ====================================================================
     if 'codigo' in colunas_mapeadas:
-        idx = colunas_mapeadas['codigo']
+        idx_original = colunas_mapeadas['codigo']
+        
+        # Encontrar coluna real com dados válidos (células mescladas)
+        idx = encontrar_coluna_real_com_dados(row, idx_original, validador=validar_codigo_insumo)
+        
         if idx < len(row):
             codigo_cell = row[idx]
             valor = codigo_cell.value if hasattr(codigo_cell, 'value') else codigo_cell
@@ -491,40 +576,35 @@ class ImportacaoService:
                     
                     # VERIFICAÇÃO 3: Gerar código automático se necessário
                     if (not dados.get('codigo') or str(dados.get('codigo')).strip() in ['', 'None', 'none']) and dados.get('nome'):
-                        nome_limpo = ''.join(c for c in str(dados['nome'])[:12].upper() if c.isalnum())
-                        codigo_final = f"AUTO_{nome_limpo}_{row_num}"
-                        contador = 1
-                        while self.db.query(Insumo).filter(
-                            Insumo.codigo == codigo_final,
-                            Insumo.restaurante_id == restaurante_id
-                        ).first():
-                            codigo_final = f"AUTO_{nome_limpo}_{row_num}_{contador}"
-                            contador += 1
+                        # Importar serviço de geração de códigos
+                        from app.services.codigo_service import gerar_proximo_codigo
+                        from app.config.codigo_config import TipoCodigo
+                        
+                        # Gerar código usando sistema oficial (faixa 5000-7999)
+                        codigo_final = gerar_proximo_codigo(self.db, TipoCodigo.INSUMO, restaurante_id)
                         dados['codigo'] = codigo_final
                         logger.info(f"Linha {row_num}: Código gerado automaticamente: {codigo_final}")
                     
-                    # FILTRO: Apenas códigos entre 5000 e 5999
+                    # FILTRO: Apenas códigos entre 5000 e 7999
                     try:
                         codigo_str = str(dados.get('codigo', '')).strip()
-                        if not codigo_str.startswith('AUTO_'):
-                            codigo_numero = int(codigo_str)
-                            if codigo_numero < 5000 or codigo_numero > 5999:
-                                log.ignorados.append(ItemLog(
-                                    linha=row_num,
-                                    tipo="ignorado",
-                                    mensagem=f"Código {dados['codigo']} fora da faixa permitida (5000-5999)",
-                                    dados=dados
-                                ))
-                                continue
-                    except (ValueError, TypeError):
-                        if not str(dados.get('codigo', '')).startswith('AUTO_'):
-                            log.erros.append(ItemLog(
+                        codigo_numero = int(codigo_str)
+                        if codigo_numero < 5000 or codigo_numero > 7999:
+                            log.ignorados.append(ItemLog(
                                 linha=row_num,
-                                tipo="erro",
-                                mensagem=f"Código inválido: {dados.get('codigo')}",
+                                tipo="ignorado",
+                                mensagem=f"Código {dados['codigo']} fora da faixa permitida (5000-7999)",
                                 dados=dados
                             ))
                             continue
+                    except (ValueError, TypeError):
+                        log.erros.append(ItemLog(
+                            linha=row_num,
+                            tipo="erro",
+                            mensagem=f"Código inválido: {dados.get('codigo')}",
+                            dados=dados
+                        ))
+                        continue
                     
                     # Validar dados
                     valido, erro = validar_dados_linha(dados, row_num)

@@ -580,20 +580,20 @@ class ImportacaoService:
                         from app.services.codigo_service import gerar_proximo_codigo
                         from app.config.codigo_config import TipoCodigo
                         
-                        # Gerar código usando sistema oficial (faixa 5000-7999)
+                        # Gerar código usando sistema oficial (a partir de 5000, sem limite superior)
                         codigo_final = gerar_proximo_codigo(self.db, TipoCodigo.INSUMO, restaurante_id)
                         dados['codigo'] = codigo_final
                         logger.info(f"Linha {row_num}: Código gerado automaticamente: {codigo_final}")
                     
-                    # FILTRO: Apenas códigos entre 5000 e 7999
+                    # FILTRO: Apenas códigos a partir de 5000 (sem limite superior)
                     try:
                         codigo_str = str(dados.get('codigo', '')).strip()
                         codigo_numero = int(codigo_str)
-                        if codigo_numero < 5000 or codigo_numero > 7999:
+                        if codigo_numero < 5000:
                             log.ignorados.append(ItemLog(
                                 linha=row_num,
                                 tipo="ignorado",
-                                mensagem=f"Código {dados['codigo']} fora da faixa permitida (5000-7999)",
+                                mensagem=f"Código {dados['codigo']} abaixo do mínimo permitido (mínimo: 5000)",
                                 dados=dados
                             ))
                             continue
@@ -601,7 +601,7 @@ class ImportacaoService:
                         log.erros.append(ItemLog(
                             linha=row_num,
                             tipo="erro",
-                            mensagem=f"Código inválido: {dados.get('codigo')}",
+                            mensagem=f"Código inválido (não numérico): {dados.get('codigo')}",
                             dados=dados
                         ))
                         continue
@@ -635,7 +635,7 @@ class ImportacaoService:
                         log.ignorados.append(ItemLog(
                             linha=row_num,
                             tipo="ignorado",
-                            mensagem=f"Insumo com código {dados['codigo']} já existe",
+                            mensagem=f"Código {dados['codigo']} já existe no sistema (insumo cadastrado: '{insumo_existente.nome}')",
                             dados=dados
                         ))
                         logger.info(f"⏭️ Pulando linha {row_num}: código {dados['codigo']} duplicado")

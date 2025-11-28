@@ -92,10 +92,11 @@ def gerar_proximo_codigo(db: Session, tipo: TipoCodigo, restaurante_id: int) -> 
             sequence.updated_at = func.now()
         
         # Validar se ainda ha codigos disponiveis na faixa
+        # NOTA: Para insumos, o limite é muito alto (999999), praticamente infinito
         if proximo_numero > fim:
             raise ValueError(
-                f"Faixa de codigos esgotada para {faixa['descricao']}. "
-                f"Limite: {fim}"
+                f"Limite máximo de códigos atingido para {faixa['descricao']} ({fim}). "
+                f"Entre em contato com o suporte técnico."
             )
         
         # Commit da atualização da sequência

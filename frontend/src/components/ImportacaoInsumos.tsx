@@ -63,6 +63,9 @@ const ImportacaoInsumos: React.FC<ImportacaoInsumosProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [contador, setContador] = useState<number>(60);
   const [intervaloId, setIntervaloId] = useState<NodeJS.Timeout | null>(null);
+  const [mostrarDetalhesErros, setMostrarDetalhesErros] = useState(false);
+  const [mostrarDetalhesIgnorados, setMostrarDetalhesIgnorados] = useState(false);
+  const [logProcessamento, setLogProcessamento] = useState<any>(null);
 
   // Estado para mapeamento de colunas
   const [mapeamento, setMapeamento] = useState<{
@@ -177,17 +180,14 @@ return () => {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
-    });
+      });
 
-    console.log('Status da resposta:', response.status);
-    console.log('Headers:', response.headers);
+      console.log('Status da resposta:', response.status);
+      console.log('Headers:', response.headers);
 
-    // ============================================================================
-    // Verificar se a resposta é JSON antes de tentar parsear
-    // ============================================================================
-    const contentType = response.headers.get('content-type');
+      const contentType = response.headers.get('content-type');
 
-    if (!response.ok) {
+      if (!response.ok) {
         if (contentType && contentType.includes('application/json')) {
           const errorData = await response.json();
           throw new Error(errorData.detail || 'Erro ao fazer upload');
@@ -196,48 +196,47 @@ return () => {
           console.error('Erro não-JSON:', textError);
           throw new Error(`Erro ${response.status}: ${response.statusText}`);
         }
-    }
+      }
 
-    // Verificar se resposta é JSON válido
-    if (!contentType || !contentType.includes('application/json')) {
+      if (!contentType || !contentType.includes('application/json')) {
         const textResponse = await response.text();
         console.error('Resposta não é JSON:', textResponse);
         throw new Error('Servidor retornou resposta inválida. Verifique os logs do backend.');
-    }
-
-    const data = await response.json();
-    setImportacaoId(data.importacao_id);
-    setPreview(data.preview);
-
-    // Inicializar mapeamento automático
-    const mapeamentoInicial: typeof mapeamento = {};
-    data.preview.colunas_detectadas.forEach((coluna: string) => {
-      // Tentar mapear automaticamente
-      const colunaLower = coluna.toLowerCase();
-      let campoAuto = '';
-      
-      if (colunaLower.includes('nome') || colunaLower.includes('produto') || colunaLower.includes('descri')) {
-        campoAuto = 'nome';
-      } else if (colunaLower.includes('unid')) {
-        campoAuto = 'unidade';
-      } else if (colunaLower.includes('qtd') || colunaLower.includes('quantidade') || colunaLower.includes('estoque')) {
-        campoAuto = 'quantidade';
-      } else if (colunaLower.includes('prec') || colunaLower.includes('valor') || colunaLower.includes('custo')) {
-        campoAuto = 'preco_unitario';
-      } else if (colunaLower.includes('cod') || colunaLower.includes('ean')) {
-        campoAuto = 'codigo';
-      } else if (colunaLower.includes('categ') || colunaLower.includes('grupo') || colunaLower.includes('tipo')) {
-        campoAuto = 'grupo';
       }
-      
-      mapeamentoInicial[coluna] = {
-        selecionada: campoAuto !== '', // Selecionar automaticamente se encontrou mapeamento
-        campoDestino: campoAuto
-      };
-    });
 
-    setMapeamento(mapeamentoInicial);
-    setEtapa('mapeamento');
+      const data = await response.json();
+      setImportacaoId(data.importacao_id);
+      setPreview(data.preview);
+
+      // Inicializar mapeamento automático
+      const mapeamentoInicial: typeof mapeamento = {};
+      data.preview.colunas_detectadas.forEach((coluna: string) => {
+        const colunaLower = coluna.toLowerCase();
+        let campoAuto = '';
+        
+        // Detectar campo automaticamente
+        if (colunaLower.includes('nome') || colunaLower.includes('produto') || colunaLower.includes('descri')) {
+          campoAuto = 'nome';
+        } else if (colunaLower.includes('unid')) {
+          campoAuto = 'unidade';
+        } else if (colunaLower.includes('qtd') || colunaLower.includes('quantidade') || colunaLower.includes('estoque')) {
+          campoAuto = 'quantidade';
+        } else if (colunaLower.includes('prec') || colunaLower.includes('valor') || colunaLower.includes('custo')) {
+          campoAuto = 'preco_unitario';
+        } else if (colunaLower.includes('cod') || colunaLower.includes('ean')) {
+          campoAuto = 'codigo';
+        } else if (colunaLower.includes('categ') || colunaLower.includes('grupo') || colunaLower.includes('tipo')) {
+          campoAuto = 'grupo';
+        }
+        
+        mapeamentoInicial[coluna] = {
+          selecionada: campoAuto !== '',
+          campoDestino: campoAuto
+        };
+      });
+
+      setMapeamento(mapeamentoInicial);
+      setEtapa('mapeamento');
 
     } catch (error: any) {
       setErro(error.message || 'Erro ao processar arquivo');
@@ -256,15 +255,31 @@ return () => {
     setErro(null);
 
     try {
+        // DEBUG: Mostrar TODOS os mapeamentos antes de filtrar
+        console.log('🔍 DEBUG - MAPEAMENTO COMPLETO:', mapeamento);
+        console.log('🔍 DEBUG - TOTAL DE COLUNAS:', Object.keys(mapeamento).length);
+        
+        // Verificar especificamente a coluna Código
+        const colunaCodigo = Object.entries(mapeamento).find(([col, config]) => 
+          col.toLowerCase().includes('código') || col.toLowerCase().includes('codigo')
+        );
+        console.log('🔍 DEBUG - COLUNA CÓDIGO:', colunaCodigo);
+        
         // Preparar mapeamento apenas das colunas selecionadas
         const mapeamentoParaEnviar: Record<string, string> = {};
         Object.entries(mapeamento).forEach(([colunaExcel, config]) => {
+          console.log(`🔍 DEBUG - Processando: ${colunaExcel}`, {
+            selecionada: config.selecionada,
+            campoDestino: config.campoDestino
+          });
+          
           if (config.selecionada && config.campoDestino) {
             mapeamentoParaEnviar[colunaExcel] = config.campoDestino;
           }
         });
 
-        console.log('📤 Enviando mapeamento:', mapeamentoParaEnviar);
+        console.log('📤 DEBUG - MAPEAMENTO FINAL A ENVIAR:', mapeamentoParaEnviar);
+        console.log('📤 DEBUG - TEM CÓDIGO?:', 'Código' in mapeamentoParaEnviar || 'codigo' in mapeamentoParaEnviar);
 
         const response = await fetch(`${API_BASE_URL}/api/v1/importacoes/processar`, {
           method: 'POST',
@@ -307,35 +322,56 @@ return () => {
       }
 
       const data = await response.json();
-        setResultado(data);
-        setEtapa('concluido');
-        setContador(60); // Resetar contador
+      console.log('🔍 DEBUG - Resposta completa:', data);
+      console.log('🔍 DEBUG - log_processamento:', data.log_processamento);
 
-        // Iniciar contagem regressiva
-        const intervalo = setInterval(() => {
-        setContador((prev) => {
-            if (prev <= 1) {
-            clearInterval(intervalo);
-            // Usar setTimeout para evitar warning de estado durante render
-            setTimeout(() => {
-                if (onSuccess) {
-                onSuccess();
-                }
-                onClose();
-            }, 0);
-            return 0;
-            }
-            return prev - 1;
-        });
-        }, 1000);
+      setResultado(data);
 
-        setIntervaloId(intervalo);
+      // Carregar log de processamento se disponível
+      if (data.log_processamento) {
+          try {
+              const log = typeof data.log_processamento === 'string' 
+                  ? JSON.parse(data.log_processamento)
+                  : data.log_processamento;
+              console.log('🔍 DEBUG - Log parseado:', log);
+              console.log('🔍 DEBUG - Ignorados no log:', log.ignorados);
+              console.log('🔍 DEBUG - ERROS no log:', log.erros);
+              console.log('🔍 DEBUG - Quantidade de erros:', log.erros?.length);
+              setLogProcessamento(log);
+          } catch (e) {
+              console.error('❌ Erro ao parsear log:', e);
+          }
+      } else {
+          console.log('⚠️ Não há log_processamento na resposta');
+      }
 
-    } catch (error: any) {
-        setErro(error.message || 'Erro ao processar importação');
-        setEtapa('preview');
-    }
-    };
+      setEtapa('concluido');
+      setContador(60);
+
+      // Iniciar contagem regressiva
+      const intervalo = setInterval(() => {
+          setContador((prev) => {
+              if (prev <= 1) {
+                  clearInterval(intervalo);
+                  setTimeout(() => {
+                      if (onSuccess) {
+                          onSuccess();
+                      }
+                      onClose();
+                  }, 0);
+                  return 0;
+              }
+              return prev - 1;
+          });
+      }, 1000);
+
+      setIntervaloId(intervalo);
+
+      } catch (error: any) {
+          setErro(error.message || 'Erro ao processar arquivo');
+          setEtapa('upload');
+      }
+  };
 
   // ========================================================================
   // FUNÇÃO: CANCELAR
@@ -809,33 +845,149 @@ return () => {
             </div>
 
             {/* Erros */}
-            <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-4 border border-red-200">
-            <div className="flex items-center justify-between mb-2">
+            <div 
+                className="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-4 border border-red-200 cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => setMostrarDetalhesErros(!mostrarDetalhesErros)}
+                title="Clique para ver detalhes"
+            >
+              <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-red-700">Erros</span>
                 <div className="bg-red-200 p-1.5 rounded">
                 ❌
                 </div>
-            </div>
-            <p className="text-2xl font-bold text-red-900">
+              </div>
+              <p className="text-2xl font-bold text-red-900">
                 {resultado.linhas_com_erro}
-            </p>
-            <p className="text-xs text-red-600 mt-1">com falha</p>
+              </p>
+              <p className="text-xs text-red-600 mt-1">
+                {resultado.linhas_com_erro > 0 ? 'clique para ver detalhes' : 'sem erros'}
+              </p>
             </div>
 
             {/* Ignorados */}
-            <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg p-4 border border-yellow-200">
-            <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-yellow-700">Ignorados</span>
-                <div className="bg-yellow-200 p-1.5 rounded">
-                ⚠️
+            <div 
+                className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg p-4 border border-yellow-200 cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => setMostrarDetalhesIgnorados(!mostrarDetalhesIgnorados)}
+                title="Clique para ver detalhes"
+            >
+                <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-yellow-700">Ignorados</span>
+                    <div className="bg-yellow-200 p-1.5 rounded">
+                    ⚠️
+                    </div>
                 </div>
-            </div>
-            <p className="text-2xl font-bold text-yellow-900">
-                {resultado.linhas_ignoradas}
-            </p>
-            <p className="text-xs text-yellow-600 mt-1">fora da faixa</p>
+                <p className="text-2xl font-bold text-yellow-900">
+                    {resultado.linhas_ignoradas}
+                </p>
+                <p className="text-xs text-yellow-600 mt-1">
+                    {resultado.linhas_ignoradas > 0 ? 'clique para ver detalhes' : 'nenhum ignorado'}
+                </p>
             </div>
         </div>
+
+        {/* Seção de detalhes dos ignorados */}
+        {mostrarDetalhesIgnorados && resultado.linhas_ignoradas > 0 && logProcessamento && (
+            <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-semibold text-yellow-900 text-lg">
+                        ⚠️ Detalhes dos Registros Ignorados
+                    </h4>
+                    <button
+                        onClick={() => setMostrarDetalhesIgnorados(false)}
+                        className="text-yellow-600 hover:text-yellow-800"
+                    >
+                        ✕
+                    </button>
+                </div>
+
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {logProcessamento.ignorados && logProcessamento.ignorados.length > 0 ? (
+                        logProcessamento.ignorados.map((item: any, index: number) => (
+                            <div 
+                                key={index}
+                                className="bg-white border border-yellow-200 rounded-lg p-4"
+                            >
+                                <div className="flex items-start space-x-3">
+                                    <div className="bg-yellow-100 p-2 rounded-full flex-shrink-0">
+                                        <span className="text-yellow-700 font-bold">
+                                            {item.linha}
+                                        </span>
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-sm font-medium text-gray-900">
+                                            {item.mensagem}
+                                        </p>
+                                        {item.dados && (item.dados.codigo || item.dados.nome) && (
+                                            <p className="text-xs text-gray-600 mt-1">
+                                                {item.dados.codigo && `Código: ${item.dados.codigo}`}
+                                                {item.dados.codigo && item.dados.nome && ' | '}
+                                                {item.dados.nome && `Nome: ${item.dados.nome}`}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <p className="text-center text-gray-500 py-4">
+                            Nenhum detalhe disponível
+                        </p>
+                    )}
+                </div>
+            </div>
+        )}
+
+        {/* Seção de detalhes dos erros */}
+        {mostrarDetalhesErros && resultado.linhas_com_erro > 0 && logProcessamento && (
+            <div className="bg-red-50 border-2 border-red-200 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-semibold text-red-900 text-lg">
+                        ❌ Detalhes dos Erros
+                    </h4>
+                    <button
+                        onClick={() => setMostrarDetalhesErros(false)}
+                        className="text-red-600 hover:text-red-800"
+                    >
+                        ✕
+                    </button>
+                </div>
+
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {logProcessamento.erros && logProcessamento.erros.length > 0 ? (
+                        logProcessamento.erros.map((item: any, index: number) => (
+                            <div 
+                                key={index}
+                                className="bg-white border border-red-200 rounded-lg p-4"
+                            >
+                                <div className="flex items-start space-x-3">
+                                    <div className="bg-red-100 p-2 rounded-full flex-shrink-0">
+                                        <span className="text-red-700 font-bold">
+                                            {item.linha}
+                                        </span>
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-sm font-medium text-red-900">
+                                            {item.mensagem}
+                                        </p>
+                                        {item.dados && (item.dados.codigo || item.dados.nome) && (
+                                            <p className="text-xs text-gray-600 mt-1">
+                                                {item.dados.codigo && `Código: ${item.dados.codigo}`}
+                                                {item.dados.codigo && item.dados.nome && ' | '}
+                                                {item.dados.nome && `Nome: ${item.dados.nome}`}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <p className="text-center text-gray-500 py-4">
+                            Nenhum detalhe disponível
+                        </p>
+                    )}
+                </div>
+            </div>
+        )}
 
         {/* Mensagem de sucesso com animação */}
         {sucesso && (

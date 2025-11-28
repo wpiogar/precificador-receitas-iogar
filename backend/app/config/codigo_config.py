@@ -39,7 +39,7 @@ FAIXAS_CODIGOS = {
     },
     TipoCodigo.INSUMO: {
         "inicio": 5000,
-        "fim": 7999,
+        "fim": 999999,
         "prefixo": "",  # Sem prefixo - apenas números
         "descricao": "Insumos"
     }

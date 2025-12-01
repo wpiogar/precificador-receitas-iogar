@@ -143,15 +143,15 @@ class EstatisticasImportacao(BaseModel):
 class ItemLog(BaseModel):
     """
     Schema para um item individual do log de processamento.
+    Linha 0 indica mensagens do sistema (não vinculadas a uma linha específica).
     """
-    linha: int = Field(description="Número da linha no arquivo", gt=0)
-    tipo: str = Field(description="Tipo: sucesso, erro, aviso, ignorado")
+    linha: int = Field(description="Número da linha no arquivo (0 = mensagem do sistema)", ge=0)
+    tipo: str = Field(description="Tipo: sucesso, erro, aviso, ignorado, atualizado, info")
     mensagem: str = Field(description="Mensagem descritiva")
     dados: Optional[Dict[str, Any]] = Field(
         None,
         description="Dados adicionais (código, nome, etc.)"
     )
-
 
 # ============================================================================
 # SCHEMA PARA LOG ESTRUTURADO

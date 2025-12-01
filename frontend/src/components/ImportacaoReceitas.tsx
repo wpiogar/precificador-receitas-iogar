@@ -89,7 +89,7 @@ const ImportacaoReceitas: React.FC<ImportacaoReceitasProps> = ({
   const [resultado, setResultado] = useState<ResultadoImportacao | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [receitasSelecionadas, setReceitasSelecionadas] = useState<number[]>([]);
+  const [receitasSelecionadas, setReceitasSelecionadas] = useState<string[]>([])
 
   // ============================================================================
   // DEBUG: Log quando o componente renderiza
@@ -175,8 +175,10 @@ const ImportacaoReceitas: React.FC<ImportacaoReceitasProps> = ({
       const data = await response.json();
       setPreview(data.preview);
 
-      // Selecionar automaticamente todas as receitas prontas
-      const receitasProntas = data.preview.receitas_prontas.map((r: ReceitaPreview) => r.codigo);
+      // Selecionar automaticamente todas as receitas prontas com identificador único
+      const receitasProntas = data.preview.receitas_prontas.map(
+        (r: ReceitaPreview, indice: number) => `${r.codigo}-${indice}`
+      );
       setReceitasSelecionadas(receitasProntas);
 
       setEtapa('preview');
@@ -212,11 +214,22 @@ const ImportacaoReceitas: React.FC<ImportacaoReceitasProps> = ({
       formData.append('arquivo', arquivo);
       formData.append('restaurante_id', restauranteId.toString());
 
-      console.log('🔍 Receitas a enviar:', receitasSelecionadas);
-      console.log('🔍 JSON stringified:', JSON.stringify(receitasSelecionadas));
+      // Extrair códigos reais dos identificadores únicos
+      const codigosReais = receitasSelecionadas.map(identificador => {
+        // Remove prefixo "faltando-" se existir
+        const semPrefixo = identificador.replace('faltando-', '');
+        // Extrai o código (parte antes do último "-")
+        const partes = semPrefixo.split('-');
+        // Retorna o código como número (todas as partes exceto a última que é o índice)
+        return parseInt(partes[0]);
+      });
+
+      console.log('🔍 Identificadores selecionados:', receitasSelecionadas);
+      console.log('🔍 Códigos extraídos para enviar:', codigosReais);
+      console.log('🔍 JSON stringified:', JSON.stringify(codigosReais));
       
-      // Enviar cada receita selecionada como item separado
-      formData.append('receitas_selecionadas', JSON.stringify(receitasSelecionadas));
+      // Enviar códigos reais para o backend
+      formData.append('receitas_selecionadas', JSON.stringify(codigosReais));
 
       console.log('========================================');
       console.log('2. FormData preparado');
@@ -258,12 +271,12 @@ const ImportacaoReceitas: React.FC<ImportacaoReceitasProps> = ({
   // FUNÇÃO: TOGGLE SELEÇÃO DE RECEITA
   // ========================================================================
 
-  const toggleReceitaSelecionada = (codigo: number) => {
+  const toggleReceitaSelecionada = (identificador: string) => {
     setReceitasSelecionadas(prev => {
-      if (prev.includes(codigo)) {
-        return prev.filter(c => c !== codigo);
+      if (prev.includes(identificador)) {
+        return prev.filter(id => id !== identificador);
       } else {
-        return [...prev, codigo];
+        return [...prev, identificador];
       }
     });
   };
@@ -385,74 +398,94 @@ const ImportacaoReceitas: React.FC<ImportacaoReceitasProps> = ({
           </div>
         )}
 
+
         <div className="space-y-4">
           <h4 className="font-semibold text-gray-900">Receitas que podem ser importadas</h4>
-          {preview.receitas_prontas.map((receita) => (
-            <div
-              key={receita.codigo}
-              className={`border rounded-lg p-4 cursor-pointer transition-all ${
-                receitasSelecionadas.includes(receita.codigo)
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-gray-200 hover:border-green-300'
-              }`}
-              onClick={() => toggleReceitaSelecionada(receita.codigo)}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={receitasSelecionadas.includes(receita.codigo)}
-                      onChange={() => toggleReceitaSelecionada(receita.codigo)}
-                      className="h-4 w-4 text-green-600 rounded"
-                    />
-                    <h5 className="font-semibold text-gray-900">
-                      {receita.codigo} - {receita.nome}
-                    </h5>
-                    <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">
-                      {receita.tipo}
-                    </span>
+          {preview.receitas_prontas.map((receita, indice) => {
+            const identificadorUnico = `${receita.codigo}-${indice}`;
+            
+            return (
+              <div
+                key={identificadorUnico}
+                className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                  receitasSelecionadas.includes(identificadorUnico)
+                    ? 'border-green-500 bg-green-50'
+                    : 'border-gray-200 hover:border-green-300'
+                }`}
+                onClick={() => toggleReceitaSelecionada(identificadorUnico)}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={receitasSelecionadas.includes(identificadorUnico)}
+                        onChange={() => toggleReceitaSelecionada(identificadorUnico)}
+                        className="h-4 w-4 text-green-600 rounded"
+                      />
+                      <h5 className="font-semibold text-gray-900">
+                        {receita.codigo} - {receita.nome}
+                      </h5>
+                      <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">
+                        {receita.tipo}
+                      </span>
+                    </div>
+                    <div className="mt-2 text-sm text-gray-600">
+                      {receita.total_insumos} insumos | Custo: R$ {receita.custo_total.toFixed(2)}
+                    </div>
                   </div>
-                  <div className="mt-2 text-sm text-gray-600">
-                    {receita.total_insumos} insumos | Custo: R$ {receita.custo_total.toFixed(2)}
-                  </div>
+                  <CheckCircle className="h-5 w-5 text-green-600" />
                 </div>
-                <CheckCircle className="h-5 w-5 text-green-600" />
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {preview.receitas_com_insumos_faltando.length > 0 && (
           <div className="space-y-4">
             <h4 className="font-semibold text-gray-900">Receitas com insumos faltando</h4>
-            {preview.receitas_com_insumos_faltando.map((receita) => (
-              <div
-                key={receita.codigo}
-                className="border border-orange-200 bg-orange-50 rounded-lg p-4"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2">
-                      <AlertCircle className="h-5 w-5 text-orange-600" />
-                      <h5 className="font-semibold text-gray-900">
-                        {receita.codigo} - {receita.nome}
-                      </h5>
-                    </div>
-                    <div className="mt-2 text-sm text-orange-800">
-                      {receita.insumos_nao_encontrados} insumo(s) não encontrado(s):
-                      <ul className="mt-1 ml-4 list-disc">
-                        {receita.insumos.map((insumo, idx) => (
-                          <li key={idx}>
-                            {insumo.nome} ({insumo.quantidade} {insumo.unidade})
-                          </li>
-                        ))}
-                      </ul>
+            {preview.receitas_com_insumos_faltando.map((receita, indice) => {
+              const identificadorUnico = `faltando-${receita.codigo}-${indice}`;
+              
+              return (
+                <div
+                  key={identificadorUnico}
+                  className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                    receitasSelecionadas.includes(identificadorUnico)
+                      ? 'border-orange-500 bg-orange-50'
+                      : 'border-orange-200 bg-orange-50 hover:border-orange-400'
+                  }`}
+                  onClick={() => toggleReceitaSelecionada(identificadorUnico)}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          checked={receitasSelecionadas.includes(identificadorUnico)}
+                          onChange={() => toggleReceitaSelecionada(identificadorUnico)}
+                          className="h-4 w-4 text-orange-600 rounded"
+                        />
+                        <AlertCircle className="h-5 w-5 text-orange-600" />
+                        <h5 className="font-semibold text-gray-900">
+                          {receita.codigo} - {receita.nome}
+                        </h5>
+                      </div>
+                      <div className="mt-2 text-sm text-orange-800">
+                        {receita.insumos_nao_encontrados} insumo(s) não encontrado(s):
+                        <ul className="mt-1 ml-4 list-disc">
+                          {receita.insumos.map((insumo, idx) => (
+                            <li key={idx}>
+                              {insumo.nome} ({insumo.quantidade} {insumo.unidade})
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -468,7 +501,7 @@ const ImportacaoReceitas: React.FC<ImportacaoReceitasProps> = ({
             disabled={receitasSelecionadas.length === 0}
             className="px-4 py-2 bg-gradient-to-r from-green-500 to-pink-500 text-white rounded-lg hover:from-green-600 hover:to-pink-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Importar {receitasSelecionadas.length} receita(s)
+            Importar {receitasSelecionadas.length} receita(s) selecionada(s)
           </button>
         </div>
       </div>

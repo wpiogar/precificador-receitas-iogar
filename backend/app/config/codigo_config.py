@@ -29,13 +29,13 @@ FAIXAS_CODIGOS = {
         "inicio": 3000,
         "fim": 3999,
         "prefixo": "",  # Sem prefixo - apenas números
-        "descricao": "Receitas Normais"
+        "descricao": "Receitas Normais (geração automática)"
     },
     TipoCodigo.RECEITA_PROCESSADA: {
         "inicio": 4000,
         "fim": 4999,
         "prefixo": "",  # Sem prefixo - apenas números
-        "descricao": "Receitas Processadas"
+        "descricao": "Receitas Processadas (geração automática)"
     },
     TipoCodigo.INSUMO: {
         "inicio": 5000,

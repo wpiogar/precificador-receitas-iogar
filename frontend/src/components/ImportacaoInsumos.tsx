@@ -346,26 +346,6 @@ return () => {
       }
 
       setEtapa('concluido');
-      setContador(60);
-
-      // Iniciar contagem regressiva
-      const intervalo = setInterval(() => {
-          setContador((prev) => {
-              if (prev <= 1) {
-                  clearInterval(intervalo);
-                  setTimeout(() => {
-                      if (onSuccess) {
-                          onSuccess();
-                      }
-                      onClose();
-                  }, 0);
-                  return 0;
-              }
-              return prev - 1;
-          });
-      }, 1000);
-
-      setIntervaloId(intervalo);
 
       } catch (error: any) {
           setErro(error.message || 'Erro ao processar arquivo');
@@ -1003,9 +983,6 @@ return () => {
                 <p className="text-green-800 text-sm">
                     Todos os {resultado.linhas_processadas} insumos foram adicionados ao sistema e já estão disponíveis para uso.
                 </p>
-                <p className="text-green-700 text-sm mt-3 font-medium">
-                    ⏱️ Esta janela fechará automaticamente em <span className="text-green-900 font-bold text-lg">{contador}</span> segundo{contador !== 1 ? 's' : ''}
-                </p>
                 </div>
             </div>
             </div>
@@ -1015,14 +992,14 @@ return () => {
         <div className="flex justify-end">
             <button
                 onClick={() => {
-                    if (intervaloId) {
-                        clearInterval(intervaloId);
+                    if (onSuccess) {
+                        onSuccess();
                     }
                     onClose();
                 }}
                 className="px-6 py-3 bg-gradient-to-r from-green-500 to-pink-500 text-white rounded-lg hover:from-green-600 hover:to-pink-600 transition-all shadow-md hover:shadow-lg font-medium"
             >
-                Fechar Agora
+                Fechar
             </button>
         </div>
         </div>

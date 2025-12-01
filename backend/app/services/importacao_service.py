@@ -164,13 +164,14 @@ def encontrar_coluna_real_com_dados(row, idx_inicial: int, validador=None) -> in
 
 def validar_codigo_insumo(valor) -> bool:
     """
-    Valida se um valor é um código de insumo válido (numérico entre 5000-7999).
+    Valida se um valor é um código de insumo válido (numérico).
+    Para importação, aceita qualquer código numérico válido da planilha.
     
     Args:
         valor: Valor a validar
         
     Returns:
-        bool: True se for código válido, False caso contrário
+        bool: True se for código numérico válido, False caso contrário
     """
     try:
         # Converter para string e limpar
@@ -185,8 +186,8 @@ def validar_codigo_insumo(valor) -> bool:
         # Converter para inteiro
         codigo_num = int(codigo_str)
         
-        # Validar faixa
-        return 5000 <= codigo_num <= 7999
+        # Aceitar qualquer código numérico positivo na importação
+        return codigo_num > 0
         
     except (ValueError, TypeError):
         return False
@@ -300,7 +301,8 @@ def extrair_dados_linha(row, colunas_mapeadas: Dict[str, int]) -> Dict[str, Any]
 
 def validar_dados_linha(dados: Dict[str, Any], linha_num: int) -> Tuple[bool, Optional[str]]:
     """
-    Valida se os dados extraídos estão corretos.
+    Valida os dados extraídos de uma linha.
+    Na importação, o código da planilha é aceito sem validação de faixa.
     
     Args:
         dados: Dicionário com dados extraídos
@@ -309,7 +311,7 @@ def validar_dados_linha(dados: Dict[str, Any], linha_num: int) -> Tuple[bool, Op
     Returns:
         Tuple[bool, Optional[str]]: (válido, mensagem_erro)
     """
-    # Validar código (obrigatório na importação)
+    # Validar código (obrigatório na importação, aceita qualquer valor da planilha)
     codigo = dados.get('codigo')
     if not codigo or str(codigo).strip() == '' or str(codigo).lower() in ['none', 'nan']:
         return False, f"Linha {linha_num}: Código do produto está vazio ou inválido"
@@ -535,6 +537,20 @@ class ImportacaoService:
 
             logger.info(f"🚀 Iniciando processamento de {total_linhas} linhas a partir da linha {linha_dados_inicial}")
 
+            # Processar linhas
+            linha_dados_inicial = linha_cabecalho + 1
+            total_linhas = ws.max_row - linha_cabecalho
+
+            logger.info(f"🚀 Iniciando processamento de {total_linhas} linhas a partir da linha {linha_dados_inicial}")
+            
+            # Verificar quantos insumos já existem no banco para este restaurante
+            from sqlalchemy import text
+            contagem_atual = self.db.execute(
+                text("SELECT COUNT(*) FROM insumos WHERE restaurante_id = :restaurante_id"),
+                {"restaurante_id": restaurante_id}
+            ).scalar()
+            logger.info(f"📦 Insumos já cadastrados no restaurante {restaurante_id}: {contagem_atual}")
+
             for row_num, row in enumerate(
                 ws.iter_rows(min_row=linha_dados_inicial),
                 start=linha_dados_inicial
@@ -585,15 +601,15 @@ class ImportacaoService:
                         dados['codigo'] = codigo_final
                         logger.info(f"Linha {row_num}: Código gerado automaticamente: {codigo_final}")
                     
-                    # FILTRO: Apenas códigos a partir de 5000 (sem limite superior)
+                    # VALIDAÇÃO: Código deve ser numérico válido
                     try:
                         codigo_str = str(dados.get('codigo', '')).strip()
                         codigo_numero = int(codigo_str)
-                        if codigo_numero < 5000:
-                            log.ignorados.append(ItemLog(
+                        if codigo_numero <= 0:
+                            log.erros.append(ItemLog(
                                 linha=row_num,
-                                tipo="ignorado",
-                                mensagem=f"Código {dados['codigo']} abaixo do mínimo permitido (mínimo: 5000)",
+                                tipo="erro",
+                                mensagem=f"Código {dados['codigo']} inválido (deve ser maior que zero)",
                                 dados=dados
                             ))
                             continue
@@ -601,7 +617,7 @@ class ImportacaoService:
                         log.erros.append(ItemLog(
                             linha=row_num,
                             tipo="erro",
-                            mensagem=f"Código inválido (não numérico): {dados.get('codigo')}",
+                            mensagem=f"Código inválido: {dados.get('codigo')}",
                             dados=dados
                         ))
                         continue
@@ -618,28 +634,95 @@ class ImportacaoService:
                         continue
                     
                     # ====================================================================
-                    # IMPORTANTE: Limpar cache do SQLAlchemy antes de verificar duplicados
-                    # Isso garante que após uma limpeza de insumos, a verificação
-                    # consulta dados frescos do banco, não do cache da sessão
+                    # VERIFICAÇÃO DE DUPLICATAS: Atualizar se já existir
+                    # Se encontrar código duplicado, atualiza o insumo com novos dados
                     # ====================================================================
-                    self.db.flush()
                     self.db.expire_all()
+                    
+                    # Query direta no banco com isolamento de transação
+                    from sqlalchemy import text
+                    resultado = self.db.execute(
+                        text("""
+                            SELECT id, nome, preco_compra
+                            FROM insumos 
+                            WHERE restaurante_id = :restaurante_id 
+                            AND codigo = :codigo
+                            LIMIT 1
+                        """),
+                        {"restaurante_id": restaurante_id, "codigo": dados['codigo']}
+                    ).fetchone()
 
-                    # Verificar se insumo já existe (consulta fresca no banco)
-                    insumo_existente = self.db.query(Insumo).filter(
-                        Insumo.restaurante_id == restaurante_id,
-                        Insumo.codigo == dados['codigo']
-                    ).first()
-
-                    if insumo_existente:
-                        log.ignorados.append(ItemLog(
-                            linha=row_num,
-                            tipo="ignorado",
-                            mensagem=f"Código {dados['codigo']} já existe no sistema (insumo cadastrado: '{insumo_existente.nome}')",
-                            dados=dados
-                        ))
-                        logger.info(f"⏭️ Pulando linha {row_num}: código {dados['codigo']} duplicado")
-                        continue
+                    if resultado:
+                        # Insumo já existe - ATUALIZAR ao invés de pular
+                        insumo_id_existente = resultado[0]
+                        nome_antigo = resultado[1]
+                        preco_antigo_centavos = resultado[2] or 0
+                        
+                        # Preparar novos valores
+                        quantidade = dados.get('quantidade', 1)
+                        if quantidade is None or quantidade == 0:
+                            quantidade = 1
+                        
+                        preco_real = dados.get('preco_unitario', dados.get('preco_compra_real', 0)) or 0
+                        preco_novo_centavos = int(float(preco_real) * 100) if preco_real else 0
+                        
+                        # Atualizar insumo existente
+                        try:
+                            self.db.execute(
+                                text("""
+                                    UPDATE insumos 
+                                    SET nome = :nome,
+                                        quantidade = :quantidade,
+                                        fator = :fator,
+                                        unidade = :unidade,
+                                        preco_compra = :preco_compra,
+                                        importacao_id = :importacao_id
+                                    WHERE id = :id
+                                """),
+                                {
+                                    "id": insumo_id_existente,
+                                    "nome": dados['nome'],
+                                    "quantidade": float(quantidade),
+                                    "fator": float(dados.get('fator', 1.0)),
+                                    "unidade": dados['unidade'],
+                                    "preco_compra": preco_novo_centavos,
+                                    "importacao_id": importacao_id
+                                }
+                            )
+                            self.db.flush()
+                            
+                            # Log detalhado da atualização
+                            mudancas = []
+                            if nome_antigo != dados['nome']:
+                                mudancas.append(f"nome: '{nome_antigo}' -> '{dados['nome']}'")
+                            if preco_antigo_centavos != preco_novo_centavos:
+                                preco_antigo_real = preco_antigo_centavos / 100
+                                mudancas.append(f"preço: R$ {preco_antigo_real:.2f} -> R$ {preco_real:.2f}")
+                            
+                            mensagem_log = f"Código {dados['codigo']} atualizado"
+                            if mudancas:
+                                mensagem_log += f" ({', '.join(mudancas)})"
+                            
+                            log.sucessos.append(ItemLog(
+                                linha=row_num,
+                                tipo="atualizado",
+                                mensagem=mensagem_log,
+                                dados=dados
+                            ))
+                            
+                            logger.info(f"🔄 Linha {row_num}: Insumo atualizado - {mensagem_log}")
+                            continue
+                            
+                        except Exception as e_update:
+                            logger.error(f"❌ Erro ao atualizar insumo linha {row_num}: {str(e_update)}")
+                            log.erros.append(ItemLog(
+                                linha=row_num,
+                                tipo="erro",
+                                mensagem=f"Erro ao atualizar insumo: {str(e_update)}",
+                                dados=dados
+                            ))
+                            self.db.rollback()
+                            continue
                     
                     # ================================================================
                     # CRIAR INSUMO NO BANCO DE DADOS
@@ -736,6 +819,68 @@ class ImportacaoService:
                     logger.info(f"📊 Progresso linha {row_num} - Sucessos: {len(log.sucessos)}, Erros: {len(log.erros)}, Ignorados: {len(log.ignorados)}")
 
             wb.close()
+
+            # ================================================================
+            # GERAR ANÁLISE DETALHADA PARA O LOG
+            # ================================================================
+            
+            # Contar tipos específicos nos logs
+            atualizacoes = [item for item in log.sucessos if item.tipo == "atualizado"]
+            criados = [item for item in log.sucessos if item.tipo != "atualizado"]
+            
+            # Analisar duplicados ignorados vs atualizados
+            total_duplicados_processados = len(atualizacoes)
+            duplicados_identicos = len([item for item in log.ignorados if "já existe" in item.mensagem or "duplicado" in item.mensagem])
+            
+            # Analisar tipos de atualização
+            atualizacoes_preco = len([
+                item for item in atualizacoes 
+                if item.mensagem and "preço" in item.mensagem.lower()
+            ])
+            
+            atualizacoes_nome = len([
+                item for item in atualizacoes 
+                if item.mensagem and "nome" in item.mensagem.lower()
+            ])
+            
+            # Adicionar mensagens informativas no log de ignorados
+            if atualizacoes or duplicados_identicos:
+                log.ignorados.insert(0, ItemLog(
+                    linha=0,
+                    tipo="info",
+                    mensagem=f"📊 ANÁLISE DE DUPLICADOS: {total_duplicados_processados + duplicados_identicos} códigos apareceram mais de 1 vez na planilha",
+                    dados={
+                        "atualizados": total_duplicados_processados,
+                        "identicos_ignorados": duplicados_identicos,
+                        "atualizacoes_preco": atualizacoes_preco,
+                        "atualizacoes_nome": atualizacoes_nome
+                    }
+                ))
+                
+                if total_duplicados_processados > 0:
+                    log.ignorados.insert(1, ItemLog(
+                        linha=0,
+                        tipo="info",
+                        mensagem=f"✅ {total_duplicados_processados} duplicados foram ATUALIZADOS (tinham diferenças de preço ou nome)",
+                        dados={}
+                    ))
+                
+                if duplicados_identicos > 0:
+                    log.ignorados.insert(2, ItemLog(
+                        linha=0,
+                        tipo="info",
+                        mensagem=f"⏭️ {duplicados_identicos} duplicados foram IGNORADOS (dados idênticos à primeira ocorrência)",
+                        dados={}
+                    ))
+            
+            # Adicionar estatísticas de criação
+            if criados:
+                log.sucessos.insert(0, ItemLog(
+                    linha=0,
+                    tipo="info",
+                    mensagem=f"🆕 {len(criados)} novos insumos foram criados no sistema",
+                    dados={}
+                ))
 
             # Atualizar estatísticas da importação
             importacao.total_linhas = total_linhas

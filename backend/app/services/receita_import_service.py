@@ -143,6 +143,7 @@ class ReceitaImportService:
                     })
                 
                 # Contar estatísticas
+                insumos_faltando_count = 0
                 for ins in receita.insumos:
                     if ins.tipo_match == "EXATO":
                         resultado["estatisticas"]["insumos_matched_exato"] += 1
@@ -150,6 +151,18 @@ class ReceitaImportService:
                         resultado["estatisticas"]["insumos_matched_fuzzy"] += 1
                     elif ins.tipo_match == "NAO_ENCONTRADO":
                         resultado["estatisticas"]["insumos_nao_encontrados"] += 1
+                        insumos_faltando_count += 1
+                
+                # Alteração: Receitas SEM insumos ou com insumos faltando podem ser importadas
+                # Elas serão criadas como "pendentes" e o usuário pode adicionar insumos depois
+                receita_preview["pode_importar"] = True
+                
+                # Adicionar aviso se houver insumos faltando
+                if insumos_faltando_count > 0:
+                    receita_preview["avisos"] = [
+                        f"Esta receita possui {insumos_faltando_count} insumo(s) não encontrado(s)",
+                        "A receita será importada como 'pendente' e você pode adicionar os insumos posteriormente"
+                    ]
             
             return resultado
             
@@ -184,12 +197,13 @@ class ReceitaImportService:
                 if receita_atual is not None:
                     receitas.append(receita_atual)
                 
-                # Extrair código e nome da receita
+                # Extrair código e nome da receita usando regex
+                # \d+ captura qualquer sequência de dígitos (sem limite de faixa)
                 match = re.search(r'Composto:\s*(\d+)\s*-\s*(.+?)\s*-\s*(PROCESSADO|COMPOSTO)', 
                                 primeira_coluna, re.IGNORECASE)
                 
                 if match:
-                    codigo = int(match.group(1))
+                    codigo = int(match.group(1))  # Aceita qualquer número inteiro positivo
                     nome = match.group(2).strip()
                     tipo = match.group(3).strip()
                     

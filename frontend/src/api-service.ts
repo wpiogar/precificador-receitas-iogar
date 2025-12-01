@@ -945,8 +945,12 @@ async updateReceita(id: number, receita: any): Promise<ApiResponse<any>> {
   // ================================
 
   // Obter estatísticas de dados
-  async getEstatisticasLimpeza(): Promise<ApiResponse<any>> {
-    return this.request<any>('/api/v1/limpeza-dados/estatisticas', {
+  async getEstatisticasLimpeza(restauranteId?: number): Promise<ApiResponse<any>> {
+    const url = restauranteId 
+      ? `/api/v1/limpeza-dados/estatisticas?restaurante_id=${restauranteId}`
+      : '/api/v1/limpeza-dados/estatisticas';
+    
+    return this.request<any>(url, {
       method: 'GET'
     });
   }

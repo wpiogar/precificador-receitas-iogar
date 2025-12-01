@@ -94,11 +94,14 @@ const LimpezaDados: React.FC<LimpezaDadosProps> = ({ selectedRestaurante }) => {
 
   useEffect(() => {
     carregarEstatisticas();
-  }, []);
+  }, [selectedRestaurante]);
 
   const carregarEstatisticas = async () => {
     try {
-      const { data, error } = await apiService.getEstatisticasLimpeza();
+      // Passar o ID do restaurante selecionado para filtrar as estatísticas
+      const { data, error } = await apiService.getEstatisticasLimpeza(
+        selectedRestaurante?.id
+      );
       
       if (error) {
         console.error('Erro ao carregar estatisticas:', error);

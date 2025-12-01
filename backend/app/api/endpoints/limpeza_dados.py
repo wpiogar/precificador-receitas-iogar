@@ -59,27 +59,39 @@ class ResultadoLimpeza(BaseModel):
 
 @router.get("/estatisticas", response_model=EstatisticasLimpeza)
 def obter_estatisticas(
+    restaurante_id: Optional[int] = Query(None, description="Filtrar estatísticas por restaurante"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_admin_user)
 ):
     """
     Retorna estatísticas gerais de dados no sistema.
-    
     Acesso: Apenas ADMIN
     
-    Obs: Mostra TODOS os registros, mas ao limpar:
+    Parâmetros:
+    - restaurante_id: Se fornecido, retorna apenas estatísticas daquele restaurante
+    
+    Obs: Ao limpar:
     - Restaurantes: mantém ID 1
     - Usuários: mantém o admin atual
     """
+    # Query base para receitas
+    query_receitas = db.query(func.count(Receita.id))
+    query_insumos = db.query(func.count(Insumo.id))
+    
+    # Aplicar filtro por restaurante se fornecido
+    if restaurante_id:
+        query_receitas = query_receitas.filter(Receita.restaurante_id == restaurante_id)
+        query_insumos = query_insumos.filter(Insumo.restaurante_id == restaurante_id)
+    
     # Contar registros em cada tabela
     stats = EstatisticasLimpeza(
-        total_receitas=db.query(func.count(Receita.id)).scalar(),
-        total_insumos=db.query(func.count(Insumo.id)).scalar(),
+        total_receitas=query_receitas.scalar(),
+        total_insumos=query_insumos.scalar(),
         total_fornecedores=db.query(func.count(Fornecedor.id)).scalar(),
         total_fornecedor_insumos=db.query(func.count(FornecedorInsumo.id)).scalar(),
         total_restaurantes=db.query(func.count(Restaurante.id)).scalar(),
         total_taxonomias=db.query(func.count(Taxonomia.id)).scalar(),
-        total_usuarios=db.query(func.count(User.id)).scalar()  # Mostra todos
+        total_usuarios=db.query(func.count(User.id)).scalar()
     )
     
     return stats

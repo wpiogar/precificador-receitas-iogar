@@ -9017,23 +9017,7 @@ const Receitas = React.memo(() => {
         </div>
       </div>
 
-      {/* HEADER DA SEÇÃO DE RECEITAS */}
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold text-gray-900">Receitas</h2>
-        
-        <div className="flex space-x-3">
-          {/* NOVO BOTÃO - Importar Receitas */}
-          <button
-            onClick={() => setMostrarImportacaoReceitas(true)}
-            className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-green-500 to-pink-500 text-white rounded-lg hover:from-green-600 hover:to-pink-600 transition-all shadow-md"
-          >
-            <Upload className="mr-2 h-4 w-4" />
-            Importar Dados
-          </button>
-          
-          {/* Outros botões existentes (se houver) */}
-        </div>
-      </div>
+      
       
       {/* ===================================================================================================
           SUPER GRID DE RECEITAS - COMPONENTE PRINCIPAL

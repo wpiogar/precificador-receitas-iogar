@@ -8918,6 +8918,7 @@ const Receitas = React.memo(() => {
         onDeleteReceita={handleDeleteReceita}
         onViewReceita={handleViewReceita}
         onCreateReceita={handleCreateReceita}
+        onImportar={() => setMostrarModalSelecaoImportacao(true)}
       />
 
       {/* ===================================================================================================
@@ -11527,6 +11528,7 @@ return (  //RETORN DO COMPONENTE PRINCIPAL
           restauranteSelecionado={selectedRestaurante}
           restaurantesDisponiveis={restaurantes}
           userRole={user?.role || ''}
+          tipoFixo={activeTab === 'receitas' ? 'receitas' : activeTab === 'insumos' ? 'insumos' : null}
         />
       )}
 

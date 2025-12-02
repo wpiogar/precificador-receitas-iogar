@@ -24,6 +24,7 @@ interface ModalSelecaoImportacaoProps {
   restauranteSelecionado: { id: number; nome: string } | null;
   restaurantesDisponiveis: Array<{ id: number; nome: string }>;
   userRole: string;
+  tipoFixo?: 'insumos' | 'receitas' | null;
 }
 
 // ============================================================================
@@ -36,10 +37,11 @@ const ModalSelecaoImportacao: React.FC<ModalSelecaoImportacaoProps> = ({
   onSelectReceitas,
   restauranteSelecionado,
   restaurantesDisponiveis,
-  userRole
+  userRole,
+  tipoFixo = null
 }) => {
   // Estados locais
-  const [tipoSelecionado, setTipoSelecionado] = useState<'insumos' | 'receitas' | null>(null);
+  const [tipoSelecionado, setTipoSelecionado] = useState<'insumos' | 'receitas' | null>(tipoFixo);
   const [insumoGlobal, setInsumoGlobal] = useState(false);
   const [restauranteEscolhido, setRestauranteEscolhido] = useState<number | null>(null);
   const [processando, setProcessando] = useState(false);
@@ -52,28 +54,20 @@ const ModalSelecaoImportacao: React.FC<ModalSelecaoImportacaoProps> = ({
 
     setProcessando(true);
 
-    // Delay de 300ms para mostrar o spinner
     setTimeout(() => {
       if (tipoSelecionado === 'insumos') {
-        // Se há restaurante selecionado no menu, usar ele
-        if (restauranteSelecionado) {
-          onSelectInsumos(restauranteSelecionado.id, false);
-        }
-        // Se marcou como global
-        else if (insumoGlobal) {
-          onSelectInsumos(null, true);
-        }
-        // Se escolheu um restaurante específico
-        else if (restauranteEscolhido) {
-          onSelectInsumos(restauranteEscolhido, false);
-        }
-      } else if (tipoSelecionado === 'receitas') {
-        // Receitas sempre precisam de restaurante
+        onSelectInsumos(
+          insumoGlobal ? null : (restauranteEscolhido || restauranteSelecionado?.id || null),
+          insumoGlobal
+        );
+      } else {
+        // Receitas: usar restaurante selecionado automaticamente
         const restauranteId = restauranteSelecionado?.id || restauranteEscolhido;
         if (restauranteId) {
           onSelectReceitas(restauranteId);
         }
       }
+      setProcessando(false);
     }, 300);
   };
 
@@ -143,11 +137,21 @@ const ModalSelecaoImportacao: React.FC<ModalSelecaoImportacaoProps> = ({
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-pink-500 rounded-lg flex items-center justify-center">
-              <Package className="w-5 h-5 text-white" />
+              {tipoFixo === 'receitas' ? (
+                <ChefHat className="w-5 h-5 text-white" />
+              ) : tipoFixo === 'insumos' ? (
+                <Package className="w-5 h-5 text-white" />
+              ) : (
+                <Package className="w-5 h-5 text-white" />
+              )}
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Importar Dados</h2>
-              <p className="text-sm text-gray-500">Escolha o tipo de dados que deseja importar</p>
+              <h2 className="text-xl font-bold text-gray-900">
+                {tipoFixo === 'receitas' ? 'Importar Receitas' : tipoFixo === 'insumos' ? 'Importar Insumos' : 'Importar Dados'}
+              </h2>
+              <p className="text-sm text-gray-500">
+                {tipoFixo ? 'Configure as opções de importação' : 'Escolha o tipo de dados que deseja importar'}
+              </p>
             </div>
           </div>
           <button
@@ -161,15 +165,16 @@ const ModalSelecaoImportacao: React.FC<ModalSelecaoImportacaoProps> = ({
         {/* Conteúdo */}
         <div className="p-6 space-y-6">
           
-          {/* Opções de Tipo */}
-          <div className="space-y-3">
-            <label className="block text-sm font-semibold text-gray-900 mb-3">
-              O que você deseja importar?
-            </label>
+          {/* Opções de Tipo - Apenas se não for tipo fixo */}
+          {!tipoFixo && (
+            <div className="space-y-3">
+              <label className="block text-sm font-semibold text-gray-900 mb-3">
+                O que você deseja importar?
+              </label>
 
-            {/* Opção: Insumos */}
-            <button
-              onClick={() => setTipoSelecionado('insumos')}
+              {/* Opção: Insumos */}
+              <button
+                onClick={() => setTipoSelecionado('insumos')}
               className={`w-full flex items-start gap-4 p-4 rounded-xl border-2 transition-all ${
                 tipoSelecionado === 'insumos'
                   ? 'border-green-500 bg-green-50'
@@ -219,26 +224,39 @@ const ModalSelecaoImportacao: React.FC<ModalSelecaoImportacaoProps> = ({
               </div>
             </button>
           </div>
-
+          )}
           {/* Configurações adicionais - Apenas se tipo selecionado */}
           {tipoSelecionado && (
             <div className="space-y-4 pt-4 border-t border-gray-200">
               
               {/* Se tem restaurante selecionado no menu */}
               {restauranteSelecionado && (
-                <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
+                <div className={`rounded-xl p-4 ${
+                  tipoSelecionado === 'receitas' 
+                    ? 'bg-green-50 border-2 border-green-500' 
+                    : 'bg-blue-50 border-2 border-blue-200'
+                }`}>
                   <div className="flex items-start gap-3">
-                    <Store className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <Store className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
+                      tipoSelecionado === 'receitas' ? 'text-green-600' : 'text-blue-600'
+                    }`} />
                     <div className="flex-1">
-                      <h4 className="font-semibold text-blue-900 mb-1">
-                        Restaurante Selecionado
+                      <h4 className={`font-semibold mb-1 ${
+                        tipoSelecionado === 'receitas' ? 'text-green-900' : 'text-blue-900'
+                      }`}>
+                        {tipoSelecionado === 'receitas' ? '✓ Pronto para Importar' : 'Restaurante Selecionado'}
                       </h4>
-                      <p className="text-sm text-blue-800">
-                        Os dados serão importados para: <strong>{restauranteSelecionado.nome}</strong>
+                      <p className={`text-sm ${
+                        tipoSelecionado === 'receitas' ? 'text-green-800' : 'text-blue-800'
+                      }`}>
+                        {tipoSelecionado === 'receitas' 
+                          ? `As receitas serão importadas para: ${restauranteSelecionado.nome}`
+                          : `Os dados serão importados para: ${restauranteSelecionado.nome}`
+                        }
                       </p>
                       {tipoSelecionado === 'receitas' && (
-                        <p className="text-xs text-blue-700 mt-2">
-                          As receitas ficarão vinculadas a este restaurante.
+                        <p className="text-xs text-green-700 mt-2 font-medium">
+                          Clique em "Continuar" para selecionar o arquivo Excel
                         </p>
                       )}
                     </div>
@@ -330,7 +348,10 @@ const ModalSelecaoImportacao: React.FC<ModalSelecaoImportacaoProps> = ({
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
             }`}
           >
-            Continuar
+            {tipoSelecionado === 'receitas' && restauranteSelecionado 
+              ? 'Continuar para Importação' 
+              : 'Continuar'
+            }
           </button>
         </div>
       </div>

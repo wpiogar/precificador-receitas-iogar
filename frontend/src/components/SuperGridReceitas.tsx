@@ -67,12 +67,13 @@ interface FiltroGrid {
 
 interface SuperGridReceitasProps {
   receitas: Receita[];
-  loading?: boolean;
+  loading: boolean;
   onEditReceita?: (receita: Receita) => void;
   onDuplicateReceita?: (receita: Receita) => void;
   onDeleteReceita?: (receita: Receita) => void;
   onViewReceita?: (receita: Receita) => void;
   onCreateReceita?: () => void;
+  onImportar?: () => void;
 }
 
 // ===================================================================================================
@@ -126,7 +127,8 @@ const SuperGridReceitas: React.FC<SuperGridReceitasProps> = ({
   onDuplicateReceita,
   onDeleteReceita,
   onViewReceita,
-  onCreateReceita
+  onCreateReceita,
+  onImportar
 }) => {
 
   // ===================================================================================================
@@ -1123,7 +1125,10 @@ const SuperGridReceitas: React.FC<SuperGridReceitasProps> = ({
               )}
               
               <Tooltip content="Importar receitas a partir de arquivo Excel ou CSV">
-                <button className="flex items-center justify-center gap-2 px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 hover:shadow-sm transition-all duration-200 flex-1 sm:flex-initial active:scale-95">
+                <button 
+                  onClick={onImportar}
+                  className="flex items-center justify-center gap-2 px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 hover:shadow-sm transition-all duration-200 flex-1 sm:flex-initial active:scale-95"
+                >
                   <Upload className="w-4 h-4" />
                   Importar
                 </button>

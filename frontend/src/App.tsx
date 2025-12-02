@@ -35,7 +35,7 @@ import {
   Users, ChefHat, Utensils, Plus, Search, Edit, Edit2, Edit3, Trash, Trash2, Save,
   X, Check, AlertCircle, BarChart3, Settings, Zap, FileText,
   Upload, Activity, Brain, Monitor, Shield, Database, LinkIcon,
-  Target, Eye, ChevronDown, ChevronRight, Copy, AlertTriangle, Store, FileSpreadsheet, Upload
+  Target, Eye, ChevronDown, ChevronRight, Copy, AlertTriangle, Store, FileSpreadsheet, Grid, List
 } from 'lucide-react';
 
 // Logo após os outros imports de componentes
@@ -2218,6 +2218,8 @@ const FoodCostSystem: React.FC = () => {
   // Ref para posicionar dropdown de exportação
   const exportButtonRef = useRef<HTMLButtonElement>(null);
   const [showImportarInsumosModal, setShowImportarInsumosModal] = useState(false);
+  // Estado para controlar visualização (tabela ou cards)
+  const [viewModeInsumos, setViewModeInsumos] = useState<'list' | 'grid'>('list');
   // Estados para popup de classificação IA
   const [showClassificacaoPopup, setShowClassificacaoPopup] = useState<boolean>(false);
   const [insumoRecemCriado, setInsumoRecemCriado] = useState<{id: number, nome: string} | null>(null);
@@ -6219,24 +6221,26 @@ const fetchInsumos = async () => {
     return (
       <div className="space-y-6 min-h-screen">
         {/* Header da seção de insumos */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Gestão de Insumos</h2>
-            <p className="text-gray-600">Controle total de ingredientes e custos</p>
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Gestão de Insumos</h2>
+            <p className="text-sm sm:text-base text-gray-600 mt-1">Controle total de ingredientes e custos</p>
           </div>
           
-          {/* Container dos botões - seguindo padrão de Receitas */}
-          <div className="flex items-center gap-3">
-            {/* Botão Exportar com dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setShowExportDropdown(!showExportDropdown)}
-                className="bg-gray-100 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2"
-              >
-                <Upload className="w-5 h-5 rotate-180" />
-                <span className="font-medium">Exportar</span>
-                <ChevronDown className="w-4 h-4" />
-              </button>
+          {/* Container dos botões - responsivo mobile/desktop */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+            {/* Linha 1: Exportar e Importar (lado a lado no mobile e desktop) */}
+            <div className="flex items-center gap-3">
+              {/* Botão Exportar com dropdown */}
+              <div className="relative flex-1 sm:flex-initial">
+                <button
+                  onClick={() => setShowExportDropdown(!showExportDropdown)}
+                  className="w-full sm:w-auto bg-gray-100 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Upload className="w-5 h-5 rotate-180" />
+                  <span className="font-medium">Exportar</span>
+                  <ChevronDown className="w-4 h-4" />
+                </button>
 
               {/* Overlay invisível para fechar dropdown ao clicar fora */}
               {showExportDropdown && (
@@ -6284,33 +6288,34 @@ const fetchInsumos = async () => {
             </div>
             
             {/* Botão Importar */}
-            <button
-              onClick={() => {
-                if (!selectedRestaurante) {
-                  showErrorPopup(
-                    'Restaurante Não Selecionado',
-                    'Por favor, selecione um restaurante no menu lateral antes de importar insumos.'
-                  );
-                  return;
-                }
-                setShowImportarInsumosModal(true);
-              }}
-              className={`px-4 py-3 rounded-lg transition-colors flex items-center gap-2 ${
-                selectedRestaurante 
-                  ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' 
-                  : 'bg-gray-50 text-gray-400 cursor-not-allowed'
-              }`}
-              disabled={!selectedRestaurante}
-              title={!selectedRestaurante ? 'Selecione um restaurante primeiro' : 'Importar insumos via Excel'}
-            >
-              <Upload className="w-5 h-5" />
-              <span className="font-medium">Importar</span>
-            </button>
+              <button
+                onClick={() => {
+                  if (!selectedRestaurante) {
+                    showErrorPopup(
+                      'Selecione um Restaurante',
+                      'Para importar insumos, você precisa selecionar um restaurante primeiro.'
+                    );
+                    return;
+                  }
+                  setMostrarModalSelecaoImportacao(true);
+                }}
+                className={`flex-1 sm:flex-initial px-4 py-3 rounded-lg transition-colors flex items-center justify-center gap-2 ${
+                  selectedRestaurante 
+                    ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' 
+                    : 'bg-gray-50 text-gray-400 cursor-not-allowed'
+                }`}
+                disabled={!selectedRestaurante}
+                title={!selectedRestaurante ? 'Selecione um restaurante primeiro' : 'Importar insumos via Excel'}
+              >
+                <Upload className="w-5 h-5" />
+                <span className="font-medium">Importar</span>
+              </button>
+            </div>
             
-            {/* Botão Novo Insumo */}
+            {/* Linha 2: Botão Novo Insumo (ocupa largura total no mobile, inline no desktop) */}
             <button
               onClick={() => setShowInsumoForm(true)}
-              className="bg-gradient-to-r from-green-500 to-pink-500 text-white px-6 py-3 rounded-lg flex items-center gap-2 hover:from-green-600 hover:to-pink-600 transition-all"
+              className="w-full sm:w-auto bg-gradient-to-r from-green-500 to-pink-500 text-white px-6 py-3 rounded-lg flex items-center justify-center gap-2 hover:from-green-600 hover:to-pink-600 transition-all"
             >
               <Plus className="w-5 h-5" />
               <span className="font-medium">Novo Insumo</span>
@@ -6318,8 +6323,40 @@ const fetchInsumos = async () => {
           </div>
         </div>
 
-        {/* Barra de busca - COMPONENTE ISOLADO */}
-        <SearchInput onSearch={handleSearchChange} />
+        {/* Barra de busca e toggle de visualização */}
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+          <div className="flex-1">
+            <SearchInput onSearch={handleSearchChange} />
+          </div>
+          
+          {/* Toggle de visualização */}
+          <div className="flex rounded-lg border border-gray-200 p-1 bg-white" role="group" aria-label="Modo de visualização">
+            <button
+              onClick={() => setViewModeInsumos('list')}
+              className={`flex-1 sm:flex-initial px-4 py-2 rounded transition-colors ${
+                viewModeInsumos === 'list' 
+                  ? 'bg-green-100 text-green-600' 
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}
+              aria-label="Visualizar em lista"
+              aria-pressed={viewModeInsumos === 'list'}
+            >
+              <List className="w-5 h-5 mx-auto" aria-hidden="true" />
+            </button>
+            <button
+              onClick={() => setViewModeInsumos('grid')}
+              className={`flex-1 sm:flex-initial px-4 py-2 rounded transition-colors ${
+                viewModeInsumos === 'grid' 
+                  ? 'bg-green-100 text-green-600' 
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}
+              aria-label="Visualizar em grade"
+              aria-pressed={viewModeInsumos === 'grid'}
+            >
+              <Grid className="w-5 h-5 mx-auto" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
 
         {/* ===================================================================================================
             CHECKBOX: INCLUIR INSUMOS GLOBAIS (DINÂMICO)
@@ -6339,13 +6376,14 @@ const fetchInsumos = async () => {
           </div>
         )}
 
-        {/* Tabela de insumos */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          {insumos.length === 0 ? (
-            <div className="p-8 text-center">
-              <p className="text-gray-500">Nenhum insumo cadastrado. Tente adicionar um novo insumo ou verificar a conexão com a API.</p>
-            </div>
-          ) : (
+        {/* Visualização de insumos - Tabela ou Cards */}
+        {insumos.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
+            <p className="text-gray-500">Nenhum insumo cadastrado.</p>
+          </div>
+        ) : viewModeInsumos === 'list' ? (
+          /* Visualização em Lista (Tabela) */
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
 
             <div>
 
@@ -6488,8 +6526,8 @@ const fetchInsumos = async () => {
                 </div>
               )}
 
-              {/* Versão Desktop - Tabela */}
-              <div className="hidden md:block overflow-x-auto">
+              {/* Tabela Desktop */}
+              <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
@@ -6884,8 +6922,99 @@ const fetchInsumos = async () => {
                 </div>
               )}
             </div>
-          )}
         </div>
+        ) : (
+          /* Visualização em Grid (Cards) */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {insumosPaginados.map((insumo) => (
+              <div
+                key={insumo.id}
+                className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-shadow"
+              >
+                {/* Header do Card */}
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900 text-sm line-clamp-2 mb-2">
+                      {insumo.nome}
+                    </h3>
+                    <div className="flex gap-2">
+                      {insumo.tipo_origem === 'fornecedor' && (
+                        <span className="inline-block px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full font-medium">
+                          Fornecedor
+                        </span>
+                      )}
+                      {(insumo.restaurante_id === null || insumo.restaurante_id === undefined) && (
+                        <span className="inline-block px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full font-medium">
+                          Global
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Informações */}
+                <div className="space-y-2 text-sm mb-4">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Categoria:</span>
+                    <span className="text-gray-900 font-medium truncate ml-2">{insumo.grupo || 'Sem categoria'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Unidade:</span>
+                    <span className="text-gray-900">{insumo.unidade}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Quantidade:</span>
+                    <span className="text-gray-900">{insumo.quantidade ?? 0}</span>
+                  </div>
+                  {insumo.fator && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Fator:</span>
+                      <span className="text-gray-900">{parseFloat(parseFloat(insumo.fator).toFixed(2))}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center pt-2 border-t border-gray-100">
+                    <span className="text-gray-500">Valor/Un:</span>
+                    <span className="text-gray-900 font-bold text-green-600">
+                      R$ {insumo.tipo_origem === 'fornecedor' 
+                        ? insumo.preco_compra_real?.toFixed(2) || '0,00'
+                        : (() => {
+                            if (!insumo.preco_compra_real || !insumo.quantidade || insumo.quantidade <= 0) {
+                              return '0,00';
+                            }
+                            const fator = parseFloat(insumo.fator) || 1.0;
+                            const precoUnitario = insumo.preco_compra_real / (insumo.quantidade * fator);
+                            return precoUnitario.toFixed(2);
+                          })()
+                      }
+                    </span>
+                  </div>
+                </div>
+
+                {/* Ações */}
+                {insumo.tipo_origem !== 'fornecedor' ? (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleEditInsumo(insumo)}
+                      className="flex-1 px-3 py-2 text-xs bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors font-medium"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => handleDeleteInsumo(insumo.id, insumo.nome)}
+                      className="flex-1 px-3 py-2 text-xs bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors font-medium"
+                    >
+                      Excluir
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-center text-xs text-gray-500 italic py-2 bg-gray-50 rounded-lg">
+                    Gerenciar em Fornecedores
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
         {/* USAR COMPONENTE ISOLADO */}
         <FormularioInsumoIsolado
           isVisible={showInsumoForm}

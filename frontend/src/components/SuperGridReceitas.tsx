@@ -1238,6 +1238,97 @@ const SuperGridReceitas: React.FC<SuperGridReceitasProps> = ({
       {/* ===================================================================================================
           CONTEÚDO PRINCIPAL - GRID OU LISTA
           =================================================================================================== */}
+
+      {/* ===================================================================================================
+          PAGINAÇÃO NO TOPO
+          =================================================================================================== */}
+      
+      {totalPaginas > 1 && (
+        <div className="mb-4 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3 sm:px-6 rounded-lg">
+          {/* Mobile - Botões Anterior/Próxima */}
+          <div className="flex flex-1 justify-between sm:hidden">
+            <button
+              onClick={() => setPaginaAtual(Math.max(1, paginaAtual - 1))}
+              disabled={paginaAtual === 1}
+              className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Anterior
+            </button>
+            <span className="text-sm text-gray-700">
+              {paginaAtual} / {totalPaginas}
+            </span>
+            <button
+              onClick={() => setPaginaAtual(Math.min(totalPaginas, paginaAtual + 1))}
+              disabled={paginaAtual === totalPaginas}
+              className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Próxima
+            </button>
+          </div>
+
+          {/* Desktop - Paginação Completa */}
+          <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm text-gray-700">
+                Mostrando 
+                <span className="font-medium"> {indiceInicial + 1}</span> a{' '}
+                <span className="font-medium">
+                  {Math.min(indiceInicial + itensPorPagina, receitasFiltradas.length)}
+                </span>{' '}
+                de <span className="font-medium">{receitasFiltradas.length}</span> receitas
+              </p>
+            </div>
+            <div>
+              <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                <button
+                  onClick={() => setPaginaAtual(Math.max(1, paginaAtual - 1))}
+                  disabled={paginaAtual === 1}
+                  className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="sr-only">Anterior</span>
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                
+                {Array.from({ length: Math.min(5, totalPaginas) }, (_, i) => {
+                  let pageNum;
+                  if (totalPaginas <= 5) {
+                    pageNum = i + 1;
+                  } else if (paginaAtual <= 3) {
+                    pageNum = i + 1;
+                  } else if (paginaAtual >= totalPaginas - 2) {
+                    pageNum = totalPaginas - 4 + i;
+                  } else {
+                    pageNum = paginaAtual - 2 + i;
+                  }
+                  
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setPaginaAtual(pageNum)}
+                      className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
+                        paginaAtual === pageNum
+                          ? 'z-10 bg-green-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600'
+                          : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+                
+                <button
+                  onClick={() => setPaginaAtual(Math.min(totalPaginas, paginaAtual + 1))}
+                  disabled={paginaAtual === totalPaginas}
+                  className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="sr-only">Próxima</span>
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+              </nav>
+            </div>
+          </div>
+        </div>
+        )}
       
       {loading ? (
         <div className="space-y-4">
@@ -1395,31 +1486,55 @@ const SuperGridReceitas: React.FC<SuperGridReceitasProps> = ({
           )}
 
           {/* ===================================================================================================
-              PAGINAÇÃO
-              =================================================================================================== */}
+                  PAGINAÇÃO NO RODAPÉ
+                  =================================================================================================== */}
           
           {totalPaginas > 1 && (
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between">
-                
-                {/* Informações da paginação */}
-                <div className="text-sm text-gray-500">
-                  Mostrando {indiceInicial + 1} a {Math.min(indiceInicial + itensPorPagina, receitasFiltradas.length)} de {receitasFiltradas.length} receitas
+            <div className="mt-6 flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 rounded-lg">
+              {/* Mobile - Botões Anterior/Próxima */}
+              <div className="flex flex-1 justify-between sm:hidden">
+                <button
+                  onClick={() => setPaginaAtual(Math.max(1, paginaAtual - 1))}
+                  disabled={paginaAtual === 1}
+                  className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Anterior
+                </button>
+                <span className="text-sm text-gray-700">
+                  {paginaAtual} / {totalPaginas}
+                </span>
+                <button
+                  onClick={() => setPaginaAtual(Math.min(totalPaginas, paginaAtual + 1))}
+                  disabled={paginaAtual === totalPaginas}
+                  className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Próxima
+                </button>
+              </div>
+
+              {/* Desktop - Paginação Completa */}
+              <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm text-gray-700">
+                    Mostrando 
+                    <span className="font-medium"> {indiceInicial + 1}</span> a{' '}
+                    <span className="font-medium">
+                      {Math.min(indiceInicial + itensPorPagina, receitasFiltradas.length)}
+                    </span>{' '}
+                    de <span className="font-medium">{receitasFiltradas.length}</span> receitas
+                  </p>
                 </div>
-                
-                {/* Controles de paginação */}
-                <nav className="flex items-center gap-2" aria-label="Navegação de páginas">
-                  <button
-                    onClick={() => setPaginaAtual(Math.max(1, paginaAtual - 1))}
-                    disabled={paginaAtual === 1}
-                    className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-                    aria-label="Página anterior"
-                  >
-                    <ChevronLeft className="w-5 h-5" aria-hidden="true" />
-                  </button>
-                  
-                  {/* Números das páginas */}
-                  <div className="flex items-center gap-1">
+                <div>
+                  <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                    <button
+                      onClick={() => setPaginaAtual(Math.max(1, paginaAtual - 1))}
+                      disabled={paginaAtual === 1}
+                      className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="sr-only">Anterior</span>
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
+                    
                     {Array.from({ length: Math.min(5, totalPaginas) }, (_, i) => {
                       let pageNum;
                       if (totalPaginas <= 5) {
@@ -1436,35 +1551,34 @@ const SuperGridReceitas: React.FC<SuperGridReceitasProps> = ({
                         <button
                           key={pageNum}
                           onClick={() => setPaginaAtual(pageNum)}
-                          className={`px-3 py-1 text-sm rounded-md ${
+                          className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
                             paginaAtual === pageNum
-                              ? 'bg-green-500 text-white'
-                              : 'text-gray-600 hover:bg-gray-100'
+                              ? 'z-10 bg-green-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600'
+                              : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50'
                           }`}
                         >
                           {pageNum}
                         </button>
                       );
                     })}
-                  </div>
-                  
-                  <button
-                    onClick={() => setPaginaAtual(Math.min(totalPaginas, paginaAtual + 1))}
-                    disabled={paginaAtual === totalPaginas}
-                    className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-                    aria-label="Próxima página"
-                  >
-                    <ChevronRight className="w-5 h-5" aria-hidden="true" />
-                  </button>
-                </nav>
+                    
+                    <button
+                      onClick={() => setPaginaAtual(Math.min(totalPaginas, paginaAtual + 1))}
+                      disabled={paginaAtual === totalPaginas}
+                      className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="sr-only">Próxima</span>
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
+                  </nav>
+                </div>
               </div>
             </div>
-          )}
+            )}               
         </>
       )}
-      
-      {/* Overlay para fechar dropdown quando clicado fora */}
-      {showDropdown && (
+    {/* Overlay para fechar dropdown */}
+    {showDropdown && (
         <div 
           className="fixed inset-0 z-5" 
           onClick={() => setShowDropdown(null)}

@@ -17,7 +17,9 @@ import {
   AlertTriangle,
   Clock,
   Target,
-  BarChart3
+  BarChart3,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 // Importar componente do popup de classificação
@@ -200,112 +202,108 @@ const InsumosSemClassificacao: React.FC = () => {
       {/* ============================================================================ */}
       {/* HEADER COM CONTADOR E PAGINAÇÃO */}
       {/* ============================================================================ */}
-      <div className="flex justify-between items-center mb-4">
-        {/* Contador de insumos (esquerda) */}
-        <div className="text-sm text-gray-600">
-          <span className="font-semibold text-orange-600">{insumosSemClassificacao.length}</span> insumo(s) aguardando classificação
+      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-6">
+        {/* Titulo e contador de insumos */}
+        <div className="flex-1">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            Insumos Aguardando Classificação
+          </h3>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center justify-center min-w-[28px] h-7 px-2.5 bg-orange-100 text-orange-700 font-bold rounded-full text-sm">
+              {totalInsumosSemClassificacao}
+            </span>
+            <p className="text-sm text-gray-600">
+              {totalInsumosSemClassificacao === 1 ? 'insumo aguardando' : 'insumos aguardando'} classificação pela IA
+            </p>
+          </div>
         </div>
 
-        {/* Controles de paginação (direita) */}
+        {/* Paginacao no topo */}
         {totalPaginas > 1 && (
-          <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-            {/* Botão Anterior */}
-            <button
-              onClick={() => setPaginaAtual(prev => Math.max(1, prev - 1))}
-              disabled={paginaAtual === 1}
-              className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className="sr-only">Anterior</span>
-              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
-              </svg>
-            </button>
+          <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3 sm:px-6 rounded-lg">
+            {/* Mobile - Botoes Anterior/Proxima */}
+            <div className="flex flex-1 justify-between sm:hidden">
+              <button
+                onClick={() => setPaginaAtual(Math.max(1, paginaAtual - 1))}
+                disabled={paginaAtual === 1}
+                className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Anterior
+              </button>
+              <span className="text-sm text-gray-700">
+                {paginaAtual} / {totalPaginas}
+              </span>
+              <button
+                onClick={() => setPaginaAtual(Math.min(totalPaginas, paginaAtual + 1))}
+                disabled={paginaAtual === totalPaginas}
+                className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Próxima
+              </button>
+            </div>
 
-            {/* Números das páginas - mostrar apenas páginas próximas */}
-            {(() => {
-              const maxPaginasVisiveis = 5;
-              const metade = Math.floor(maxPaginasVisiveis / 2);
-              let paginaInicio = Math.max(1, paginaAtual - metade);
-              let paginaFim = Math.min(totalPaginas, paginaInicio + maxPaginasVisiveis - 1);
-              
-              if (paginaFim - paginaInicio < maxPaginasVisiveis - 1) {
-                paginaInicio = Math.max(1, paginaFim - maxPaginasVisiveis + 1);
-              }
-              
-              const paginas = [];
-              
-              // Sempre mostrar primeira página
-              if (paginaInicio > 1) {
-                paginas.push(
+            {/* Desktop - Paginacao Completa */}
+            <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between sm:gap-8">
+              <div>
+                <p className="text-sm text-gray-700">
+                  Mostrando 
+                  <span className="font-medium"> {(paginaAtual - 1) * itensPorPagina + 1}</span> a{' '}
+                  <span className="font-medium">
+                    {Math.min(paginaAtual * itensPorPagina, totalInsumosSemClassificacao)}
+                  </span>{' '}
+                  de <span className="font-medium">{totalInsumosSemClassificacao}</span> insumos
+                </p>
+              </div>
+              <div>
+                <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
                   <button
-                    key={1}
-                    onClick={() => setPaginaAtual(1)}
-                    className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                    onClick={() => setPaginaAtual(Math.max(1, paginaAtual - 1))}
+                    disabled={paginaAtual === 1}
+                    className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    1
+                    <span className="sr-only">Anterior</span>
+                    <ChevronLeft className="h-5 w-5" />
                   </button>
-                );
-                if (paginaInicio > 2) {
-                  paginas.push(
-                    <span key="dots-start" className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700">
-                      ...
-                    </span>
-                  );
-                }
-              }
-              
-              // Páginas do meio
-              for (let i = paginaInicio; i <= paginaFim; i++) {
-                paginas.push(
+                  
+                  {Array.from({ length: Math.min(5, totalPaginas) }, (_, i) => {
+                    let pageNum;
+                    if (totalPaginas <= 5) {
+                      pageNum = i + 1;
+                    } else if (paginaAtual <= 3) {
+                      pageNum = i + 1;
+                    } else if (paginaAtual >= totalPaginas - 2) {
+                      pageNum = totalPaginas - 4 + i;
+                    } else {
+                      pageNum = paginaAtual - 2 + i;
+                    }
+                    
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setPaginaAtual(pageNum)}
+                        className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
+                          paginaAtual === pageNum
+                            ? 'z-10 bg-green-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600'
+                            : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                  
                   <button
-                    key={i}
-                    onClick={() => setPaginaAtual(i)}
-                    className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
-                      paginaAtual === i
-                        ? 'z-10 bg-green-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600'
-                        : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50'
-                    }`}
+                    onClick={() => setPaginaAtual(Math.min(totalPaginas, paginaAtual + 1))}
+                    disabled={paginaAtual === totalPaginas}
+                    className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {i}
+                    <span className="sr-only">Próxima</span>
+                    <ChevronRight className="h-5 w-5" />
                   </button>
-                );
-              }
-              
-              // Sempre mostrar última página
-              if (paginaFim < totalPaginas) {
-                if (paginaFim < totalPaginas - 1) {
-                  paginas.push(
-                    <span key="dots-end" className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700">
-                      ...
-                    </span>
-                  );
-                }
-                paginas.push(
-                  <button
-                    key={totalPaginas}
-                    onClick={() => setPaginaAtual(totalPaginas)}
-                    className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-                  >
-                    {totalPaginas}
-                  </button>
-                );
-              }
-              
-              return paginas;
-            })()}
-
-            {/* Botão Próxima */}
-            <button
-              onClick={() => setPaginaAtual(prev => Math.min(totalPaginas, prev + 1))}
-              disabled={paginaAtual === totalPaginas}
-              className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className="sr-only">Próxima</span>
-              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
-              </svg>
-            </button>
-          </nav>
+                </nav>
+              </div>
+            </div>
+          </div>
         )}
       </div>
       
@@ -377,106 +375,92 @@ const InsumosSemClassificacao: React.FC = () => {
           </div>
         </div>
 
-        {/* Controles de paginação (direita) */}
+        {/* Paginacao no rodape */}
         {totalPaginas > 1 && (
-          <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-            {/* Botão Anterior */}
-            <button
-              onClick={() => setPaginaAtual(prev => Math.max(1, prev - 1))}
-              disabled={paginaAtual === 1}
-              className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className="sr-only">Anterior</span>
-              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
-              </svg>
-            </button>
+          <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 rounded-lg mt-4">
+            {/* Mobile - Botoes Anterior/Proxima */}
+            <div className="flex flex-1 justify-between sm:hidden">
+              <button
+                onClick={() => setPaginaAtual(Math.max(1, paginaAtual - 1))}
+                disabled={paginaAtual === 1}
+                className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Anterior
+              </button>
+              <span className="text-sm text-gray-700">
+                {paginaAtual} / {totalPaginas}
+              </span>
+              <button
+                onClick={() => setPaginaAtual(Math.min(totalPaginas, paginaAtual + 1))}
+                disabled={paginaAtual === totalPaginas}
+                className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Próxima
+              </button>
+            </div>
 
-            {/* Números das páginas - mostrar apenas páginas próximas */}
-            {(() => {
-              const maxPaginasVisiveis = 5;
-              const metade = Math.floor(maxPaginasVisiveis / 2);
-              let paginaInicio = Math.max(1, paginaAtual - metade);
-              let paginaFim = Math.min(totalPaginas, paginaInicio + maxPaginasVisiveis - 1);
-              
-              if (paginaFim - paginaInicio < maxPaginasVisiveis - 1) {
-                paginaInicio = Math.max(1, paginaFim - maxPaginasVisiveis + 1);
-              }
-              
-              const paginas = [];
-              
-              // Sempre mostrar primeira página
-              if (paginaInicio > 1) {
-                paginas.push(
+            {/* Desktop - Paginacao Completa */}
+            <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm text-gray-700">
+                  Mostrando 
+                  <span className="font-medium"> {(paginaAtual - 1) * itensPorPagina + 1}</span> a{' '}
+                  <span className="font-medium">
+                    {Math.min(paginaAtual * itensPorPagina, totalInsumosSemClassificacao)}
+                  </span>{' '}
+                  de <span className="font-medium">{totalInsumosSemClassificacao}</span> insumos
+                </p>
+              </div>
+              <div>
+                <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
                   <button
-                    key={1}
-                    onClick={() => setPaginaAtual(1)}
-                    className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                    onClick={() => setPaginaAtual(Math.max(1, paginaAtual - 1))}
+                    disabled={paginaAtual === 1}
+                    className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    1
+                    <span className="sr-only">Anterior</span>
+                    <ChevronLeft className="h-5 w-5" />
                   </button>
-                );
-                if (paginaInicio > 2) {
-                  paginas.push(
-                    <span key="dots-start" className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700">
-                      ...
-                    </span>
-                  );
-                }
-              }
-              
-              // Páginas do meio
-              for (let i = paginaInicio; i <= paginaFim; i++) {
-                paginas.push(
+                  
+                  {Array.from({ length: Math.min(5, totalPaginas) }, (_, i) => {
+                    let pageNum;
+                    if (totalPaginas <= 5) {
+                      pageNum = i + 1;
+                    } else if (paginaAtual <= 3) {
+                      pageNum = i + 1;
+                    } else if (paginaAtual >= totalPaginas - 2) {
+                      pageNum = totalPaginas - 4 + i;
+                    } else {
+                      pageNum = paginaAtual - 2 + i;
+                    }
+                    
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setPaginaAtual(pageNum)}
+                        className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
+                          paginaAtual === pageNum
+                            ? 'z-10 bg-green-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600'
+                            : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                  
                   <button
-                    key={i}
-                    onClick={() => setPaginaAtual(i)}
-                    className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
-                      paginaAtual === i
-                        ? 'z-10 bg-green-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600'
-                        : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50'
-                    }`}
+                    onClick={() => setPaginaAtual(Math.min(totalPaginas, paginaAtual + 1))}
+                    disabled={paginaAtual === totalPaginas}
+                    className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {i}
+                    <span className="sr-only">Próxima</span>
+                    <ChevronRight className="h-5 w-5" />
                   </button>
-                );
-              }
-              
-              // Sempre mostrar última página
-              if (paginaFim < totalPaginas) {
-                if (paginaFim < totalPaginas - 1) {
-                  paginas.push(
-                    <span key="dots-end" className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700">
-                      ...
-                    </span>
-                  );
-                }
-                paginas.push(
-                  <button
-                    key={totalPaginas}
-                    onClick={() => setPaginaAtual(totalPaginas)}
-                    className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-                  >
-                    {totalPaginas}
-                  </button>
-                );
-              }
-              
-              return paginas;
-            })()}
-
-            {/* Botão Próxima */}
-            <button
-              onClick={() => setPaginaAtual(prev => Math.min(totalPaginas, prev + 1))}
-              disabled={paginaAtual === totalPaginas}
-              className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className="sr-only">Próxima</span>
-              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
-              </svg>
-            </button>
-          </nav>
+                </nav>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     
@@ -644,10 +628,6 @@ const ClassificadorIA: React.FC = () => {
 
       {/* Status do Sistema */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Brain className="w-5 h-5" />
-          <h3 className="text-lg font-semibold">Status do Sistema IA</h3>
-        </div>
         
         {status ? (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -739,11 +719,6 @@ const ClassificadorIA: React.FC = () => {
           <div className="space-y-6">
             {/* Tabela de insumos aguardando classificação */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Search className="w-5 h-5" />
-                <h3 className="text-lg font-semibold">Insumos Aguardando Classificação</h3>
-              </div>
-              
               <InsumosSemClassificacao />
             </div>
           </div>

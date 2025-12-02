@@ -207,10 +207,17 @@ async def processar_importacao_receitas(
         resultado_processamento = service.processar_arquivo(caminho_arquivo)
 
         # Filtrar apenas receitas selecionadas pelo usuário
+        # Buscar tanto em receitas_prontas quanto em receitas_com_insumos_faltando
+        todas_receitas = resultado_processamento.get("receitas_prontas", [])
+        
         receitas_para_importar = [
-            r for r in resultado_processamento.get("receitas_prontas", [])
-            if r["codigo"] in receitas_selecionadas_list  # ← MUDOU AQUI
+            r for r in todas_receitas
+            if r["codigo"] in receitas_selecionadas_list
         ]
+        
+        print(f"🔍 Total de receitas encontradas para importar: {len(receitas_para_importar)}")
+        print(f"🔍 Códigos procurados: {receitas_selecionadas_list}")
+        print(f"🔍 Códigos encontrados: {[r['codigo'] for r in receitas_para_importar]}")
         
         receitas_sucesso = []
         receitas_erro = []

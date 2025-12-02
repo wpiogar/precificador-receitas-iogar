@@ -101,37 +101,48 @@ class ReceitaImportService:
             }
             
             # Classificar receitas
+            # Alteração: TODAS as receitas vão para "receitas_prontas" 
+            # (mesmo com insumos faltando, pois podem ser importadas como "pendentes")
             for receita in receitas:
                 insumos_faltando = [
                     ins for ins in receita.insumos 
                     if ins.tipo_match == "NAO_ENCONTRADO"
                 ]
                 
-                if len(insumos_faltando) == 0:
-                    resultado["receitas_prontas"].append({
+                # Todas as receitas são adicionadas a receitas_prontas
+                resultado["receitas_prontas"].append({
+                    "codigo": receita.codigo,
+                    "nome": receita.nome,
+                    "tipo": receita.tipo,
+                    "total_insumos": len(receita.insumos),
+                    "custo_total": receita.custo_total,
+                    "valor_total": receita.valor_total,
+                    "insumos_nao_encontrados": len(insumos_faltando),
+                    "insumos": [
+                        {
+                            "insumo_id": ins.insumo_id_matched,
+                            "nome": ins.nome,
+                            "quantidade": ins.quantidade,
+                            "unidade": ins.unidade,
+                            "custo": ins.custo,
+                            "valor": ins.valor,
+                            "tipo_match": ins.tipo_match
+                        }
+                        for ins in receita.insumos
+                    ]
+                })
+                
+                # Se tiver insumos faltando, adicionar TAMBÉM na lista de problemas
+                # (para exibir aviso ao usuário, mas não impede importação)
+                if len(insumos_faltando) > 0:
+                    resultado["receitas_com_insumos_faltando"].append({
                         "codigo": receita.codigo,
                         "nome": receita.nome,
                         "tipo": receita.tipo,
                         "total_insumos": len(receita.insumos),
                         "custo_total": receita.custo_total,
                         "valor_total": receita.valor_total,
-                        "insumos": [
-                            {
-                                "insumo_id": ins.insumo_id_matched,
-                                "nome": ins.nome,
-                                "quantidade": ins.quantidade,
-                                "unidade": ins.unidade,
-                                "custo": ins.custo,
-                                "valor": ins.valor
-                            }
-                            for ins in receita.insumos
-                        ]
-                    })
-                else:
-                    resultado["receitas_com_insumos_faltando"].append({
-                        "codigo": receita.codigo,
-                        "nome": receita.nome,
-                        "tipo": receita.tipo,
+                        "insumos_nao_encontrados": len(insumos_faltando),
                         "insumos_faltando": [
                             {
                                 "nome": ins.nome,
@@ -143,7 +154,6 @@ class ReceitaImportService:
                     })
                 
                 # Contar estatísticas
-                insumos_faltando_count = 0
                 for ins in receita.insumos:
                     if ins.tipo_match == "EXATO":
                         resultado["estatisticas"]["insumos_matched_exato"] += 1
@@ -151,18 +161,6 @@ class ReceitaImportService:
                         resultado["estatisticas"]["insumos_matched_fuzzy"] += 1
                     elif ins.tipo_match == "NAO_ENCONTRADO":
                         resultado["estatisticas"]["insumos_nao_encontrados"] += 1
-                        insumos_faltando_count += 1
-                
-                # Alteração: Receitas SEM insumos ou com insumos faltando podem ser importadas
-                # Elas serão criadas como "pendentes" e o usuário pode adicionar insumos depois
-                receita_preview["pode_importar"] = True
-                
-                # Adicionar aviso se houver insumos faltando
-                if insumos_faltando_count > 0:
-                    receita_preview["avisos"] = [
-                        f"Esta receita possui {insumos_faltando_count} insumo(s) não encontrado(s)",
-                        "A receita será importada como 'pendente' e você pode adicionar os insumos posteriormente"
-                    ]
             
             return resultado
             
@@ -191,21 +189,30 @@ class ReceitaImportService:
             # Pegar primeira coluna
             primeira_coluna = str(row[0]) if pd.notna(row[0]) else ""
             
-            # Verificar se é linha de receita (Composto: XXXX - NOME - PROCESSADO)
+            # Verificar se é linha de receita (qualquer linha que comece com "Composto:" seguido de número)
             if primeira_coluna.startswith("Composto:"):
                 # Salvar receita anterior se existir
                 if receita_atual is not None:
                     receitas.append(receita_atual)
                 
-                # Extrair código e nome da receita usando regex
-                # \d+ captura qualquer sequência de dígitos (sem limite de faixa)
-                match = re.search(r'Composto:\s*(\d+)\s*-\s*(.+?)\s*-\s*(PROCESSADO|COMPOSTO)', 
-                                primeira_coluna, re.IGNORECASE)
+                # Extrair código e nome da receita
+                # Padrão: "Composto: CODIGO - NOME" (com ou sem tipo no final)
+                # Regex simplificado: pega código e todo o resto como nome
+                match = re.search(r'Composto:\s*(\d+)\s*-\s*(.+)', primeira_coluna, re.IGNORECASE)
                 
                 if match:
-                    codigo = int(match.group(1))  # Aceita qualquer número inteiro positivo
-                    nome = match.group(2).strip()
-                    tipo = match.group(3).strip()
+                    codigo = int(match.group(1))  # Código da receita
+                    nome_completo = match.group(2).strip()  # Nome pode incluir tipo no final
+                    
+                    # Remover tipo do nome se existir (PROCESSADO ou COMPOSTO no final)
+                    # Exemplo: "TEMPERO SHARI - PROCESSADO" vira "TEMPERO SHARI"
+                    nome = re.sub(r'\s*-\s*(PROCESSADO|COMPOSTO)\s*$', '', nome_completo, flags=re.IGNORECASE).strip()
+                    
+                    # Detectar tipo se existir, senão usar "COMPOSTO" como padrão
+                    if re.search(r'PROCESSADO', nome_completo, re.IGNORECASE):
+                        tipo = "PROCESSADO"
+                    else:
+                        tipo = "COMPOSTO"
                     
                     receita_atual = ReceitaImportacao(codigo, nome, tipo)
             

@@ -145,6 +145,72 @@ import sys
 import os
 from pathlib import Path
 
+# ============================================================================
+# VERIFICAÇÃO DE DEPENDÊNCIAS CRÍTICAS
+# ============================================================================
+def verificar_dependencias_criticas():
+    """
+    Verifica se todas as dependências críticas estão instaladas.
+    Emite avisos se alguma dependência estiver faltando.
+    
+    Dependências verificadas:
+    - pandas: Necessário para importação de Excel
+    - openpyxl: Necessário para leitura de arquivos .xlsx
+    - numpy: Necessário para cálculos numéricos do pandas
+    """
+    dependencias_faltando = []
+    avisos = []
+    
+    # Verificar pandas
+    try:
+        import pandas as pd
+        print(f"✅ pandas {pd.__version__} instalado")
+    except ImportError:
+        dependencias_faltando.append("pandas")
+        avisos.append("❌ pandas NÃO encontrado - Importação de Excel NÃO funcionará!")
+    
+    # Verificar openpyxl
+    try:
+        import openpyxl
+        print(f"✅ openpyxl {openpyxl.__version__} instalado")
+    except ImportError:
+        dependencias_faltando.append("openpyxl")
+        avisos.append("❌ openpyxl NÃO encontrado - Leitura de arquivos .xlsx NÃO funcionará!")
+    
+    # Verificar numpy
+    try:
+        import numpy as np
+        print(f"✅ numpy {np.__version__} instalado")
+    except ImportError:
+        dependencias_faltando.append("numpy")
+        avisos.append("❌ numpy NÃO encontrado - Cálculos numéricos podem falhar!")
+    
+    # Emitir avisos se houver dependências faltando
+    if dependencias_faltando:
+        print("\n" + "=" * 80)
+        print("⚠️  AVISO: DEPENDÊNCIAS CRÍTICAS FALTANDO")
+        print("=" * 80)
+        for aviso in avisos:
+            print(aviso)
+        print("\n💡 Para corrigir, execute:")
+        print(f"   pip install {' '.join(dependencias_faltando)}")
+        print("=" * 80 + "\n")
+        
+        # Em produção, isso é CRÍTICO
+        if os.getenv("ENVIRONMENT") in ["staging", "production"]:
+            print("🚨 AMBIENTE DE PRODUÇÃO: Dependências faltando podem causar falhas!")
+            print("🚨 Recomenda-se rebuild completo no Render")
+    else:
+        print("✅ Todas as dependências críticas estão instaladas\n")
+    
+    return len(dependencias_faltando) == 0
+
+# Executar verificação de dependências no startup
+print("=" * 80)
+print("🔍 VERIFICANDO DEPENDÊNCIAS CRÍTICAS")
+print("=" * 80)
+verificar_dependencias_criticas()
+
 def run_migrations_on_startup():
     """
     Executa migrações e adiciona coluna fator se não existir.

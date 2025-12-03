@@ -537,6 +537,92 @@ class ImportacaoService:
 
             logger.info(f"🚀 Iniciando processamento de {total_linhas} linhas a partir da linha {linha_dados_inicial}")
 
+            # ========================================================================
+            # VALIDAÇÃO PRÉVIA: Verificar códigos duplicados ANTES de importar
+            # ========================================================================
+            logger.info("🔍 Iniciando validação prévia de códigos duplicados...")
+            
+            codigos_na_planilha = []
+            linha_dados_inicial_validacao = linha_cabecalho + 1
+            
+            # Ler todos os códigos da planilha
+            for row in ws.iter_rows(min_row=linha_dados_inicial_validacao):
+                try:
+                    # Extrair código da linha
+                    dados_temp = extrair_dados_linha(row, colunas_mapeadas)
+                    codigo_valor = dados_temp.get('codigo')
+                    
+                    # Ignorar linhas sem código válido
+                    if not codigo_valor or str(codigo_valor).strip() in ['', 'None', 'none']:
+                        continue
+                    
+                    # Ignorar cabeçalhos de grupo
+                    if str(codigo_valor).strip().upper().startswith('GRUPO'):
+                        continue
+                    
+                    # Validar que é numérico
+                    try:
+                        codigo_int = int(str(codigo_valor).strip())
+                        if codigo_int > 0:
+                            codigos_na_planilha.append(codigo_int)
+                    except (ValueError, TypeError):
+                        continue
+                        
+                except Exception:
+                    continue
+            
+            logger.info(f"📋 Total de códigos válidos na planilha: {len(codigos_na_planilha)}")
+            
+            # Buscar quais códigos já existem no banco para este restaurante
+            if codigos_na_planilha:
+                # CRÍTICO: Converter códigos para string pois codigo é VARCHAR no banco
+                codigos_na_planilha_str = [str(c) for c in codigos_na_planilha]
+                
+                codigos_existentes = self.db.query(Insumo.codigo, Insumo.nome).filter(
+                    Insumo.restaurante_id == restaurante_id,
+                    Insumo.codigo.in_(codigos_na_planilha_str)
+                ).all()
+                
+                if codigos_existentes:
+                    # Criar mensagem de erro detalhada
+                    mensagem_erro = f"❌ ERRO: Encontrados {len(codigos_existentes)} códigos duplicados\n\n"
+                    mensagem_erro += "Os seguintes códigos já existem neste restaurante:\n\n"
+                    
+                    # Mostrar no máximo 15 exemplos
+                    for codigo, nome in sorted(codigos_existentes, key=lambda x: x[0])[:15]:
+                        mensagem_erro += f"  • Código {codigo}: {nome}\n"
+                    
+                    if len(codigos_existentes) > 15:
+                        mensagem_erro += f"\n  ... e mais {len(codigos_existentes) - 15} códigos duplicados.\n"
+                    
+                    mensagem_erro += f"\n⚠️ Total de códigos duplicados: {len(codigos_existentes)}"
+                    mensagem_erro += f"\n\n💡 SOLUÇÃO:"
+                    mensagem_erro += f"\n   1. Importe esta planilha para um restaurante diferente, OU"
+                    mensagem_erro += f"\n   2. Remova/altere os códigos duplicados no Excel antes de importar."
+                    
+                    # Atualizar status da importação
+                    importacao.status = StatusImportacao.ERRO
+                    importacao.mensagem_erro = mensagem_erro
+                    importacao.data_fim_processamento = datetime.now()
+                    importacao.linhas_com_erro = len(codigos_existentes)
+                    self.db.commit()
+                    
+                    wb.close()
+                    
+                    logger.error(f"❌ Códigos duplicados encontrados: {len(codigos_existentes)}")
+                    logger.error(f"   Primeiros códigos: {[c for c, n in codigos_existentes[:10]]}")
+                    
+                    return False, mensagem_erro
+                else:
+                    logger.info(f"✅ Nenhum código duplicado encontrado - prosseguindo com importação")
+            
+            # ========================================================================
+            # FIM DA VALIDAÇÃO - Continuar com processamento normal
+            # ========================================================================
+            
+            # Verificar quantos insumos já existem no banco para este restaurante
+            from sqlalchemy import text
+
             # Processar linhas
             linha_dados_inicial = linha_cabecalho + 1
             total_linhas = ws.max_row - linha_cabecalho
@@ -634,95 +720,58 @@ class ImportacaoService:
                         continue
                     
                     # ====================================================================
-                    # VERIFICAÇÃO DE DUPLICATAS: Atualizar se já existir
-                    # Se encontrar código duplicado, atualiza o insumo com novos dados
+                    # VERIFICAÇÃO DE DUPLICATAS: Ignorar se já existir
+                    # Se encontrar código duplicado, registrar no log e pular
+                    # IMPORTANTE: Adicionar try-catch para não travar a transação
                     # ====================================================================
-                    self.db.expire_all()
-                    
-                    # Query direta no banco com isolamento de transação
-                    from sqlalchemy import text
-                    resultado = self.db.execute(
-                        text("""
-                            SELECT id, nome, preco_compra
-                            FROM insumos 
-                            WHERE restaurante_id = :restaurante_id 
-                            AND codigo = :codigo
-                            LIMIT 1
-                        """),
-                        {"restaurante_id": restaurante_id, "codigo": dados['codigo']}
-                    ).fetchone()
+                    try:
+                        self.db.expire_all()
+                        
+                        # Query direta no banco - codigo é VARCHAR, converter para string
+                        from sqlalchemy import text
+                        resultado = self.db.execute(
+                            text("""
+                                SELECT id, nome, preco_compra
+                                FROM insumos 
+                                WHERE restaurante_id = :restaurante_id 
+                                AND codigo = :codigo
+                                LIMIT 1
+                            """),
+                            {
+                                "restaurante_id": restaurante_id, 
+                                "codigo": str(dados['codigo'])
+                            }
+                        ).fetchone()
 
-                    if resultado:
-                        # Insumo já existe - ATUALIZAR ao invés de pular
-                        insumo_id_existente = resultado[0]
-                        nome_antigo = resultado[1]
-                        preco_antigo_centavos = resultado[2] or 0
-                        
-                        # Preparar novos valores
-                        quantidade = dados.get('quantidade', 1)
-                        if quantidade is None or quantidade == 0:
-                            quantidade = 1
-                        
-                        preco_real = dados.get('preco_unitario', dados.get('preco_compra_real', 0)) or 0
-                        preco_novo_centavos = int(float(preco_real) * 100) if preco_real else 0
-                        
-                        # Atualizar insumo existente
-                        try:
-                            self.db.execute(
-                                text("""
-                                    UPDATE insumos 
-                                    SET nome = :nome,
-                                        quantidade = :quantidade,
-                                        fator = :fator,
-                                        unidade = :unidade,
-                                        preco_compra = :preco_compra,
-                                        importacao_id = :importacao_id
-                                    WHERE id = :id
-                                """),
-                                {
-                                    "id": insumo_id_existente,
-                                    "nome": dados['nome'],
-                                    "quantidade": float(quantidade),
-                                    "fator": float(dados.get('fator', 1.0)),
-                                    "unidade": dados['unidade'],
-                                    "preco_compra": preco_novo_centavos,
-                                    "importacao_id": importacao_id
-                                }
-                            )
-                            self.db.flush()
+                        if resultado:
+                            # Insumo já existe neste restaurante - IGNORAR
+                            insumo_id_existente = resultado[0]
+                            nome_existente = resultado[1]
+                            preco_existente_centavos = resultado[2] or 0
+                            preco_existente_real = preco_existente_centavos / 100
                             
-                            # Log detalhado da atualização
-                            mudancas = []
-                            if nome_antigo != dados['nome']:
-                                mudancas.append(f"nome: '{nome_antigo}' -> '{dados['nome']}'")
-                            if preco_antigo_centavos != preco_novo_centavos:
-                                preco_antigo_real = preco_antigo_centavos / 100
-                                mudancas.append(f"preço: R$ {preco_antigo_real:.2f} -> R$ {preco_real:.2f}")
-                            
-                            mensagem_log = f"Código {dados['codigo']} atualizado"
-                            if mudancas:
-                                mensagem_log += f" ({', '.join(mudancas)})"
-                            
-                            log.sucessos.append(ItemLog(
+                            log.ignorados.append(ItemLog(
                                 linha=row_num,
-                                tipo="atualizado",
-                                mensagem=mensagem_log,
+                                tipo="duplicado",
+                                mensagem=f"Código {dados['codigo']} já cadastrado neste restaurante: '{nome_existente}' (R$ {preco_existente_real:.2f})",
                                 dados=dados
                             ))
                             
-                            logger.info(f"🔄 Linha {row_num}: Insumo atualizado - {mensagem_log}")
+                            logger.info(f"⏭️ Linha {row_num}: Código {dados['codigo']} ignorado - já existe no restaurante")
                             continue
-                            
-                        except Exception as e_update:
-                            logger.error(f"❌ Erro ao atualizar insumo linha {row_num}: {str(e_update)}")
-                            log.erros.append(ItemLog(
-                                linha=row_num,
-                                tipo="erro",
-                                mensagem=f"Erro ao atualizar insumo: {str(e_update)}",
-                                dados=dados
-                            ))
-                            self.db.rollback()
-                            continue
+                    
+                    except Exception as e_duplicata:
+                        # Se der erro na verificação de duplicata, registrar e pular linha
+                        logger.error(f"❌ Erro ao verificar duplicata linha {row_num}: {str(e_duplicata)}")
+                        log.erros.append(ItemLog(
+                            linha=row_num,
+                            tipo="erro",
+                            mensagem=f"Erro ao verificar se código já existe: {str(e_duplicata)}",
+                            dados=dados
+                        ))
+                        # CRÍTICO: Fazer rollback para não travar próximas queries
+                        self.db.rollback()
+                        continue
                     
                     # ================================================================
                     # CRIAR INSUMO NO BANCO DE DADOS
@@ -802,6 +851,10 @@ class ImportacaoService:
                         mensagem=f"Erro: {str(e_linha)}",
                         dados=dados if 'dados' in locals() else {}
                     ))
+                    
+                    # CRÍTICO: Rollback para não travar próximas linhas
+                    self.db.rollback()
+                    
 
                 # ============================================================
                 # COMMIT EM LOTE - A cada 50 sucessos, salvar no banco

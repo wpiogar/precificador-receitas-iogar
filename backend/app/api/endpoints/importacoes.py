@@ -121,6 +121,25 @@ async def upload_arquivo_preview(
     4. Cria registro pendente no banco
     5. Retorna preview + importacao_id
     """
+    from app.models.receita import Restaurante
+    
+    restaurante = db.query(Restaurante).filter(
+        Restaurante.id == restaurante_id
+    ).first()
+    
+    if not restaurante:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Restaurante com ID {restaurante_id} não encontrado"
+        )
+    
+    print("=" * 80)
+    print("📤 UPLOAD DE IMPORTAÇÃO DE INSUMOS")
+    print(f"   Restaurante ID: {restaurante_id}")
+    print(f"   Restaurante Nome: {restaurante.nome}")
+    print(f"   Arquivo: {file.filename}")
+    print("=" * 80)
+
     # Validar tipo de arquivo
     if not file.filename.endswith('.xlsx'):
         raise HTTPException(

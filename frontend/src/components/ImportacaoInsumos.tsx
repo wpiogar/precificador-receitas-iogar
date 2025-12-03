@@ -848,61 +848,90 @@ return () => {
             <div 
                 className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg p-4 border border-yellow-200 cursor-pointer hover:shadow-md transition-shadow"
                 onClick={() => setMostrarDetalhesIgnorados(!mostrarDetalhesIgnorados)}
-                title="Clique para ver detalhes"
+                title="Clique para ver detalhes dos códigos duplicados"
             >
                 <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-yellow-700">Ignorados</span>
+                    <span className="text-sm font-medium text-yellow-700">Duplicados</span>
                     <div className="bg-yellow-200 p-1.5 rounded">
-                    ⚠️
+                    ⏭️
                     </div>
                 </div>
                 <p className="text-2xl font-bold text-yellow-900">
                     {resultado.linhas_ignoradas}
                 </p>
                 <p className="text-xs text-yellow-600 mt-1">
-                    {resultado.linhas_ignoradas > 0 ? 'clique para ver detalhes' : 'nenhum ignorado'}
+                    {resultado.linhas_ignoradas > 0 ? 'já cadastrados' : 'nenhum duplicado'}
                 </p>
             </div>
         </div>
 
-        {/* Seção de detalhes dos ignorados */}
+        {/* Seção de detalhes dos ignorados (CÓDIGOS DUPLICADOS) */}
         {mostrarDetalhesIgnorados && resultado.linhas_ignoradas > 0 && logProcessamento && (
-            <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-6">
+            <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-6 shadow-lg">
                 <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-semibold text-yellow-900 text-lg">
-                        ⚠️ Detalhes dos Registros Ignorados
-                    </h4>
+                    <div>
+                        <h4 className="font-semibold text-yellow-900 text-lg flex items-center gap-2">
+                            ⏭️ Códigos Duplicados (Não Importados)
+                        </h4>
+                        <p className="text-sm text-yellow-700 mt-1">
+                            Os seguintes insumos <strong>não foram importados</strong> pois já existem neste restaurante
+                        </p>
+                    </div>
                     <button
                         onClick={() => setMostrarDetalhesIgnorados(false)}
-                        className="text-yellow-600 hover:text-yellow-800"
+                        className="text-yellow-600 hover:text-yellow-800 p-2 hover:bg-yellow-100 rounded-lg transition-colors"
+                        title="Fechar"
                     >
                         ✕
                     </button>
                 </div>
 
+                {/* Explicação adicional */}
+                <div className="bg-white border border-yellow-200 rounded-lg p-4 mb-4">
+                    <div className="flex items-start gap-3">
+                        <div className="text-2xl">💡</div>
+                        <div className="flex-1 text-sm text-gray-700">
+                            <p className="font-medium text-gray-900 mb-2">Por que foram ignorados?</p>
+                            <ul className="list-disc list-inside space-y-1 text-gray-600">
+                                <li>Estes códigos <strong>já estão cadastrados</strong> neste restaurante</li>
+                                <li>O sistema não permite códigos duplicados no mesmo restaurante</li>
+                                <li>Para atualizar estes insumos, edite-os manualmente na lista de insumos</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Lista de duplicados */}
                 <div className="space-y-2 max-h-96 overflow-y-auto">
                     {logProcessamento.ignorados && logProcessamento.ignorados.length > 0 ? (
                         logProcessamento.ignorados.map((item: any, index: number) => (
                             <div 
                                 key={index}
-                                className="bg-white border border-yellow-200 rounded-lg p-4"
+                                className="bg-white border-2 border-yellow-200 rounded-lg p-4 hover:border-yellow-300 transition-colors"
                             >
                                 <div className="flex items-start space-x-3">
-                                    <div className="bg-yellow-100 p-2 rounded-full flex-shrink-0">
-                                        <span className="text-yellow-700 font-bold">
-                                            {item.linha}
+                                    <div className="bg-yellow-100 px-3 py-2 rounded-lg flex-shrink-0">
+                                        <span className="text-yellow-900 font-bold text-sm">
+                                            Linha {item.linha}
                                         </span>
                                     </div>
                                     <div className="flex-1">
-                                        <p className="text-sm font-medium text-gray-900">
+                                        <p className="text-sm font-medium text-gray-900 mb-1">
                                             {item.mensagem}
                                         </p>
                                         {item.dados && (item.dados.codigo || item.dados.nome) && (
-                                            <p className="text-xs text-gray-600 mt-1">
-                                                {item.dados.codigo && `Código: ${item.dados.codigo}`}
-                                                {item.dados.codigo && item.dados.nome && ' | '}
-                                                {item.dados.nome && `Nome: ${item.dados.nome}`}
-                                            </p>
+                                            <div className="flex items-center gap-4 text-xs text-gray-600 bg-gray-50 rounded px-3 py-2">
+                                                {item.dados.codigo && (
+                                                    <span className="font-mono">
+                                                        <strong>Código:</strong> {item.dados.codigo}
+                                                    </span>
+                                                )}
+                                                {item.dados.nome && (
+                                                    <span>
+                                                        <strong>Nome na planilha:</strong> {item.dados.nome}
+                                                    </span>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                 </div>

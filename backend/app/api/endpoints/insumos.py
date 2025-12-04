@@ -12,6 +12,10 @@ from sqlalchemy.orm import Session
 from app import schemas
 from app.api.deps import get_db
 from app.crud import insumo as crud_insumo
+import logging
+
+# Configurar logger para este módulo
+logger = logging.getLogger(__name__)
 from app.schemas.insumo import (
     InsumoCreate,
     InsumoUpdate,
@@ -98,17 +102,17 @@ def listar_insumos(
     )
 
     # Log detalhado para diagnostico de busca
-    print("=" * 80)
-    print("🔍 BUSCA DE INSUMOS - DEBUG")
-    print(f"  Restaurante ID filtro: {restaurante_id}")
-    print(f"  Incluir globais: {incluir_globais}")
-    print(f"  Filtros aplicados: {filters.model_dump() if filters else 'Nenhum'}")
-    print(f"  Total encontrados: {len(insumos)}")
+    logger.info("=" * 80)
+    logger.info("BUSCA DE INSUMOS - DEBUG")
+    logger.info(f"Restaurante ID filtro: {restaurante_id}")
+    logger.info(f"Incluir globais: {incluir_globais}")
+    logger.info(f"Filtros aplicados: {filters.model_dump() if filters else 'Nenhum'}")
+    logger.info(f"Total encontrados: {len(insumos)}")
     if insumos:
-        print(f"  Primeiros resultados:")
+        logger.info("Primeiros resultados:")
         for idx, ins in enumerate(insumos[:3]):
-            print(f"    [{idx+1}] Código: {ins.codigo}, Nome: {ins.nome}, Rest_ID: {ins.restaurante_id}")
-    print("=" * 80)
+            logger.info(f"[{idx+1}] Código: {ins.codigo}, Nome: {ins.nome}, Rest_ID: {ins.restaurante_id}")
+    logger.info("=" * 80)
 
     # Converter preços para reais e calcular preço unitário com fator
     # NOTA: preco_unitario_real é calculado automaticamente pela @property do modelo
@@ -392,23 +396,23 @@ def obter_insumo_por_codigo(
     - **codigo**: Código único do insumo
     """
     # Log detalhado para diagnostico de busca por codigo
-    print("=" * 80)
-    print("🔍 BUSCA POR CÓDIGO - DEBUG")
-    print(f"  Código buscado: '{codigo}'")
-    print("=" * 80)
+    logger.info("=" * 80)
+    logger.info("BUSCA POR CODIGO - DEBUG")
+    logger.info(f"Código buscado: '{codigo}'")
+    logger.info("=" * 80)
     insumo = crud_insumo.get_insumo_by_codigo(db, codigo)
     # Log do resultado
-    print("=" * 80)
-    print("📋 RESULTADO DA BUSCA POR CÓDIGO")
+    logger.info("=" * 80)
+    logger.info("RESULTADO DA BUSCA POR CODIGO")
     if insumo:
-        print(f"  ✅ Insumo ENCONTRADO:")
-        print(f"     ID: {insumo.id}")
-        print(f"     Código: {insumo.codigo}")
-        print(f"     Nome: {insumo.nome}")
-        print(f"     Restaurant_ID: {insumo.restaurante_id}")
+        logger.info("Insumo ENCONTRADO:")
+        logger.info(f"ID: {insumo.id}")
+        logger.info(f"Código: {insumo.codigo}")
+        logger.info(f"Nome: {insumo.nome}")
+        logger.info(f"Restaurant_ID: {insumo.restaurante_id}")
     else:
-        print(f"  ❌ Insumo NÃO encontrado com código '{codigo}'")
-    print("=" * 80)
+        logger.info(f"Insumo NAO encontrado com código '{codigo}'")
+    logger.info("=" * 80)
     if not insumo:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -511,15 +515,15 @@ def criar_insumo(
         insumo_criado = crud_insumo.create_insumo(db=db, insumo=insumo_com_codigo)
 
         # Log detalhado para diagnostico de criacao
-        print("=" * 80)
-        print("✅ INSUMO CRIADO COM SUCESSO")
-        print(f"  ID: {insumo_criado.id}")
-        print(f"  Código: {insumo_criado.codigo}")
-        print(f"  Nome: {insumo_criado.nome}")
-        print(f"  Restaurant_ID: {insumo_criado.restaurante_id}")
-        print(f"  Preço: {insumo_criado.preco_compra}")
-        print(f"  Unidade: {insumo_criado.unidade}")
-        print("=" * 80)
+        logger.info("=" * 80)
+        logger.info("INSUMO CRIADO COM SUCESSO")
+        logger.info(f"ID: {insumo_criado.id}")
+        logger.info(f"Código: {insumo_criado.codigo}")
+        logger.info(f"Nome: {insumo_criado.nome}")
+        logger.info(f"Restaurant_ID: {insumo_criado.restaurante_id}")
+        logger.info(f"Preço: {insumo_criado.preco_compra}")
+        logger.info(f"Unidade: {insumo_criado.unidade}")
+        logger.info("=" * 80)
 
         # Converter preço para reais e calcular preço unitário na resposta
        # NOTA: preco_unitario_real é calculado automaticamente pela @property do modelo

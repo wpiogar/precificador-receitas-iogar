@@ -97,6 +97,19 @@ def listar_insumos(
         incluir_globais=incluir_globais
     )
 
+    # Log detalhado para diagnostico de busca
+    print("=" * 80)
+    print("🔍 BUSCA DE INSUMOS - DEBUG")
+    print(f"  Restaurante ID filtro: {restaurante_id}")
+    print(f"  Incluir globais: {incluir_globais}")
+    print(f"  Filtros aplicados: {filters.model_dump() if filters else 'Nenhum'}")
+    print(f"  Total encontrados: {len(insumos)}")
+    if insumos:
+        print(f"  Primeiros resultados:")
+        for idx, ins in enumerate(insumos[:3]):
+            print(f"    [{idx+1}] Código: {ins.codigo}, Nome: {ins.nome}, Rest_ID: {ins.restaurante_id}")
+    print("=" * 80)
+
     # Converter preços para reais e calcular preço unitário com fator
     # NOTA: preco_unitario_real é calculado automaticamente pela @property do modelo
     for insumo in insumos:
@@ -378,7 +391,24 @@ def obter_insumo_por_codigo(
     **Parâmetros:**
     - **codigo**: Código único do insumo
     """
+    # Log detalhado para diagnostico de busca por codigo
+    print("=" * 80)
+    print("🔍 BUSCA POR CÓDIGO - DEBUG")
+    print(f"  Código buscado: '{codigo}'")
+    print("=" * 80)
     insumo = crud_insumo.get_insumo_by_codigo(db, codigo)
+    # Log do resultado
+    print("=" * 80)
+    print("📋 RESULTADO DA BUSCA POR CÓDIGO")
+    if insumo:
+        print(f"  ✅ Insumo ENCONTRADO:")
+        print(f"     ID: {insumo.id}")
+        print(f"     Código: {insumo.codigo}")
+        print(f"     Nome: {insumo.nome}")
+        print(f"     Restaurant_ID: {insumo.restaurante_id}")
+    else:
+        print(f"  ❌ Insumo NÃO encontrado com código '{codigo}'")
+    print("=" * 80)
     if not insumo:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -479,6 +509,17 @@ def criar_insumo(
         
         # Criar insumo usando CRUD
         insumo_criado = crud_insumo.create_insumo(db=db, insumo=insumo_com_codigo)
+
+        # Log detalhado para diagnostico de criacao
+        print("=" * 80)
+        print("✅ INSUMO CRIADO COM SUCESSO")
+        print(f"  ID: {insumo_criado.id}")
+        print(f"  Código: {insumo_criado.codigo}")
+        print(f"  Nome: {insumo_criado.nome}")
+        print(f"  Restaurant_ID: {insumo_criado.restaurante_id}")
+        print(f"  Preço: {insumo_criado.preco_compra}")
+        print(f"  Unidade: {insumo_criado.unidade}")
+        print("=" * 80)
 
         # Converter preço para reais e calcular preço unitário na resposta
        # NOTA: preco_unitario_real é calculado automaticamente pela @property do modelo

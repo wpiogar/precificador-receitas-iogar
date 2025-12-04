@@ -13,6 +13,10 @@ from pathlib import Path
 import shutil
 import uuid
 from datetime import datetime
+import logging
+
+# Configurar logger para este módulo
+logger = logging.getLogger(__name__)
 
 from app.database import get_db
 from app.models.importacao_insumo import ImportacaoInsumo, StatusImportacao
@@ -214,6 +218,13 @@ async def processar_importacao(
     5. Atualiza estatísticas
     6. Retorna resultado
     """
+    # Log detalhado do inicio do processamento
+    logger.info("=" * 80)
+    logger.info("INICIANDO PROCESSAMENTO DE IMPORTACAO")
+    logger.info(f"Importacao ID: {confirmacao.importacao_id}")
+    logger.info(f"Confirmar: {confirmacao.confirmar}")
+    logger.info(f"Mapeamento colunas: {confirmacao.mapeamento_colunas}")
+    logger.info("=" * 80)
     # Buscar importação
     importacao = db.query(ImportacaoInsumo).filter(
         ImportacaoInsumo.id == confirmacao.importacao_id
@@ -224,6 +235,16 @@ async def processar_importacao(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Importação não encontrada"
         )
+    
+    # Log da importacao encontrada
+    logger.info("=" * 80)
+    logger.info("IMPORTACAO ENCONTRADA")
+    logger.info(f"ID: {importacao.id}")
+    logger.info(f"Restaurante ID: {importacao.restaurante_id}")
+    logger.info(f"Nome arquivo: {importacao.nome_arquivo}")
+    logger.info(f"Caminho arquivo: {importacao.caminho_arquivo}")
+    logger.info(f"Status atual: {importacao.status}")
+    logger.info("=" * 80)
     
     # Validar status
     if importacao.status != StatusImportacao.PENDENTE:
@@ -247,24 +268,53 @@ async def processar_importacao(
     if confirmacao.observacoes:
         importacao.observacoes = confirmacao.observacoes
         db.commit()
+
+    # Log antes de processar
+    logger.info("=" * 80)
+    logger.info("CHAMANDO SERVICE PARA PROCESSAR")
+    logger.info(f"Importacao ID: {importacao.id}")
+    logger.info(f"Restaurante ID: {importacao.restaurante_id}")
+    logger.info("=" * 80)
     
-    # Processar importação
-    service = ImportacaoService(db)
-    sucesso, mensagem = service.processar_importacao(
-        importacao.id,
-        importacao.restaurante_id,
-        mapeamento_customizado=confirmacao.mapeamento_colunas
-    )
-    
-    if not sucesso:
+    # Processar importação com tratamento de erro
+    try:
+        service = ImportacaoService(db)
+        sucesso, mensagem = service.processar_importacao(
+            importacao.id,
+            importacao.restaurante_id,
+            mapeamento_customizado=confirmacao.mapeamento_colunas
+        )
+        
+        logger.info("=" * 80)
+        logger.info("PROCESSAMENTO CONCLUIDO")
+        logger.info(f"Sucesso: {sucesso}")
+        logger.info(f"Mensagem: {mensagem}")
+        logger.info("=" * 80)
+        
+        if not sucesso:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=mensagem
+            )
+        
+        # Retornar importação atualizada
+        db.refresh(importacao)
+        return importacao
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("=" * 80)
+        logger.error("ERRO NO PROCESSAMENTO DA IMPORTACAO")
+        logger.error(f"Tipo do erro: {type(e).__name__}")
+        logger.error(f"Mensagem: {str(e)}")
+        logger.error("=" * 80)
+        import traceback
+        logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=mensagem
+            detail=f"Erro ao processar importação: {str(e)}"
         )
-    
-    # Retornar importação atualizada
-    db.refresh(importacao)
-    return importacao
 
 
 # ============================================================================

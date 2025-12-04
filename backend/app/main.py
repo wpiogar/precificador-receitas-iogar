@@ -9,6 +9,21 @@
 # Imports principais do FastAPI e configurações
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+
+import logging
+import sys
+
+# Configurar logging para exibir no console (stdout)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
+# Logger para o módulo principal
+logger = logging.getLogger(__name__)
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 
@@ -283,6 +298,12 @@ async def lifespan(app: FastAPI):
     Gerencia o ciclo de vida da aplicação FastAPI.
     Executa tarefas na inicialização e finalização.
     """
+
+    # Log de inicializacao
+    logger.info("=" * 80)
+    logger.info("FOOD COST API INICIANDO")
+    logger.info("Logging configurado e ativo")
+    logger.info("=" * 80)
     # Startup: Criar tabelas no banco se não existirem
     print("🚀 Iniciando Food Cost System...")
     try:

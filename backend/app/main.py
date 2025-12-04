@@ -796,6 +796,109 @@ def fix_fornecedores_null():
             "error": str(e),
             "status": "failed"
         }
+    
+@app.post("/emergency-clean-insumos/{restaurante_id}", summary="[EMERGÊNCIA] Limpar insumos de restaurante específico")
+def emergency_clean_insumos(
+    restaurante_id: int,
+    confirm_token: str,
+):
+    """
+    ENDPOINT EMERGENCIAL - Limpa TODOS os insumos de um restaurante específico
+    
+    ⚠️ ATENÇÃO: Esta ação é IRREVERSÍVEL!
+    
+    Parâmetros:
+    - restaurante_id: ID do restaurante (ex: 23 para CALMA BAR)
+    - confirm_token: Token de confirmação (use: "CONFIRMO_LIMPEZA_TOTAL")
+    
+    Uso:
+    POST /emergency-clean-insumos/23?confirm_token=CONFIRMO_LIMPEZA_TOTAL
+    """
+    try:
+        from app.database import engine
+        from sqlalchemy import text
+        
+        # Validação de segurança
+        if confirm_token != "CONFIRMO_LIMPEZA_TOTAL":
+            return {
+                "error": "Token de confirmação inválido",
+                "status": "denied",
+                "message": "Use confirm_token=CONFIRMO_LIMPEZA_TOTAL para confirmar"
+            }
+        
+        # Verificar se restaurante existe
+        with engine.connect() as connection:
+            result = connection.execute(
+                text("SELECT nome FROM restaurantes WHERE id = :id"),
+                {"id": restaurante_id}
+            )
+            restaurante = result.fetchone()
+            
+            if not restaurante:
+                return {
+                    "error": f"Restaurante ID {restaurante_id} não encontrado",
+                    "status": "not_found"
+                }
+            
+            nome_restaurante = restaurante[0]
+            
+            # Contar insumos antes de deletar
+            result = connection.execute(
+                text("""
+                    SELECT COUNT(*) 
+                    FROM insumos 
+                    WHERE restaurante_id = :restaurante_id
+                """),
+                {"restaurante_id": restaurante_id}
+            )
+            total_insumos = result.scalar()
+            
+            if total_insumos == 0:
+                return {
+                    "status": "already_clean",
+                    "message": f"Restaurante '{nome_restaurante}' já está sem insumos",
+                    "restaurante_id": restaurante_id,
+                    "restaurante_nome": nome_restaurante
+                }
+            
+            # DELETAR TODOS OS INSUMOS deste restaurante
+            connection.execute(
+                text("""
+                    DELETE FROM insumos 
+                    WHERE restaurante_id = :restaurante_id
+                """),
+                {"restaurante_id": restaurante_id}
+            )
+            
+            connection.commit()
+            
+            # Verificar se foram deletados
+            result = connection.execute(
+                text("""
+                    SELECT COUNT(*) 
+                    FROM insumos 
+                    WHERE restaurante_id = :restaurante_id
+                """),
+                {"restaurante_id": restaurante_id}
+            )
+            total_apos = result.scalar()
+            
+            return {
+                "status": "success",
+                "message": f"✅ Insumos limpos com sucesso",
+                "restaurante_id": restaurante_id,
+                "restaurante_nome": nome_restaurante,
+                "insumos_deletados": total_insumos,
+                "insumos_restantes": total_apos,
+                "timestamp": datetime.now().isoformat()
+            }
+    
+    except Exception as e:
+        return {
+            "error": str(e),
+            "status": "failed"
+        }
+
 @app.get("/fix-cpf-valido", summary="Corrigir fornecedor com CPF válido")
 def fix_cpf_valido():
     """

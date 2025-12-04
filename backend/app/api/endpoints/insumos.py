@@ -827,3 +827,35 @@ def marcar_aguardando_classificacao(
         )
 
     return insumo_atualizado
+
+# ============================================================================
+# ENDPOINT TEMPORARIO DE DIAGNOSTICO
+# ============================================================================
+
+@router.get("/debug/codigo/{codigo}", response_model=List[dict], summary="[DEBUG] Buscar TODOS insumos por código")
+def debug_buscar_por_codigo(
+    codigo: str,
+    db: Session = Depends(get_db)
+):
+    """
+    ENDPOINT TEMPORARIO DE DIAGNOSTICO
+    Busca TODOS os insumos com um código específico, ignorando filtros de restaurante.
+    """
+    from app.models.insumo import Insumo
+    
+    # Buscar TODOS os insumos com este código
+    insumos = db.query(Insumo).filter(Insumo.codigo == codigo).all()
+    
+    resultado = []
+    for insumo in insumos:
+        resultado.append({
+            "id": insumo.id,
+            "codigo": insumo.codigo,
+            "nome": insumo.nome,
+            "restaurante_id": insumo.restaurante_id,
+            "preco_compra": insumo.preco_compra,
+            "unidade": insumo.unidade,
+            "quantidade": insumo.quantidade
+        })
+    
+    return resultado

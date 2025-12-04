@@ -2477,7 +2477,7 @@ const fetchInsumos = async () => {
     setLoading(true);
     
     // ========================================================================
-    // BUSCAR INSUMOS DA TABELA PRINCIPAL COM PAGINAÇÃO SERVER-SIDE
+    // PARÂMETROS DE PAGINAÇÃO E BUSCA
     // ========================================================================
     const params: any = {
       page: paginaAtualInsumos,
@@ -2488,10 +2488,17 @@ const fetchInsumos = async () => {
     if (selectedRestaurante) {
       params.restaurante_id = selectedRestaurante.id;
       
-      // Adicionar flag de incluir globais se checkbox marcado (apenas ADMIN/CONSULTANT)
       if (incluirInsumosGlobais && ['ADMIN', 'CONSULTANT'].includes(user?.role || '')) {
         params.incluir_globais = true;
       }
+    }
+
+    // ========================================================================
+    // ADICIONAR BUSCA POR NOME OU CÓDIGO
+    // ========================================================================
+    if (searchTerm && searchTerm.trim()) {
+      params.nome = searchTerm.trim();
+      params.codigo = searchTerm.trim();
     }
 
     console.log('🔍 Buscando insumos com parâmetros (paginação server-side):', params);
@@ -5811,9 +5818,22 @@ const fetchInsumos = async () => {
       deleteConfirm.isOpen
     );
   
+    // ============================================================================
+    // CALLBACK PARA BUSCA DE INSUMOS (NOME OU CÓDIGO)
+    // ============================================================================
     const handleSearchChange = useCallback((term) => {
       setSearchTerm(term);
-    }, [setSearchTerm]);
+      
+      // Resetar para primeira página ao buscar
+      setPaginaAtualInsumos(1);
+      
+      // Buscar no backend com debounce de 500ms
+      const timer = setTimeout(() => {
+        fetchInsumos();
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }, [setSearchTerm, fetchInsumos]);
 
     // ============================================================================
     // Filtro dos insumos baseado na busca (nome OU código)

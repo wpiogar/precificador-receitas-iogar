@@ -797,7 +797,7 @@ def fix_fornecedores_null():
             "status": "failed"
         }
     
-@app.post("/emergency-clean-insumos/{restaurante_id}", summary="[EMERGÊNCIA] Limpar insumos de restaurante específico")
+@app.get("/emergency-clean-insumos/{restaurante_id}", summary="[EMERGÊNCIA] Limpar insumos de restaurante específico")
 def emergency_clean_insumos(
     restaurante_id: int,
     confirm_token: str,

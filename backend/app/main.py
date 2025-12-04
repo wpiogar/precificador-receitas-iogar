@@ -132,6 +132,7 @@ from app.models import taxonomia, taxonomia_alias, insumo, fornecedor, fornecedo
 from app.core.config import settings
 import os
 import time
+from datetime import datetime
 
 # ============================================================================
 # TRATAMENTO DE SINAIS E SHUTDOWN GRACIOSOS

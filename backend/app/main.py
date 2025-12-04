@@ -899,6 +899,69 @@ def emergency_clean_insumos(
             "error": str(e),
             "status": "failed"
         }
+    
+@app.get("/debug-insumos-restaurante/{restaurante_id}", summary="[DEBUG] Ver insumos do restaurante")
+def debug_insumos_restaurante(restaurante_id: int):
+    """
+    Endpoint para verificar quais insumos existem no restaurante
+    """
+    try:
+        from app.database import engine
+        from sqlalchemy import text
+        
+        with engine.connect() as connection:
+            # Verificar restaurante
+            result = connection.execute(
+                text("SELECT nome FROM restaurantes WHERE id = :id"),
+                {"id": restaurante_id}
+            )
+            restaurante = result.fetchone()
+            
+            if not restaurante:
+                return {"error": f"Restaurante {restaurante_id} não encontrado"}
+            
+            # Buscar insumos
+            result = connection.execute(
+                text("""
+                    SELECT id, codigo, nome, preco_compra, created_at
+                    FROM insumos 
+                    WHERE restaurante_id = :restaurante_id
+                    ORDER BY codigo
+                    LIMIT 50
+                """),
+                {"restaurante_id": restaurante_id}
+            )
+            
+            insumos = []
+            for row in result:
+                insumos.append({
+                    "id": row[0],
+                    "codigo": row[1],
+                    "nome": row[2],
+                    "preco_compra": row[3],
+                    "created_at": str(row[4]) if row[4] else None
+                })
+            
+            # Contar total
+            result = connection.execute(
+                text("SELECT COUNT(*) FROM insumos WHERE restaurante_id = :restaurante_id"),
+                {"restaurante_id": restaurante_id}
+            )
+            total = result.scalar()
+            
+            return {
+                "restaurante_id": restaurante_id,
+                "restaurante_nome": restaurante[0],
+                "total_insumos": total,
+                "primeiros_50": insumos,
+                "timestamp": datetime.now().isoformat()
+            }
+    
+    except Exception as e:
+        return {
+            "error": str(e),
+            "status": "failed"
+        }
 
 @app.get("/fix-cpf-valido", summary="Corrigir fornecedor com CPF válido")
 def fix_cpf_valido():

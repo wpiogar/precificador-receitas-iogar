@@ -2452,8 +2452,15 @@ console.log('🌐 API Base URL:', API_BASE);
   
   // Busca todos os insumos do backend
 const fetchInsumos = async (searchTerm?: string) => {
+  // Prevenir múltiplas chamadas simultâneas
+  if (loading) {
+    console.log('⚠️ fetchInsumos já está em execução, ignorando nova chamada');
+    return;
+  }
+  
   try {
     setLoading(true);
+    console.log('🔍 ===== INICIANDO fetchInsumos =====');
 
     // ========== ADICIONAR ESTES LOGS ==========
     console.log('🔍 ===== DEBUG fetchInsumos =====');
@@ -2520,6 +2527,7 @@ const fetchInsumos = async (searchTerm?: string) => {
     console.error('Erro geral ao buscar insumos:', error);
   } finally {
     setLoading(false);
+    console.log('✅ ===== FINALIZANDO fetchInsumos =====');
   }
 };
   

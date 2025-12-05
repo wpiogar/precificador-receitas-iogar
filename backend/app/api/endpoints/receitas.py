@@ -95,132 +95,20 @@ def list_receitas(
         restaurante_id=restaurante_id, grupo=grupo, ativo=ativo
     )
     
-    # Calcular CMVs automaticamente para cada receita
+    # Retornar receitas SEM calcular CMV em tempo real (performance crítica)
     receitas_com_cmv = []
     for receita in receitas:
-    
-        # CALCULAR CUSTO REAL BASEADO NOS INSUMOS (com suporte a CMV parcial)
-        resultado_calculo = calcular_custo_receita(db, receita.id)
-        custo_real = resultado_calculo['custo_total']
-        tem_pendentes = resultado_calculo['tem_insumos_sem_preco']
-        insumos_pendentes = resultado_calculo['insumos_pendentes']
-
-        # ATUALIZAR campos da receita
-        if custo_real > 0 and receita.cmv != int(custo_real * 100):
-            receita.cmv = int(custo_real * 100)  # Salvar em centavos
-
-        # Atualizar status de insumos pendentes
-        receita.tem_insumos_sem_preco = tem_pendentes
-        receita.insumos_pendentes = insumos_pendentes if tem_pendentes else None
-        db.commit()
-
-        # Usar custo calculado ou campo salvo
-        preco_compra = custo_real if custo_real > 0 else (receita.cmv / 100 if receita.cmv else 0)
+        # Usar CMV já salvo no banco (calculado em background)
+        preco_compra = (receita.cmv / 100) if receita.cmv else 0
         
-        print(f"🔍 Receita {receita.nome}: custo_calculado={custo_real}, cmv_salvo={receita.cmv}")
+        # Calcular CMVs com diferentes margens usando valor já salvo
+        cmv_20 = preco_compra / 0.20 if preco_compra > 0 else 0
+        cmv_25 = preco_compra / 0.25 if preco_compra > 0 else 0
+        cmv_30 = preco_compra / 0.30 if preco_compra > 0 else 0
         
-        # Calcular CMVs com diferentes margens
-        cmv_20 = preco_compra / 0.20 if preco_compra > 0 else 0  # 20% de CMV
-        cmv_25 = preco_compra / 0.25 if preco_compra > 0 else 0  # 25% de CMV  
-        cmv_30 = preco_compra / 0.30 if preco_compra > 0 else 0  # 30% de CMV
+        # Contar insumos SEM buscar do banco (usar relacionamento lazy)
+        total_insumos = len(receita.receita_insumos) if hasattr(receita, 'receita_insumos') else 0
         
-        # ========== BUSCAR INSUMOS DA RECEITA ==========
-        receita_insumos_data = []
-        try:
-            # Buscar insumos relacionados a esta receita
-            from app.models.receita import ReceitaInsumo
-            from app.models.insumo import Insumo
-            
-            insumos_query = db.query(ReceitaInsumo).filter(
-                ReceitaInsumo.receita_id == receita.id
-            ).all()
-            
-            print(f"🔍 Receita {receita.nome}: encontrados {len(insumos_query)} insumos no BD")
-            
-            # Processar cada insumo
-            for ri in insumos_query:
-                # DEBUG: Mostrar o que veio do banco
-                print(f"🔍 Item do banco - insumo_id: {ri.insumo_id}, receita_processada_id: {ri.receita_processada_id}")
-                # ===================================================================================================
-                # BUSCAR DADOS DO INSUMO OU RECEITA PROCESSADA
-                # ===================================================================================================
-                if ri.receita_processada_id:
-                    # ===================================================================================================
-                    # CORREÇÃO: Incluir receita_processada_id para o frontend identificar corretamente
-                    # ===================================================================================================
-                    # É uma receita processada usada como insumo
-                    receita_proc = db.query(Receita).filter(Receita.id == ri.receita_processada_id).first()
-                    
-                    if receita_proc:
-                        # CALCULAR CUSTO POR RENDIMENTO PARA RECEITAS PROCESSADAS
-                        # ===================================================================================================
-                        # Se a receita processada tem rendimento, dividir o custo total pelo rendimento
-                        custo_por_rendimento = receita_proc.cmv_real or 0
-                        if receita_proc.rendimento_porcoes and receita_proc.rendimento_porcoes > 0:
-                            # Converter para float para evitar erro de divisão entre float e Decimal
-                            custo_por_rendimento = float(custo_por_rendimento) / float(receita_proc.rendimento_porcoes)
-                        
-                        insumo_data = {
-                            'insumo_id': None,  # ← NULL quando for receita processada
-                            'receita_processada_id': ri.receita_processada_id,
-                            'quantidade_necessaria': ri.quantidade_necessaria,
-                            'unidade_medida': ri.unidade_medida or 'un',
-                            'custo_calculado': getattr(ri, 'custo_calculado', 0),
-                            'insumo': {
-                                'id': receita_proc.id,
-                                'nome': receita_proc.nome,
-                                'unidade': receita_proc.unidade or 'un',
-                                'preco_compra_real': custo_por_rendimento  # ← USAR CUSTO POR RENDIMENTO
-                            },
-                            'receita_processada': {
-                                'id': receita_proc.id,
-                                'nome': receita_proc.nome,
-                                'codigo': receita_proc.codigo,
-                                'unidade': receita_proc.unidade or 'un',
-                                'rendimento_porcoes': receita_proc.rendimento_porcoes  # ← ADICIONAR RENDIMENTO PARA REFERÊNCIA
-                            }
-                        }
-                        receita_insumos_data.append(insumo_data)
-                        print(f"  📦 Receita Processada: {receita_proc.nome} - Qtd: {ri.quantidade_necessaria}")
-                        print(f"  🔍 DEBUG - insumo_data completo: {insumo_data}")
-                        
-                elif ri.insumo_id:
-                    # É um insumo normal
-                    insumo = db.query(Insumo).filter(Insumo.id == ri.insumo_id).first()
-                    
-                    if insumo:
-                        insumo_data = {
-                            'insumo_id': ri.insumo_id,
-                            'quantidade_necessaria': ri.quantidade_necessaria,
-                            'unidade_medida': ri.unidade_medida or 'un',
-                            'custo_calculado': getattr(ri, 'custo_calculado', 0),
-                            'insumo': {
-                                'id': insumo.id,
-                                'nome': insumo.nome,
-                                'unidade': insumo.unidade,
-                                'preco_compra_real': insumo.preco_compra_real
-                            }
-                        }
-                        receita_insumos_data.append(insumo_data)
-                        print(f"  📦 Insumo: {insumo.nome} - Qtd: {ri.quantidade_necessaria}")
-                
-        except Exception as e:
-            print(f"❌ Erro ao buscar insumos da receita {receita.id}: {e}")
-
-        # ===================================================================================================
-        # CONTAR INSUMOS PROCESSADOS
-        # Lógica: Se receita_processada_id existe e não é NULL, é um processado
-        # ===================================================================================================
-        insumos_processados = 0
-        try:
-            for ri in receita.receita_insumos:
-                if ri.receita_processada_id is not None:
-                    insumos_processados += 1
-            print(f"📊 Receita {receita.nome}: {insumos_processados} processados contados")
-        except Exception as e:
-            print(f"⚠️ Erro ao contar insumos processados: {e}")
-            insumos_processados = 0
-        # Adicionar à resposta COM OS INSUMOS
         receitas_com_cmv.append({
             'id': receita.id,
             'nome': receita.nome,
@@ -240,19 +128,16 @@ def list_receitas(
             'tempo_preparo_minutos': getattr(receita, 'tempo_preparo_minutos', 30),
             'rendimento_porcoes': getattr(receita, 'rendimento_porcoes', 1),
             'sugestao_valor': receita.sugestao_valor / 100 if receita.sugestao_valor else 0,
-            # Campos adicionais da receita
             'unidade': getattr(receita, 'unidade', 'un'),
             'quantidade': getattr(receita, 'quantidade', 1),
             'fator': getattr(receita, 'fator', 1.0),
             'processada': getattr(receita, 'processada', False),
             'rendimento': float(receita.rendimento) if receita.rendimento else 0,
-            'total_insumos': len(receita_insumos_data),
-            'insumos_processados': insumos_processados,
-            # Campos para controle de insumos sem preço (Prioridade 1)
+            'total_insumos': total_insumos,
+            'insumos_processados': 0,  # Calcular depois se necessário
             'tem_insumos_sem_preco': receita.tem_insumos_sem_preco,
             'insumos_pendentes': receita.insumos_pendentes,
-            # ========== CAMPO CRÍTICO - AQUI ESTÃO OS INSUMOS! ==========
-            'receita_insumos': receita_insumos_data
+            'receita_insumos': []  # NÃO carregar insumos na listagem
         })
        
     return receitas_com_cmv

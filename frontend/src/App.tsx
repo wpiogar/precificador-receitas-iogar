@@ -2453,11 +2453,7 @@ console.log('🌐 API Base URL:', API_BASE);
   
   // Busca todos os insumos do backend
 const fetchInsumos = async (searchTerm?: string) => {
-  // Prevenir múltiplas chamadas simultâneas
-  if (loading) {
-    console.log('⚠️ fetchInsumos já está em execução, ignorando nova chamada');
-    return;
-  }
+  console.log('>>> fetchInsumos CHAMADO com searchTerm:', searchTerm);
   
   try {
     setLoading(true);
@@ -3310,13 +3306,26 @@ const fetchInsumos = async (searchTerm?: string) => {
   }, []); // IMPORTANTE: Array vazio para executar apenas uma vez
 
   // ===================================================================================================
-  // EFEITO: RECARREGAR INSUMOS AO MUDAR RESTAURANTE OU CHECKBOX DE GLOBAIS
-  // ===================================================================================================
-  useEffect(() => {
-    if (activeTab === 'insumos') {
-      fetchInsumos(searchTermInsumos);
-    }
-  }, [selectedRestaurante, incluirInsumosGlobais]);
+    // EFEITO: RECARREGAR INSUMOS AO MUDAR RESTAURANTE OU CHECKBOX DE GLOBAIS
+    // ===================================================================================================
+    useEffect(() => {
+      console.log('=== useEffect selectedRestaurante DISPAROU ===');
+      console.log('selectedRestaurante:', selectedRestaurante);
+      console.log('selectedRestaurante?.id:', selectedRestaurante?.id);
+      console.log('activeTab:', activeTab);
+      
+      if (selectedRestaurante?.id) {
+        console.log('Condicao atendida - Buscando insumos do restaurante:', selectedRestaurante.nome);
+        // Resetar pagina para 1 ao trocar de restaurante
+        setPaginaAtualInsumos(1);
+        // Limpar termo de busca ao trocar de restaurante
+        setSearchTermInsumos('');
+        // Buscar insumos do novo restaurante
+        fetchInsumos('');
+      } else {
+        console.log('Condicao NAO atendida - selectedRestaurante?.id e falsy');
+      }
+    }, [selectedRestaurante?.id, incluirInsumosGlobais]);
 
   // ===================================================================================================
   // EFEITO: BUSCAR INSUMOS QUANDO TERMO DE BUSCA OU PAGINA MUDAR
@@ -3359,11 +3368,11 @@ const fetchInsumos = async (searchTerm?: string) => {
           case 'dashboard':
             // Recarregar todos os dados para o dashboard
             await Promise.all([
-              fetchInsumos(),
+              fetchInsumos(searchTermInsumos),
               fetchReceitas(),
               fetchRestaurantes()
             ]);
-            console.log('✅ Dashboard recarregado');
+            console.log('Dashboard recarregado');
             break;
 
           case 'settings':
@@ -3635,44 +3644,50 @@ const fetchInsumos = async (searchTerm?: string) => {
   // COMPONENTE DASHBOARD - TELA PRINCIPAL
   // ============================================================================
   const Dashboard = () => {
-    // Estados para estatísticas do dashboard
+    // Estados para estatisticas do dashboard
     const [statsInsumos, setStatsInsumos] = useState({
       total: 0,
       grupos: 0,
       unidades: 0
     });
     
-    // Buscar estatísticas quando dashboard for montado ou restaurante mudar
+    const [statsReceitas, setStatsReceitas] = useState({
+      total: 0
+    });
+    
+    // Buscar estatisticas quando dashboard for montado ou restaurante mudar
+    // Usar mesmo endpoint de Limpeza de Dados que funciona corretamente
     useEffect(() => {
       const carregarStats = async () => {
-        if (!selectedRestaurante?.id) return;
-        
         try {
-          console.log('📊 Carregando stats do dashboard para restaurante:', selectedRestaurante.id);
-          const response = await apiService.request<any>(
-            `/api/v1/insumos/utils/stats?restaurante_id=${selectedRestaurante.id}`
-          );
+          console.log('Carregando stats:', selectedRestaurante?.nome || 'SISTEMA COMPLETO');
           
-          if (response.success && response.data) {
+          // Usar endpoint de estatisticas de limpeza (mesmo da tela de Limpeza de Dados)
+          const response = await apiService.getEstatisticasLimpeza(selectedRestaurante?.id);
+          
+          if (response.data) {
+            console.log('Stats recebidas:', response.data);
             setStatsInsumos({
               total: response.data.total_insumos || 0,
-              grupos: response.data.total_grupos || 0,
-              unidades: response.data.total_unidades || 0
+              grupos: 0,
+              unidades: 0
             });
-            console.log('✅ Stats carregadas:', response.data);
+            setStatsReceitas({
+              total: response.data.total_receitas || 0
+            });
           }
         } catch (error) {
-          console.error('❌ Erro ao carregar stats:', error);
+          console.error('Erro ao carregar stats:', error);
         }
       };
       
       carregarStats();
     }, [selectedRestaurante?.id]);
     
-    // Cálculos das estatísticas em tempo real
+    // Calculos das estatisticas em tempo real
     const totalInsumos = statsInsumos.total;
     const totalRestaurantes = restaurantes.length;
-    const totalReceitas = receitas.length;
+    const totalReceitas = statsReceitas.total;
 
     // Renderizar spinner enquanto carrega
     if (loading) {
@@ -3839,19 +3854,32 @@ const fetchInsumos = async (searchTerm?: string) => {
       <Package className="w-5 h-5 text-green-600" />
     </div>
     <div className="space-y-3">
-      {insumos.slice(-3).map((insumo) => (
-        <div key={insumo.id} className="flex items-center justify-between p-2 bg-green-50 rounded-lg">
-          <div>
-            <p className="text-sm font-medium text-gray-900">{insumo.nome}</p>
-            <p className="text-xs text-gray-500">{insumo.categoria}</p>
+      {(() => {
+        // Filtrar insumos por restaurante se selecionado
+        const insumosFiltrados = selectedRestaurante?.id
+          ? insumos.filter(i => i.restaurante_id === selectedRestaurante.id)
+          : insumos;
+        
+        return insumosFiltrados.slice(-3).map((insumo) => (
+          <div key={insumo.id} className="flex items-center justify-between p-2 bg-green-50 rounded-lg">
+            <div>
+              <p className="text-sm font-medium text-gray-900">{insumo.nome}</p>
+              <p className="text-xs text-gray-500">{insumo.categoria}</p>
+            </div>
+            <span className="text-sm font-medium text-green-600">
+              R$ {insumo.preco_compra_real?.toFixed(2) || '0.00'}
+            </span>
           </div>
-          <span className="text-sm font-medium text-green-600">
-            R$ {insumo.preco_compra_real?.toFixed(2) || '0.00'}
-          </span>
-        </div>
-      ))}
-      {insumos.length === 0 && (
-        <p className="text-sm text-gray-500 text-center py-4">Nenhum insumo cadastrado</p>
+        ));
+      })()}
+      {((selectedRestaurante?.id 
+        ? insumos.filter(i => i.restaurante_id === selectedRestaurante.id).length 
+        : insumos.length) === 0) && (
+        <p className="text-sm text-gray-500 text-center py-4">
+          {selectedRestaurante?.id 
+            ? `Nenhum insumo cadastrado para ${selectedRestaurante.nome}`
+            : 'Nenhum insumo cadastrado'}
+        </p>
       )}
     </div>
   </div>
@@ -3863,19 +3891,32 @@ const fetchInsumos = async (searchTerm?: string) => {
       <ChefHat className="w-5 h-5 text-green-600" />
     </div>
     <div className="space-y-3">
-      {receitas.slice(-3).map((receita) => (
-        <div key={receita.id} className="flex items-center justify-between p-2 bg-green-50 rounded-lg">
-          <div>
-            <p className="text-sm font-medium text-gray-900">{receita.nome}</p>
-            <p className="text-xs text-gray-500">{receita.categoria}</p>
+      {(() => {
+        // Filtrar receitas por restaurante se selecionado
+        const receitasFiltradas = selectedRestaurante?.id
+          ? receitas.filter(r => r.restaurante_id === selectedRestaurante.id)
+          : receitas;
+        
+        return receitasFiltradas.slice(-3).map((receita) => (
+          <div key={receita.id} className="flex items-center justify-between p-2 bg-green-50 rounded-lg">
+            <div>
+              <p className="text-sm font-medium text-gray-900">{receita.nome}</p>
+              <p className="text-xs text-gray-500">{receita.categoria}</p>
+            </div>
+            <span className="text-sm font-medium text-green-600">
+              {receita.porcoes} porcoes
+            </span>
           </div>
-          <span className="text-sm font-medium text-green-600">
-            {receita.porcoes} porções
-          </span>
-        </div>
-      ))}
-      {receitas.length === 0 && (
-        <p className="text-sm text-gray-500 text-center py-4">Nenhuma receita cadastrada</p>
+        ));
+      })()}
+      {((selectedRestaurante?.id 
+        ? receitas.filter(r => r.restaurante_id === selectedRestaurante.id).length 
+        : receitas.length) === 0) && (
+        <p className="text-sm text-gray-500 text-center py-4">
+          {selectedRestaurante?.id 
+            ? `Nenhuma receita cadastrada para ${selectedRestaurante.nome}`
+            : 'Nenhuma receita cadastrada'}
+        </p>
       )}
     </div>
   </div>

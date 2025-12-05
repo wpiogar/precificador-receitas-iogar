@@ -2475,6 +2475,15 @@ console.log('🌐 API Base URL:', API_BASE);
 const fetchInsumos = async () => {
   try {
     setLoading(true);
+
+    // ========== ADICIONAR ESTES LOGS ==========
+    console.log('🔍 ===== DEBUG fetchInsumos =====');
+    console.log('📍 selectedRestaurante:', selectedRestaurante);
+    console.log('🏪 selectedRestaurante.id:', selectedRestaurante?.id);
+    console.log('👤 user.role:', user?.role);
+    console.log('🌍 incluirInsumosGlobais:', incluirInsumosGlobais);
+    console.log('=====================================');
+    // ==========================================
     
     // ========================================================================
     // PARÂMETROS DE PAGINAÇÃO E BUSCA
@@ -8629,9 +8638,6 @@ const Receitas = React.memo(() => {
         // Backend já retornou filtrado, não precisa filtrar no frontend
         setReceitas(response.data);
         console.log(`Receitas carregadas para restaurante ${selectedRestaurante.nome}:`, response.data.length);
-        
-        setReceitas(receitasFiltradas);
-        console.log(`Receitas carregadas para restaurante ${selectedRestaurante.nome}:`, receitasFiltradas.length);
         
       } else if (response.error) {
         console.error('Erro ao buscar receitas:', response.error);

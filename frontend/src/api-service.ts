@@ -576,9 +576,14 @@ async refreshAccessToken(): Promise<string | null> {
   // MÉTODOS PARA RECEITAS - AJUSTADOS PARA SEU BACKEND
   // ================================
 
-  // Listar todas as receitas
-  async getReceitas(): Promise<ApiResponse<any[]>> {
-    return this.request<any[]>('/api/v1/receitas/');
+  // Listar todas as receitas com filtro opcional por restaurante
+  async getReceitas(restauranteId?: number): Promise<ApiResponse<any[]>> {
+    // Se restaurante_id fornecido, adicionar aos parâmetros
+    const params = restauranteId ? `?restaurante_id=${restauranteId}` : '';
+    
+    console.log('📡 API getReceitas:', `/api/v1/receitas/${params}`);
+    
+    return this.request<any[]>(`/api/v1/receitas/${params}`);
   }
 
   // Buscar receitas por restaurante

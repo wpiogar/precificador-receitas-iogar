@@ -8623,13 +8623,12 @@ const Receitas = React.memo(() => {
       console.log(`fetchReceitas2 CHAMADO #1 para restaurante: ${selectedRestaurante.id}, ${selectedRestaurante.nome}`);
       
       // Usar endpoint GET /api/v1/receitas/ com filtro por restaurante_id
-      const response = await apiService.getReceitas();
-      
+      const response = await apiService.getReceitas(selectedRestaurante.id);
+
       if (response.data) {
-        // Filtrar receitas pelo restaurante selecionado no frontend
-        const receitasFiltradas = response.data.filter((receita: any) =>
-          receita.restaurante_id === selectedRestaurante.id
-        );
+        // Backend já retornou filtrado, não precisa filtrar no frontend
+        setReceitas(response.data);
+        console.log(`Receitas carregadas para restaurante ${selectedRestaurante.nome}:`, response.data.length);
         
         setReceitas(receitasFiltradas);
         console.log(`Receitas carregadas para restaurante ${selectedRestaurante.nome}:`, receitasFiltradas.length);

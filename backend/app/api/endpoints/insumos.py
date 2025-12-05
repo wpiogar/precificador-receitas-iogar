@@ -756,27 +756,58 @@ def listar_unidades(db: Session = Depends(get_db)):
     return crud_insumo.get_unidades_unicas(db=db)
 
 @router.get("/utils/stats", response_model=dict, summary="Estatísticas dos insumos")
-def estatisticas_insumos(db: Session = Depends(get_db)):
+def estatisticas_insumos(
+    restaurante_id: Optional[int] = Query(None, description="ID do restaurante para filtrar estatísticas"),
+    incluir_globais: bool = Query(False, description="Incluir insumos globais nas estatísticas"),
+    db: Session = Depends(get_db)
+):
     """
-    Retorna estatísticas gerais dos insumos.
+    Retorna estatísticas gerais dos insumos filtradas por restaurante.
+    
+    **Parâmetros:**
+    - restaurante_id: ID do restaurante (obrigatório para dados corretos)
+    - incluir_globais: Se True, inclui insumos globais junto com os do restaurante
     
     **Retorna:**
-    - Total de insumos
+    - Total de insumos do restaurante
     - Número de grupos únicos
     - Número de unidades únicas
     - Preço médio, mínimo e máximo
+    
+    **IMPORTANTE:** Sem restaurante_id, retorna apenas insumos globais.
     """
 
-    from sqlalchemy import func
+    from sqlalchemy import func, or_
     from app.models.insumo import Insumo
     
-    # Contar totais
-    total_insumos =  db.query(Insumo).count()
-    total_grupos =   db.query(Insumo.grupo).distinct().count()
-    total_unidades = db.query(Insumo.unidade).distinct().count()
+    # ========================================================================
+    # APLICAR FILTRO DE RESTAURANTE (mesma lógica dos outros endpoints)
+    # ========================================================================
+    query_base = db.query(Insumo)
+    
+    if restaurante_id is not None:
+        if incluir_globais:
+            # Incluir insumos do restaurante OU globais
+            query_base = query_base.filter(
+                or_(
+                    Insumo.restaurante_id == restaurante_id,
+                    Insumo.restaurante_id.is_(None)
+                )
+            )
+        else:
+            # Apenas insumos do restaurante específico
+            query_base = query_base.filter(Insumo.restaurante_id == restaurante_id)
+    else:
+        # Se não houver restaurante selecionado, mostrar apenas globais
+        query_base = query_base.filter(Insumo.restaurante_id.is_(None))
+    
+    # Contar totais com filtro aplicado
+    total_insumos = query_base.count()
+    total_grupos = query_base.with_entities(Insumo.grupo).distinct().count()
+    total_unidades = query_base.with_entities(Insumo.unidade).distinct().count()
 
     # Estatísticas de preço (em centavos, converter para reais)
-    preco_stats = db.query(
+    preco_stats = query_base.with_entities(
         func.avg(Insumo.preco_compra).label('media'),
         func.min(Insumo.preco_compra).label('minimo'), 
         func.max(Insumo.preco_compra).label('maximo')       

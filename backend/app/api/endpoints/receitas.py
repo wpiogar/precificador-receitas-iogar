@@ -40,7 +40,7 @@ router = APIRouter()
 @router.get("/", summary="Listar receitas")
 def list_receitas(
     skip: int = Query(0, ge=0, description="Pular N registros"),
-    limit: int = Query(100, ge=1, le=1000, description="Limite de registros"),
+    limit: int = Query(1000, ge=1, le=5000, description="Limite de registros"),  # Aumentado de 100 para 1000, máximo 5000
     restaurante_id: Optional[int] = Query(None, description="Filtrar por restaurante"),
     grupo: Optional[str] = Query(None, description="Filtrar por grupo"),
     ativo: Optional[bool] = Query(None, description="Filtrar por status ativo"),
@@ -71,9 +71,14 @@ def list_receitas(
         db=db
     )
     
-    # Aplicar filtros adicionais do usuário
-    if restaurante_id:
-        query = query.filter(Receita.restaurante_id == restaurante_id)
+    # CRÍTICO: Garantir que SEMPRE filtra pelo restaurante correto
+    # Se restaurante_id foi fornecido na query, usar ele
+    # Se não, usar o restaurante do usuário logado
+    filtro_restaurante_id = restaurante_id if restaurante_id else current_user.restaurante_id
+    
+    if filtro_restaurante_id:
+        query = query.filter(Receita.restaurante_id == filtro_restaurante_id)
+        print(f"🔍 Filtrando receitas por restaurante_id: {filtro_restaurante_id}")
     
     if grupo:
         query = query.filter(Receita.grupo == grupo)
@@ -271,19 +276,36 @@ def calcular_custo_receita(db: Session, receita_id: int) -> dict:
         }
     """
     try:
-        # Buscar insumos da receita
+        # CRÍTICO: Buscar receita primeiro para validar restaurante
+        receita = db.query(Receita).filter(Receita.id == receita_id).first()
+        if not receita:
+            print(f"⚠️ Receita ID {receita_id} não encontrada")
+            return {
+                'custo_total': 0.0,
+                'tem_insumos_sem_preco': False,
+                'insumos_pendentes': [],
+                'total_insumos': 0,
+                'insumos_com_preco': 0
+            }
+        
+        # Buscar insumos da receita COM FILTRO DE RESTAURANTE
         query = """
         SELECT 
             ri.insumo_id,
             ri.quantidade_necessaria,
             i.preco_compra,
-            i.nome
+            i.nome,
+            i.restaurante_id
         FROM receita_insumos ri
         JOIN insumos i ON ri.insumo_id = i.id  
         WHERE ri.receita_id = :receita_id
+        AND (i.restaurante_id = :restaurante_id OR i.restaurante_id IS NULL)
         """
         
-        result = db.execute(text(query), {'receita_id': receita_id})
+        result = db.execute(text(query), {
+            'receita_id': receita_id,
+            'restaurante_id': receita.restaurante_id
+        })
         insumos_receita = result.fetchall()
         
         if not insumos_receita:

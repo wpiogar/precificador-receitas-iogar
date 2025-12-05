@@ -2353,9 +2353,8 @@ const CIDADES_POR_ESTADO: Record<string, string[]> = {
   // ===================================================================================================
   useEffect(() => {
     if (selectedRestaurante && selectedRestaurante.id) {
-      console.log(`🔄 Restaurante selecionado: ${selectedRestaurante.nome} (ID: ${selectedRestaurante.id})`);
-      console.log('📦 Recarregando insumos do restaurante...');
-      fetchInsumos();
+      console.log(`🔄 Restaurante selecionado: ${selectedRestaurante.nome}`);
+      fetchInsumos(searchTerm); // ← PASSAR searchTerm
     }
   }, [selectedRestaurante]);
 
@@ -2364,8 +2363,7 @@ const CIDADES_POR_ESTADO: Record<string, string[]> = {
   // ===================================================================================================
   useEffect(() => {
     if (selectedRestaurante && selectedRestaurante.id) {
-      console.log(`📄 Mudança de página detectada: ${paginaAtualInsumos}`);
-      fetchInsumos();
+      fetchInsumos(searchTerm); // ← PASSAR searchTerm
     }
   }, [paginaAtualInsumos]);
 
@@ -2472,7 +2470,7 @@ console.log('🌐 API Base URL:', API_BASE);
   // ============================================================================
   
   // Busca todos os insumos do backend
-const fetchInsumos = async () => {
+const fetchInsumos = async (searchTerm?: string) => {
   try {
     setLoading(true);
 
@@ -5833,12 +5831,8 @@ const fetchInsumos = async () => {
     const handleSearchChange = useCallback((term) => {
       setSearchTerm(term);
       
-      // Resetar para primeira página ao buscar
-      setPaginaAtualInsumos(1);
-      
-      // Buscar no backend com debounce de 500ms
       const timer = setTimeout(() => {
-        fetchInsumos();
+        fetchInsumos(term); // ← PASSAR term (o valor digitado)
       }, 500);
       
       return () => clearTimeout(timer);
@@ -5947,7 +5941,7 @@ const fetchInsumos = async () => {
           console.log('✅ Sucesso na operação:', response.data);
           
           // Recarregar lista de insumos
-          await fetchInsumos();
+          await fetchInsumos(searchTerm);
           
           // Se foi criação bem-sucedida, mostrar popup de sucesso
           if (editingInsumo) {

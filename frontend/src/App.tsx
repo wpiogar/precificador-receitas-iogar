@@ -2348,25 +2348,6 @@ const CIDADES_POR_ESTADO: Record<string, string[]> = {
     estado: ''
   });
 
-  // ===================================================================================================
-  // RECARREGAR INSUMOS QUANDO SELECIONAR UM RESTAURANTE
-  // ===================================================================================================
-  useEffect(() => {
-    if (selectedRestaurante && selectedRestaurante.id) {
-      console.log(`🔄 Restaurante selecionado: ${selectedRestaurante.nome}`);
-      fetchInsumos(searchTerm); // ← PASSAR searchTerm
-    }
-  }, [selectedRestaurante]);
-
-  // ===================================================================================================
-  // RECARREGAR INSUMOS QUANDO MUDAR A PÁGINA (PAGINAÇÃO SERVER-SIDE)
-  // ===================================================================================================
-  useEffect(() => {
-    if (selectedRestaurante && selectedRestaurante.id) {
-      fetchInsumos(searchTerm); // ← PASSAR searchTerm
-    }
-  }, [paginaAtualInsumos]);
-
   const handleCriarRestaurante = async (dadosRestaurante) => {
     if (!dadosRestaurante.nome.trim() || !dadosRestaurante.cnpj.trim()) {
       showErrorPopup(
@@ -5805,6 +5786,24 @@ const fetchInsumos = async (searchTerm?: string) => {
     // Estados de Insumo
     const [buscaInsumo, setBuscaInsumo] = useState('');
     const [searchTerm, setSearchTerm] = useState<string>('');
+
+    // ============================================================================
+    // EFFECTS PARA RECARREGAR INSUMOS
+    // ============================================================================
+    useEffect(() => {
+      if (selectedRestaurante && selectedRestaurante.id) {
+        console.log(`🔄 Restaurante selecionado: ${selectedRestaurante.nome} (ID: ${selectedRestaurante.id})`);
+        console.log('📦 Recarregando insumos do restaurante...');
+        fetchInsumos(searchTerm);
+      }
+    }, [selectedRestaurante]);
+
+    useEffect(() => {
+      if (selectedRestaurante && selectedRestaurante.id) {
+        console.log(`📄 Mudança de página detectada: ${paginaAtualInsumos}`);
+        fetchInsumos(searchTerm);
+      }
+    }, [paginaAtualInsumos]);
 
     const [editandoFornecedor, setEditandoFornecedor] = useState(null);
 

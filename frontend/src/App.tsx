@@ -5796,24 +5796,15 @@ const fetchInsumos = async (searchTerm?: string) => {
     const [searchTerm, setSearchTerm] = useState<string>('');
 
     // ============================================================================
-    // EFFECTS PARA RECARREGAR INSUMOS
+    // EFFECT PARA RECARREGAR INSUMOS (quando restaurante OU página mudar)
     // ============================================================================
     useEffect(() => {
       if (selectedRestaurante && selectedRestaurante.id) {
-        console.log(`🔄 Restaurante selecionado: ${selectedRestaurante.nome} (ID: ${selectedRestaurante.id})`);
-        console.log('📦 Recarregando insumos do restaurante...');
+        console.log(`🔄 Carregando insumos - Restaurante: ${selectedRestaurante.nome} | Página: ${paginaAtualInsumos}`);
         fetchInsumos(searchTerm);
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedRestaurante?.id]); // IMPORTANTE: Apenas .id, não o objeto inteiro
-
-    useEffect(() => {
-      if (selectedRestaurante && selectedRestaurante.id) {
-        console.log(`📄 Mudança de página detectada: ${paginaAtualInsumos}`);
-        fetchInsumos(searchTerm);
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [paginaAtualInsumos, selectedRestaurante?.id]);
+    }, [selectedRestaurante?.id, paginaAtualInsumos]);
 
     const [editandoFornecedor, setEditandoFornecedor] = useState(null);
 

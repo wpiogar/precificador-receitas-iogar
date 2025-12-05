@@ -2100,6 +2100,7 @@ const FoodCostSystem: React.FC = () => {
   const itensPorPaginaInsumos = 20;
   const [totalInsumosBackend, setTotalInsumosBackend] = useState(0);
   const [totalPaginasBackend, setTotalPaginasBackend] = useState(1);
+  const [searchTermInsumos, setSearchTermInsumos] = useState<string>('');
   const [receitas, setReceitas] = useState<Receita[]>([]);
   const [restaurantes, setRestaurantes] = useState<RestauranteGrid[]>([]);
   const [restaurantesExpandidos, setRestaurantesExpandidos] = useState<Set<number>>(new Set());
@@ -3309,13 +3310,22 @@ const fetchInsumos = async (searchTerm?: string) => {
   }, []); // IMPORTANTE: Array vazio para executar apenas uma vez
 
   // ===================================================================================================
-    // EFEITO: RECARREGAR INSUMOS AO MUDAR RESTAURANTE OU CHECKBOX DE GLOBAIS
-    // ===================================================================================================
-    useEffect(() => {
-      if (activeTab === 'insumos') {
-        fetchInsumos();
-      }
-    }, [selectedRestaurante, incluirInsumosGlobais]);
+  // EFEITO: RECARREGAR INSUMOS AO MUDAR RESTAURANTE OU CHECKBOX DE GLOBAIS
+  // ===================================================================================================
+  useEffect(() => {
+    if (activeTab === 'insumos') {
+      fetchInsumos(searchTermInsumos);
+    }
+  }, [selectedRestaurante, incluirInsumosGlobais]);
+
+  // ===================================================================================================
+  // EFEITO: BUSCAR INSUMOS QUANDO TERMO DE BUSCA OU PAGINA MUDAR
+  // ===================================================================================================
+  useEffect(() => {
+    if (activeTab === 'insumos' && selectedRestaurante?.id) {
+      fetchInsumos(searchTermInsumos);
+    }
+  }, [searchTermInsumos, paginaAtualInsumos]);
 
   // Carregar estatísticas quando um restaurante é selecionado na aba restaurantes
   // useEffect(() => {
@@ -3332,8 +3342,8 @@ const fetchInsumos = async (searchTerm?: string) => {
       try {
         switch (activeTab) {
           case 'insumos':
-            await fetchInsumos();
-            console.log('✅ Insumos recarregados');
+            await fetchInsumos(searchTermInsumos);
+            console.log('Insumos recarregados');
             break;
             
           case 'receitas':
@@ -3625,8 +3635,42 @@ const fetchInsumos = async (searchTerm?: string) => {
   // COMPONENTE DASHBOARD - TELA PRINCIPAL
   // ============================================================================
   const Dashboard = () => {
+    // Estados para estatísticas do dashboard
+    const [statsInsumos, setStatsInsumos] = useState({
+      total: 0,
+      grupos: 0,
+      unidades: 0
+    });
+    
+    // Buscar estatísticas quando dashboard for montado ou restaurante mudar
+    useEffect(() => {
+      const carregarStats = async () => {
+        if (!selectedRestaurante?.id) return;
+        
+        try {
+          console.log('📊 Carregando stats do dashboard para restaurante:', selectedRestaurante.id);
+          const response = await apiService.request<any>(
+            `/api/v1/insumos/utils/stats?restaurante_id=${selectedRestaurante.id}`
+          );
+          
+          if (response.success && response.data) {
+            setStatsInsumos({
+              total: response.data.total_insumos || 0,
+              grupos: response.data.total_grupos || 0,
+              unidades: response.data.total_unidades || 0
+            });
+            console.log('✅ Stats carregadas:', response.data);
+          }
+        } catch (error) {
+          console.error('❌ Erro ao carregar stats:', error);
+        }
+      };
+      
+      carregarStats();
+    }, [selectedRestaurante?.id]);
+    
     // Cálculos das estatísticas em tempo real
-    const totalInsumos = totalInsumosBackend;
+    const totalInsumos = statsInsumos.total;
     const totalRestaurantes = restaurantes.length;
     const totalReceitas = receitas.length;
 
@@ -5757,25 +5801,27 @@ const fetchInsumos = async (searchTerm?: string) => {
       //FIM RETURN
     };
 
-  // Componente isolado para busca de insumos
-  const SearchInput = React.memo(({ onSearch }) => {
-    const [localSearch, setLocalSearch] = useState('');
+  // ============================================================================
+  // COMPONENTE ISOLADO PARA BUSCA DE INSUMOS COM DEBOUNCE
+  // ============================================================================
+  const SearchInput = React.memo(({ onSearch, initialValue = '' }: { onSearch: (term: string) => void; initialValue?: string }) => {
+    const [localSearch, setLocalSearch] = useState(initialValue);
 
-    // Debounce completamente isolado
+    // Debounce - aguarda usuario parar de digitar antes de buscar
     useEffect(() => {
       const timeoutId = setTimeout(() => {
         onSearch(localSearch);
-      }, 300);
+      }, 500);
 
       return () => clearTimeout(timeoutId);
-    }, [localSearch]); // Sem onSearch aqui
+    }, [localSearch, onSearch]);
 
     return (
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
         <input
           type="text"
-          placeholder="Buscar insumos por nome ou código..."
+          placeholder="Buscar insumos por nome ou codigo..."
           value={localSearch}
           onChange={(e) => setLocalSearch(e.target.value)}
           className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 bg-white text-gray-900"
@@ -5792,20 +5838,6 @@ const fetchInsumos = async (searchTerm?: string) => {
   // ============================================================================
   const Insumos = () => {
     // Estados de Insumo
-    const [buscaInsumo, setBuscaInsumo] = useState('');
-    const [searchTerm, setSearchTerm] = useState<string>('');
-
-    // ============================================================================
-    // EFFECT PARA RECARREGAR INSUMOS (quando restaurante OU página mudar)
-    // ============================================================================
-    useEffect(() => {
-      if (selectedRestaurante && selectedRestaurante.id) {
-        console.log(`🔄 Carregando insumos - Restaurante: ${selectedRestaurante.nome} | Página: ${paginaAtualInsumos}`);
-        fetchInsumos(searchTerm);
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedRestaurante?.id, paginaAtualInsumos]);
-
     const [editandoFornecedor, setEditandoFornecedor] = useState(null);
 
     // Estado para modal de confirmação de exclusão
@@ -5826,39 +5858,20 @@ const fetchInsumos = async (searchTerm?: string) => {
     );
   
     // ============================================================================
-    // CALLBACK PARA BUSCA DE INSUMOS (NOME OU CÓDIGO)
+    // CALLBACK PARA BUSCA DE INSUMOS (NOME OU CODIGO) - SERVER-SIDE
     // ============================================================================
-    const handleSearchChange = useCallback((term) => {
-      setSearchTerm(term);
-      
-      const timer = setTimeout(() => {
-        fetchInsumos(term); // ← PASSAR term (o valor digitado)
-      }, 500);
-      
-      return () => clearTimeout(timer);
-    }, [setSearchTerm, fetchInsumos]);
-
+    const handleSearchChange = useCallback((term: string) => {
+      setSearchTermInsumos(term);
+      // Resetar para primeira pagina ao buscar
+      setPaginaAtualInsumos(1);
+    }, [setSearchTermInsumos, setPaginaAtualInsumos]);
+    
     // ============================================================================
-    // Filtro dos insumos baseado na busca (nome OU código)
+    // PAGINACAO SERVER-SIDE - DADOS JA VEM FILTRADOS DO BACKEND
     // ============================================================================
-    const insumosFiltrados = insumos.filter(insumoItem => {
-      // Verificar se insumo é válido
-      if (!insumoItem || !insumoItem.nome) return false;
-      
-      // Se não houver termo de busca, incluir todos
-      if (!searchTerm || !searchTerm.trim()) return true;
-      
-      const searchLower = searchTerm.toLowerCase().trim();
-      
-      // Buscar por nome
-      const nomeMatch = insumoItem.nome.toLowerCase().includes(searchLower);
-      
-      // Buscar por código (se existir)
-      const codigoMatch = insumoItem.codigo?.toLowerCase().includes(searchLower);
-      
-      // Retornar true se encontrou em qualquer um dos campos
-      return nomeMatch || codigoMatch;
-    });
+    // Como a busca e feita no servidor, nao precisamos filtrar localmente
+    // Os insumos ja vem filtrados e paginados da API
+    const insumosFiltrados = insumos;
 
     // ============================================================================
     // PAGINAÇÃO SERVER-SIDE - OS DADOS JÁ VÊM PAGINADOS DO BACKEND
@@ -5941,7 +5954,7 @@ const fetchInsumos = async (searchTerm?: string) => {
           console.log('✅ Sucesso na operação:', response.data);
           
           // Recarregar lista de insumos
-          await fetchInsumos(searchTerm);
+          await fetchInsumos(searchTermInsumos);
           
           // Se foi criação bem-sucedida, mostrar popup de sucesso
           if (editingInsumo) {
@@ -6177,7 +6190,7 @@ const fetchInsumos = async (searchTerm?: string) => {
         const response = await apiService.deleteInsumo(deleteConfirm.insumoId);
 
         if (response.data || !response.error) {
-          await fetchInsumos();
+          await fetchInsumos(searchTermInsumos);
           showSuccessPopup(
             'Insumo Excluído!',
             `${deleteConfirm.insumoNome} foi removido com sucesso do sistema.`
@@ -6349,7 +6362,7 @@ const fetchInsumos = async (searchTerm?: string) => {
         {/* Barra de busca e toggle de visualização */}
         <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
           <div className="flex-1">
-            <SearchInput onSearch={handleSearchChange} />
+            <SearchInput onSearch={handleSearchChange} initialValue={searchTermInsumos} />
           </div>
           
           {/* Toggle de visualização */}

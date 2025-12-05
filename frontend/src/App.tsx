@@ -5796,14 +5796,16 @@ const fetchInsumos = async (searchTerm?: string) => {
         console.log('📦 Recarregando insumos do restaurante...');
         fetchInsumos(searchTerm);
       }
-    }, [selectedRestaurante]);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedRestaurante?.id]); // IMPORTANTE: Apenas .id, não o objeto inteiro
 
     useEffect(() => {
       if (selectedRestaurante && selectedRestaurante.id) {
         console.log(`📄 Mudança de página detectada: ${paginaAtualInsumos}`);
         fetchInsumos(searchTerm);
       }
-    }, [paginaAtualInsumos]);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [paginaAtualInsumos, selectedRestaurante?.id]);
 
     const [editandoFornecedor, setEditandoFornecedor] = useState(null);
 

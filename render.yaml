@@ -16,10 +16,11 @@ services:
     plan: free
     rootDir: backend
     
-    # Build command com migrations automáticas
+    # Build command com migrations automáticas e verificação do modelo spaCy
     buildCommand: |
       pip install -r requirements.txt &&
       python -m spacy download pt_core_news_sm &&
+      python verify_spacy_model.py &&
       python -m alembic upgrade head
     
     startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT

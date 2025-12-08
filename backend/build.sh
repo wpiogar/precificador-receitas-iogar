@@ -39,6 +39,20 @@ echo "📦 INSTALANDO DEMAIS DEPENDÊNCIAS"
 echo "============================================================================"
 pip install --no-cache-dir -r requirements.txt
 
+# Instalar modelo spaCy para IA
+echo "============================================================================"
+echo "🤖 INSTALANDO MODELO SPACY PARA IA"
+echo "============================================================================"
+python -m spacy download pt_core_news_sm || {
+    echo "⚠️ AVISO: Não foi possível baixar modelo spaCy (IA funcionará em modo básico)"
+}
+
+# Verificar modelo spaCy
+echo "🔍 Verificando modelo spaCy..."
+python verify_spacy_model.py || {
+    echo "⚠️ AVISO: Modelo spaCy não verificado (IA funcionará em modo básico)"
+}
+
 # Verificação final
 echo "============================================================================"
 echo "✅ VERIFICAÇÃO FINAL"
@@ -47,6 +61,7 @@ python -c "import pandas; print(f'✅ pandas {pandas.__version__}')"
 python -c "import numpy; print(f'✅ numpy {numpy.__version__}')"
 python -c "import openpyxl; print(f'✅ openpyxl {openpyxl.__version__}')"
 python -c "import fastapi; print(f'✅ fastapi {fastapi.__version__}')"
+python -c "import spacy; print(f'✅ spacy {spacy.__version__}')" || echo "⚠️ spacy não instalado"
 
 echo "============================================================================"
 echo "✅ BUILD CONCLUÍDO COM SUCESSO"

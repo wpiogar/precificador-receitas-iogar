@@ -269,6 +269,9 @@ const [formData, setFormData] = useState(() => {
   return initialData;
 });
 
+// Flag de Carregamento Específica
+const [loadingRestauranteData, setLoadingRestauranteData] = useState(false);
+
 // ADICIONAR ESTE NOVO ESTADO LOGO APÓS O formData:
 // Estado para controlar se o insumo é global ou específico de um restaurante
 const [insumoGlobal, setInsumoGlobal] = useState(() => {
@@ -3087,38 +3090,42 @@ const fetchInsumos = async (searchTerm?: string) => {
     }
   };
 
-  // Busca todas as receitas do backend
   const fetchReceitas = useCallback(async () => {
-    // Verificação de segurança para evitar chamadas desnecessárias
     if (!selectedRestaurante || !selectedRestaurante.id) {
-      console.log('Nenhum restaurante selecionado, limpando receitas');
+      console.log('⚠️  selectedRestaurante inválido');
       setReceitas([]);
       return;
     }
 
     try {
       setLoading(true);
-      console.log(`Buscando receitas do restaurante: ${selectedRestaurante.nome} (ID: ${selectedRestaurante.id})`);
       
-      // Busca todas as receitas do backend
-      const response = await apiService.getReceitas();
+      const restauranteId = Number(selectedRestaurante.id);
+      
+      console.log('✅ Buscando receitas:');
+      console.log('   Restaurante:', selectedRestaurante.nome);
+      console.log('   ID:', restauranteId);
+      
+      const response = await apiService.getReceitas(restauranteId);
+      
+      console.log('📦 Resposta da API:', response);
       
       if (response.data) {
-        // Filtrar receitas pelo restaurante selecionado no frontend
-        const receitasFiltradas = response.data.filter((receita: any) => 
-          receita.restaurante_id === selectedRestaurante.id
-        );
-        
-        setReceitas(receitasFiltradas);
-        console.log(`Receitas carregadas para restaurante ${selectedRestaurante.nome}:`, receitasFiltradas.length);
+        // VALIDAÇÃO: Só atualizar se ainda for o mesmo restaurante
+        if (selectedRestaurante.id === restauranteId) {
+          setReceitas(response.data);
+          console.log(`✅ ${response.data.length} receitas carregadas`);
+        } else {
+          console.log('⚠️  Restaurante mudou durante a requisição, ignorando resposta');
+        }
         
       } else {
-        console.error('Erro ao buscar receitas:', response.error);
+        console.error('❌ Erro ao buscar receitas:', response.error);
         setReceitas([]);
         showErrorPopup('Erro de Conexão', 'Falha na conexão com o servidor ao buscar receitas.');
       }
     } catch (error) {
-      console.error('Erro ao buscar receitas:', error);
+      console.error('❌ Exceção ao buscar receitas:', error);
       setReceitas([]);
       showErrorPopup('Erro de Conexão', 'Falha na conexão com o servidor ao buscar receitas.');
     } finally {
@@ -3127,34 +3134,48 @@ const fetchInsumos = async (searchTerm?: string) => {
   }, [selectedRestaurante]);
 
   // Busca receitas de um restaurante específico
-  const fetchReceitasByRestaurante = async (restauranteId: number) => {
+  const fetchReceitas = useCallback(async () => {
+    if (!selectedRestaurante || !selectedRestaurante.id) {
+      console.log('⚠️  selectedRestaurante inválido');
+      setReceitas([]);
+      return;
+    }
+
     try {
       setLoading(true);
-      const response = await apiService.getReceitas();
+      
+      const restauranteId = Number(selectedRestaurante.id);
+      
+      console.log('✅ Buscando receitas:');
+      console.log('   Restaurante:', selectedRestaurante.nome);
+      console.log('   ID:', restauranteId);
+      
+      const response = await apiService.getReceitas(restauranteId);
+      
+      console.log('📦 Resposta da API:', response);
       
       if (response.data) {
-        // Filtrar receitas pelo restaurante
-        const receitasFiltradas = response.data.filter((receita: any) => 
-          receita.restaurante_id === restauranteId || !receita.restaurante_id
-        );
-        
-        // DEBUG: Verificar se as receitas têm insumos com unidade
-        if (receitasFiltradas.length > 0) {
-          
-          if (receitasFiltradas[0].receita_insumos && receitasFiltradas[0].receita_insumos.length > 0) {
-          }
+        // VALIDAÇÃO: Só atualizar se ainda for o mesmo restaurante
+        if (selectedRestaurante.id === restauranteId) {
+          setReceitas(response.data);
+          console.log(`✅ ${response.data.length} receitas carregadas`);
+        } else {
+          console.log('⚠️  Restaurante mudou durante a requisição, ignorando resposta');
         }
         
-        setReceitas(receitasFiltradas);
-      } else if (response.error) {
-        console.error('Erro ao buscar receitas do restaurante:', response.error);
+      } else {
+        console.error('❌ Erro ao buscar receitas:', response.error);
+        setReceitas([]);
+        showErrorPopup('Erro de Conexão', 'Falha na conexão com o servidor ao buscar receitas.');
       }
     } catch (error) {
-      console.error('Erro ao buscar receitas do restaurante:', error);
+      console.error('❌ Exceção ao buscar receitas:', error);
+      setReceitas([]);
+      showErrorPopup('Erro de Conexão', 'Falha na conexão com o servidor ao buscar receitas.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedRestaurante]);
 
   // ===================================================================================================
   // FUNÇÃO: BUSCAR DETALHES COMPLETOS DOS INSUMOS DE UMA RECEITA
@@ -3283,7 +3304,7 @@ const fetchInsumos = async (searchTerm?: string) => {
           console.log('✅ API conectada com sucesso!');
           await fetchInsumos();
           await fetchRestaurantes();
-          await fetchReceitas();
+          // NÃO carregar receitas aqui - será carregado quando selecionar restaurante
           await carregarFornecedoresDisponiveis();
           await carregarEstados();
         } else {
@@ -3304,6 +3325,30 @@ const fetchInsumos = async (searchTerm?: string) => {
 
    initializeApp();
   }, []); // IMPORTANTE: Array vazio para executar apenas uma vez
+
+  // Efeito específico para recarregar dados ao trocar restaurante
+  useEffect(() => {
+    const carregarDadosRestaurante = async () => {
+      if (selectedRestaurante && selectedRestaurante.id) {
+        console.log('🔄 Trocando para restaurante:', selectedRestaurante.nome, '(ID:', selectedRestaurante.id, ')');
+        
+        // Limpar dados antigos imediatamente
+        setReceitas([]);
+        setInsumos([]);
+        
+        // Aguardar um pouco para garantir limpeza
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        // Carregar novos dados
+        await fetchReceitas();
+        await fetchInsumos();
+        
+        console.log('✅ Dados do restaurante carregados');
+      }
+    };
+    
+    carregarDadosRestaurante();
+  }, [selectedRestaurante?.id]); // ← Importante: dependência no ID
 
   // ===================================================================================================
     // EFEITO: RECARREGAR INSUMOS AO MUDAR RESTAURANTE OU CHECKBOX DE GLOBAIS
@@ -8643,11 +8688,20 @@ const Receitas = React.memo(() => {
   const [receitaParaRelatorio, setReceitaParaRelatorio] = useState<any>(null);
   const [isLoadingReceitas, setIsLoadingReceitas] = useState(false);
 
-  // Converter receitas apenas quando necessário
+  // NOVA VALIDAÇÃO: Filtrar receitas apenas do restaurante atual
+  const receitasFiltradas = useMemo(() => {
+    if (!receitas || !selectedRestaurante) return [];
+    
+    return receitas.filter(r => 
+      r.restaurante_id === selectedRestaurante.id
+    );
+  }, [receitas, selectedRestaurante]);
+
+  // Converter receitas filtradas para o grid
   const receitasConvertidas = useMemo(() => {
-    if (!receitas || receitas.length === 0) return [];
-    return converterReceitasParaGrid(receitas);
-  }, [receitas]);
+    if (!receitasFiltradas || receitasFiltradas.length === 0) return [];
+    return converterReceitasParaGrid(receitasFiltradas);
+  }, [receitasFiltradas]);
 
   // Função manual para carregar receitas
   const carregarReceitas = async () => {
@@ -8655,7 +8709,7 @@ const Receitas = React.memo(() => {
       alert('Selecione um restaurante primeiro');
       return;
     }
-    await fetchReceitas();
+    await fetchReceitas2(); // ← MUDANÇA AQUI: usar fetchReceitas2
   };
   
   // ===================================================================================================

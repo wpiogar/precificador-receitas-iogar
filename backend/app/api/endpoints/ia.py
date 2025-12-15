@@ -17,6 +17,8 @@ from datetime import datetime, timedelta
 # Imports do projeto
 from app.database import get_db
 from app.ai.classificador_ia import obter_classificador, ClassificadorIA
+from app.core.dependencies import get_current_user, get_admin_user
+from app.models.user import User
 from app.schemas.ia import (
     ClassificarProdutoRequest,
     ClassificarProdutoResponse,
@@ -33,7 +35,9 @@ from app.schemas.ia import (
     DetalhesClassificacao,
     SugestaoAlternativa,
     StatusClassificacao,
-    ResultadoClassificacaoLote
+    ResultadoClassificacaoLote,
+    EstatisticasPeriodo,
+    DashboardEstatisticasIA
 )
 
 # Configuração de logging
@@ -432,6 +436,224 @@ async def verificar_status(
         raise HTTPException(
             status_code=500,
             detail=f"Erro interno: {str(e)}"
+        )
+    
+
+@router.get(
+    "/estatisticas/dashboard",
+    response_model=DashboardEstatisticasIA,
+    summary="Dashboard de Estatísticas Completas",
+    description="""
+    Retorna estatísticas completas para o dashboard da IA.
+    
+    **Funcionalidades:**
+    - Métricas principais (KPIs) em cards
+    - Dados para gráficos (evolução, pizza, barras)
+    - Tabela detalhada por categoria
+    - Filtros por período de tempo
+    
+    **Parâmetros de filtro:**
+    - `periodo`: Período pré-definido (7d, 30d, 90d)
+    - `data_inicio`: Data inicial customizada (formato: YYYY-MM-DD)
+    - `data_fim`: Data final customizada (formato: YYYY-MM-DD)
+    
+    **Exemplo de uso:**
+    - Últimos 7 dias: `/estatisticas/dashboard?periodo=7d`
+    - Últimos 30 dias: `/estatisticas/dashboard?periodo=30d`
+    - Período customizado: `/estatisticas/dashboard?data_inicio=2024-01-01&data_fim=2024-01-31`
+    
+    **Resposta inclui:**
+    - Cards com taxa de acerto, total de classificações, correções manuais, tempo médio
+    - Gráfico de evolução temporal (classificações por dia)
+    - Gráfico de distribuição (automáticas vs manuais)
+    - Gráfico de top 10 categorias
+    - Gráfico de taxa de acerto ao longo do tempo
+    - Tabela detalhada com estatísticas por categoria
+    """
+)
+async def obter_dashboard_estatisticas(
+    periodo: Optional[str] = Query(
+        default="30d",
+        description="Período pré-definido: 7d, 30d, 90d"
+    ),
+    data_inicio: Optional[str] = Query(
+        default=None,
+        description="Data inicial customizada (YYYY-MM-DD)"
+    ),
+    data_fim: Optional[str] = Query(
+        default=None,
+        description="Data final customizada (YYYY-MM-DD)"
+    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Endpoint para obter estatísticas completas do dashboard.
+    
+    Permite filtrar por períodos pré-definidos ou datas customizadas.
+    Retorna todas as métricas e dados formatados para os gráficos.
+    """
+    try:
+        from datetime import datetime, timedelta
+        
+        # Determinar período baseado nos parâmetros
+        periodo_fim = datetime.now()
+        
+        # Se datas customizadas foram fornecidas, usar elas
+        if data_inicio and data_fim:
+            try:
+                periodo_inicio = datetime.strptime(data_inicio, '%Y-%m-%d')
+                periodo_fim = datetime.strptime(data_fim, '%Y-%m-%d')
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Formato de data inválido. Use YYYY-MM-DD"
+                )
+        else:
+            # Usar período pré-definido
+            if periodo == "7d":
+                periodo_inicio = periodo_fim - timedelta(days=7)
+            elif periodo == "90d":
+                periodo_inicio = periodo_fim - timedelta(days=90)
+            else:  # Padrão: 30d
+                periodo_inicio = periodo_fim - timedelta(days=30)
+        
+        # Validar que data_inicio não é posterior a data_fim
+        if periodo_inicio > periodo_fim:
+            raise HTTPException(
+                status_code=400,
+                detail="Data inicial não pode ser posterior à data final"
+            )
+        
+        # Obter classificador
+        classificador = obter_classificador(db)
+        
+        if not classificador:
+            raise HTTPException(
+                status_code=503,
+                detail="Sistema de IA não disponível no momento"
+            )
+        
+        # Calcular estatísticas completas
+        estatisticas = classificador.obter_estatisticas_completas(
+            periodo_inicio=periodo_inicio,
+            periodo_fim=periodo_fim
+        )
+        
+        return estatisticas
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erro ao obter dashboard de estatísticas: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao processar estatísticas: {str(e)}"
+        )
+
+
+@router.get(
+    "/estatisticas/categorias",
+    summary="Estatísticas Detalhadas por Categoria",
+    description="""
+    Retorna estatísticas detalhadas agrupadas por categoria.
+    
+    **Informações por categoria:**
+    - Total de classificações
+    - Total de confirmações
+    - Total de correções
+    - Taxa de acerto percentual
+    - Tempo médio de classificação
+    
+    **Filtros:**
+    - `periodo`: Período pré-definido (7d, 30d, 90d)
+    - `limite`: Número máximo de categorias a retornar
+    - `ordenar_por`: Campo para ordenação (taxa_acerto, total, tempo_medio)
+    """
+)
+async def obter_estatisticas_categorias(
+    periodo: Optional[str] = Query(default="30d", description="Período: 7d, 30d, 90d"),
+    limite: Optional[int] = Query(default=20, ge=5, le=100, description="Limite de categorias"),
+    ordenar_por: Optional[str] = Query(
+        default="total",
+        description="Ordenar por: total, taxa_acerto, tempo_medio"
+    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Endpoint para obter estatísticas detalhadas por categoria.
+    
+    Útil para análises específicas e identificação de categorias problemáticas.
+    """
+    try:
+        from datetime import datetime, timedelta
+        
+        # Determinar período
+        periodo_fim = datetime.now()
+        if periodo == "7d":
+            periodo_inicio = periodo_fim - timedelta(days=7)
+        elif periodo == "90d":
+            periodo_inicio = periodo_fim - timedelta(days=90)
+        else:
+            periodo_inicio = periodo_fim - timedelta(days=30)
+        
+        # Obter classificador
+        classificador = obter_classificador(db)
+        
+        if not classificador:
+            raise HTTPException(
+                status_code=503,
+                detail="Sistema de IA não disponível"
+            )
+        
+        # Obter estatísticas completas
+        estatisticas = classificador.obter_estatisticas_completas(
+            periodo_inicio=periodo_inicio,
+            periodo_fim=periodo_fim
+        )
+        
+        # Extrair tabela de categorias
+        tabela_categorias = estatisticas.get('tabela_categorias', [])
+        
+        # Ordenar conforme solicitado
+        if ordenar_por == "taxa_acerto":
+            tabela_categorias.sort(
+                key=lambda x: x['taxa_acerto_percentual'],
+                reverse=True
+            )
+        elif ordenar_por == "tempo_medio":
+            tabela_categorias.sort(
+                key=lambda x: x['tempo_medio_ms'],
+                reverse=False
+            )
+        else:  # Padrão: total
+            tabela_categorias.sort(
+                key=lambda x: x['total_classificacoes'],
+                reverse=True
+            )
+        
+        # Aplicar limite
+        tabela_categorias = tabela_categorias[:limite]
+        
+        return {
+            "total_categorias": len(tabela_categorias),
+            "periodo": {
+                "inicio": periodo_inicio.isoformat(),
+                "fim": periodo_fim.isoformat(),
+                "dias": (periodo_fim - periodo_inicio).days + 1
+            },
+            "ordenacao": ordenar_por,
+            "categorias": tabela_categorias
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erro ao obter estatísticas por categoria: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao processar: {str(e)}"
         )
 
 # ============================================================================

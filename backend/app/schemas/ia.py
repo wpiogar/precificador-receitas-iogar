@@ -377,6 +377,99 @@ class EstatisticasIA(BaseModel):
     
     timestamp: datetime = Field(default_factory=datetime.now, description="Timestamp das estatísticas")
 
+
+# ============================================================================
+# SCHEMAS PARA DASHBOARD DE ESTATÍSTICAS COMPLETAS
+# ============================================================================
+
+class EstatisticasPeriodo(BaseModel):
+    """
+    Schema para estatísticas filtradas por período de tempo.
+    
+    Permite análise temporal do desempenho da IA.
+    """
+    
+    periodo_inicio: datetime = Field(description="Data inicial do período")
+    periodo_fim: datetime = Field(description="Data final do período")
+    total_dias: int = Field(description="Total de dias no período")
+    
+    # Métricas principais
+    total_classificacoes: int = Field(description="Total de classificações no período")
+    total_confirmacoes: int = Field(description="Classificações aceitas sem alteração")
+    total_correcoes: int = Field(description="Classificações corrigidas manualmente")
+    taxa_acerto_percentual: float = Field(description="Taxa de acerto em %")
+    
+    # Performance
+    tempo_medio_classificacao_ms: float = Field(description="Tempo médio por classificação")
+    classificacoes_por_dia: float = Field(description="Média de classificações por dia")
+    
+    # Distribuição temporal
+    classificacoes_por_data: Dict[str, int] = Field(
+        description="Classificações agrupadas por data (formato YYYY-MM-DD)"
+    )
+    taxa_acerto_por_data: Dict[str, float] = Field(
+        description="Taxa de acerto por data"
+    )
+    
+    # Top categorias
+    top_10_categorias: List[Dict[str, Any]] = Field(
+        description="Top 10 categorias mais classificadas"
+    )
+    
+    # Distribuição por tipo
+    distribuicao_tipo: Dict[str, int] = Field(
+        description="Automáticas vs Manuais"
+    )
+
+class DashboardEstatisticasIA(BaseModel):
+    """
+    Schema completo para o dashboard de estatísticas da IA.
+    
+    Agrupa todas as métricas e visualizações necessárias.
+    """
+    
+    # Cards principais (KPIs)
+    cards_principais: Dict[str, Any] = Field(
+        description="Métricas principais para cards do dashboard"
+    )
+    
+    # Estatísticas do período selecionado
+    estatisticas_periodo: EstatisticasPeriodo = Field(
+        description="Estatísticas filtradas por período"
+    )
+    
+    # Dados para gráficos
+    grafico_evolucao_temporal: List[Dict[str, Any]] = Field(
+        description="Dados para gráfico de linha - evolução diária"
+    )
+    
+    grafico_distribuicao_tipo: List[Dict[str, Any]] = Field(
+        description="Dados para gráfico de pizza - auto vs manual"
+    )
+    
+    grafico_top_categorias: List[Dict[str, Any]] = Field(
+        description="Dados para gráfico de barras - top categorias"
+    )
+    
+    grafico_taxa_acerto_temporal: List[Dict[str, Any]] = Field(
+        description="Dados para gráfico de linha - taxa de acerto ao longo do tempo"
+    )
+    
+    # Tabela de categorias
+    tabela_categorias: List[Dict[str, Any]] = Field(
+        description="Dados detalhados para tabela de categorias"
+    )
+    
+    # Metadados
+    data_geracao: datetime = Field(
+        default_factory=datetime.now,
+        description="Data/hora de geração do dashboard"
+    )
+    
+    filtros_aplicados: Dict[str, Any] = Field(
+        description="Filtros que foram aplicados para gerar os dados"
+    )
+
 class RelatorioAprendizado(BaseModel):
     """
     Schema para relatório detalhado de aprendizado.

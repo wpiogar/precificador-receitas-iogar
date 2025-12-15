@@ -824,6 +824,551 @@ class ClassificadorIA:
             logger.error(f"Erro ao gerar estatísticas: {e}")
             return {"erro": str(e)}
 
+def obter_estatisticas_completas(
+        self, 
+        periodo_inicio: Optional[datetime] = None,
+        periodo_fim: Optional[datetime] = None
+    ) -> Dict[str, Any]:
+        """
+        Retorna estatísticas completas para o dashboard.
+        
+        Calcula todas as métricas necessárias para visualizações,
+        filtradas por período de tempo se especificado.
+        
+        Args:
+            periodo_inicio: Data inicial do período (None = sem filtro)
+            periodo_fim: Data final do período (None = agora)
+            
+        Returns:
+            Dicionário com todas as estatísticas do dashboard
+        """
+        try:
+            # Definir período padrão se não especificado
+            if periodo_fim is None:
+                periodo_fim = datetime.now()
+            
+            if periodo_inicio is None:
+                # Padrão: últimos 30 dias
+                from datetime import timedelta
+                periodo_inicio = periodo_fim - timedelta(days=30)
+            
+            # Calcular total de dias no período
+            total_dias = (periodo_fim - periodo_inicio).days + 1
+            
+            # Carregar logs de feedback filtrados por período
+            logs_periodo = self._carregar_logs_feedback_periodo(periodo_inicio, periodo_fim)
+            
+            # Calcular métricas principais
+            total_classificacoes = len(logs_periodo)
+            total_confirmacoes = len([log for log in logs_periodo if log.get('tipo_feedback') == 'confirmacao'])
+            total_correcoes = len([log for log in logs_periodo if log.get('tipo_feedback') == 'correcao'])
+            
+            # Taxa de acerto
+            taxa_acerto = (total_confirmacoes / total_classificacoes * 100) if total_classificacoes > 0 else 0.0
+            
+            # Tempo médio de classificação
+            tempos = [log.get('tempo_processamento_ms', 0) for log in logs_periodo if log.get('tempo_processamento_ms')]
+            tempo_medio = sum(tempos) / len(tempos) if tempos else 0.0
+            
+            # Classificações por dia
+            classificacoes_por_dia = total_classificacoes / total_dias if total_dias > 0 else 0.0
+            
+            # Agrupar classificações por data
+            classificacoes_por_data = self._agrupar_por_data(logs_periodo)
+            
+            # Calcular taxa de acerto por data
+            taxa_acerto_por_data = self._calcular_taxa_acerto_por_data(logs_periodo)
+            
+            # Top 10 categorias
+            top_categorias = self._calcular_top_categorias(logs_periodo, limite=10)
+            
+            # Distribuição por tipo (automático vs manual)
+            distribuicao_tipo = {
+                'automatica': total_confirmacoes,
+                'manual': total_correcoes
+            }
+            
+            # Preparar dados para gráficos
+            grafico_evolucao = self._preparar_grafico_evolucao(classificacoes_por_data)
+            grafico_pizza = self._preparar_grafico_pizza(distribuicao_tipo)
+            grafico_barras = self._preparar_grafico_barras(top_categorias)
+            grafico_taxa_acerto = self._preparar_grafico_taxa_acerto(taxa_acerto_por_data)
+            
+            # Preparar tabela de categorias
+            tabela_categorias = self._preparar_tabela_categorias(logs_periodo)
+            
+            # Cards principais (KPIs)
+            cards_principais = {
+                'taxa_acerto': {
+                    'valor': round(taxa_acerto, 1),
+                    'unidade': '%',
+                    'label': 'Taxa de Acerto',
+                    'variacao': self._calcular_variacao_periodo_anterior(taxa_acerto, periodo_inicio)
+                },
+                'total_classificacoes': {
+                    'valor': total_classificacoes,
+                    'unidade': '',
+                    'label': 'Classificações Automáticas',
+                    'variacao': None
+                },
+                'total_correcoes': {
+                    'valor': total_correcoes,
+                    'unidade': '',
+                    'label': 'Correções Manuais',
+                    'variacao': None
+                },
+                'tempo_medio': {
+                    'valor': round(tempo_medio, 0),
+                    'unidade': 'ms',
+                    'label': 'Tempo Médio de Classificação',
+                    'variacao': None
+                }
+            }
+            
+            # Montar resposta completa
+            return {
+                'cards_principais': cards_principais,
+                'estatisticas_periodo': {
+                    'periodo_inicio': periodo_inicio.isoformat(),
+                    'periodo_fim': periodo_fim.isoformat(),
+                    'total_dias': total_dias,
+                    'total_classificacoes': total_classificacoes,
+                    'total_confirmacoes': total_confirmacoes,
+                    'total_correcoes': total_correcoes,
+                    'taxa_acerto_percentual': round(taxa_acerto, 2),
+                    'tempo_medio_classificacao_ms': round(tempo_medio, 2),
+                    'classificacoes_por_dia': round(classificacoes_por_dia, 2),
+                    'classificacoes_por_data': classificacoes_por_data,
+                    'taxa_acerto_por_data': taxa_acerto_por_data,
+                    'top_10_categorias': top_categorias,
+                    'distribuicao_tipo': distribuicao_tipo
+                },
+                'grafico_evolucao_temporal': grafico_evolucao,
+                'grafico_distribuicao_tipo': grafico_pizza,
+                'grafico_top_categorias': grafico_barras,
+                'grafico_taxa_acerto_temporal': grafico_taxa_acerto,
+                'tabela_categorias': tabela_categorias,
+                'data_geracao': datetime.now().isoformat(),
+                'filtros_aplicados': {
+                    'periodo_inicio': periodo_inicio.isoformat(),
+                    'periodo_fim': periodo_fim.isoformat(),
+                    'total_dias': total_dias
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Erro ao calcular estatísticas completas: {e}")
+            return self._estatisticas_vazias()
+    
+def _carregar_logs_feedback_periodo(
+    self, 
+    periodo_inicio: datetime, 
+    periodo_fim: datetime
+) -> List[Dict]:
+    """
+    Carrega logs de feedback filtrados por período.
+    
+    Args:
+        periodo_inicio: Data inicial
+        periodo_fim: Data final
+        
+    Returns:
+        Lista de logs no período especificado
+    """
+    try:
+        if not LOGS_FEEDBACK_PATH.exists():
+            return []
+        
+        with open(LOGS_FEEDBACK_PATH, 'r', encoding='utf-8') as file:
+            data = json.load(file)
+            logs = data.get("logs", []) if isinstance(data, dict) else data
+        
+        # Filtrar por período
+        logs_filtrados = []
+        for log in logs:
+            timestamp_str = log.get('timestamp')
+            if timestamp_str:
+                try:
+                    timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                    if periodo_inicio <= timestamp <= periodo_fim:
+                        logs_filtrados.append(log)
+                except (ValueError, AttributeError):
+                    continue
+        
+        return logs_filtrados
+        
+    except Exception as e:
+        logger.error(f"Erro ao carregar logs de feedback: {e}")
+        return []
+
+def _agrupar_por_data(self, logs: List[Dict]) -> Dict[str, int]:
+    """
+    Agrupa logs por data (formato YYYY-MM-DD).
+    
+    Args:
+        logs: Lista de logs
+        
+    Returns:
+        Dicionário com contagem por data
+    """
+    from collections import defaultdict
+    contagem = defaultdict(int)
+    
+    for log in logs:
+        timestamp_str = log.get('timestamp')
+        if timestamp_str:
+            try:
+                timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                data_str = timestamp.strftime('%Y-%m-%d')
+                contagem[data_str] += 1
+            except (ValueError, AttributeError):
+                continue
+    
+    return dict(contagem)
+
+def _calcular_taxa_acerto_por_data(self, logs: List[Dict]) -> Dict[str, float]:
+    """
+    Calcula taxa de acerto agrupada por data.
+    
+    Args:
+        logs: Lista de logs
+        
+    Returns:
+        Dicionário com taxa de acerto por data
+    """
+    from collections import defaultdict
+    
+    confirmacoes_por_data = defaultdict(int)
+    total_por_data = defaultdict(int)
+    
+    for log in logs:
+        timestamp_str = log.get('timestamp')
+        tipo_feedback = log.get('tipo_feedback')
+        
+        if timestamp_str:
+            try:
+                timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                data_str = timestamp.strftime('%Y-%m-%d')
+                total_por_data[data_str] += 1
+                
+                if tipo_feedback == 'confirmacao':
+                    confirmacoes_por_data[data_str] += 1
+                    
+            except (ValueError, AttributeError):
+                continue
+    
+    # Calcular taxa de acerto por data
+    taxa_por_data = {}
+    for data in total_por_data:
+        total = total_por_data[data]
+        confirmacoes = confirmacoes_por_data.get(data, 0)
+        taxa_por_data[data] = round((confirmacoes / total * 100), 2) if total > 0 else 0.0
+    
+    return taxa_por_data
+
+def _calcular_top_categorias(self, logs: List[Dict], limite: int = 10) -> List[Dict[str, Any]]:
+    """
+    Calcula as categorias mais classificadas.
+    
+    Args:
+        logs: Lista de logs
+        limite: Número máximo de categorias a retornar
+        
+    Returns:
+        Lista com top categorias e suas contagens
+    """
+    from collections import Counter
+    
+    categorias = []
+    for log in logs:
+        classificacao = log.get('classificacao_sugerida', {})
+        categoria = classificacao.get('categoria')
+        if categoria:
+            categorias.append(categoria)
+    
+    contador = Counter(categorias)
+    top = contador.most_common(limite)
+    
+    total = len(categorias)
+    resultado = []
+    for categoria, quantidade in top:
+        percentual = round((quantidade / total * 100), 2) if total > 0 else 0.0
+        resultado.append({
+            'categoria': categoria,
+            'quantidade': quantidade,
+            'percentual': percentual
+        })
+    
+    return resultado
+
+def _preparar_grafico_evolucao(self, classificacoes_por_data: Dict[str, int]) -> List[Dict[str, Any]]:
+        """
+        Prepara dados para gráfico de linha - evolução temporal.
+        
+        Args:
+            classificacoes_por_data: Dicionário com contagem por data
+            
+        Returns:
+            Lista de pontos para o gráfico de linha
+        """
+        # Ordenar por data
+        datas_ordenadas = sorted(classificacoes_por_data.keys())
+        
+        dados_grafico = []
+        for data in datas_ordenadas:
+            dados_grafico.append({
+                'data': data,
+                'quantidade': classificacoes_por_data[data],
+                'data_formatada': self._formatar_data_br(data)
+            })
+        
+        return dados_grafico
+    
+def _preparar_grafico_pizza(self, distribuicao_tipo: Dict[str, int]) -> List[Dict[str, Any]]:
+    """
+    Prepara dados para gráfico de pizza - distribuição por tipo.
+    
+    Args:
+        distribuicao_tipo: Dicionário com automáticas vs manuais
+        
+    Returns:
+        Lista de segmentos para o gráfico de pizza
+    """
+    total = sum(distribuicao_tipo.values())
+    
+    dados_grafico = []
+    for tipo, quantidade in distribuicao_tipo.items():
+        percentual = round((quantidade / total * 100), 1) if total > 0 else 0.0
+        
+        # Labels em português
+        label = 'Automáticas' if tipo == 'automatica' else 'Manuais'
+        cor = '#10b981' if tipo == 'automatica' else '#f59e0b'
+        
+        dados_grafico.append({
+            'tipo': tipo,
+            'label': label,
+            'quantidade': quantidade,
+            'percentual': percentual,
+            'cor': cor
+        })
+    
+    return dados_grafico
+
+def _preparar_grafico_barras(self, top_categorias: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Prepara dados para gráfico de barras - top categorias.
+    
+    Args:
+        top_categorias: Lista com categorias e quantidades
+        
+    Returns:
+        Lista formatada para gráfico de barras
+    """
+    # Os dados já estão no formato correto, apenas adicionar cores
+    cores = [
+        '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b',
+        '#14b8a6', '#6366f1', '#a855f7', '#f43f5e', '#06b6d4'
+    ]
+    
+    dados_grafico = []
+    for idx, item in enumerate(top_categorias):
+        dados_grafico.append({
+            'categoria': item['categoria'],
+            'quantidade': item['quantidade'],
+            'percentual': item['percentual'],
+            'cor': cores[idx % len(cores)]
+        })
+    
+    return dados_grafico
+
+def _preparar_grafico_taxa_acerto(self, taxa_acerto_por_data: Dict[str, float]) -> List[Dict[str, Any]]:
+    """
+    Prepara dados para gráfico de linha - taxa de acerto ao longo do tempo.
+    
+    Args:
+        taxa_acerto_por_data: Dicionário com taxa por data
+        
+    Returns:
+        Lista de pontos para o gráfico de linha
+    """
+    # Ordenar por data
+    datas_ordenadas = sorted(taxa_acerto_por_data.keys())
+    
+    dados_grafico = []
+    for data in datas_ordenadas:
+        dados_grafico.append({
+            'data': data,
+            'taxa_acerto': taxa_acerto_por_data[data],
+            'data_formatada': self._formatar_data_br(data)
+        })
+    
+    return dados_grafico
+
+def _preparar_tabela_categorias(self, logs: List[Dict]) -> List[Dict[str, Any]]:
+    """
+    Prepara dados detalhados para tabela de categorias.
+    
+    Args:
+        logs: Lista de logs
+        
+    Returns:
+        Lista com estatísticas detalhadas por categoria
+    """
+    from collections import defaultdict
+    
+    # Estruturas para agregação
+    categorias_stats = defaultdict(lambda: {
+        'total': 0,
+        'confirmacoes': 0,
+        'correcoes': 0,
+        'tempos': []
+    })
+    
+    # Processar logs
+    for log in logs:
+        classificacao = log.get('classificacao_sugerida', {})
+        categoria = classificacao.get('categoria')
+        
+        if not categoria:
+            continue
+        
+        tipo_feedback = log.get('tipo_feedback')
+        tempo = log.get('tempo_processamento_ms', 0)
+        
+        stats = categorias_stats[categoria]
+        stats['total'] += 1
+        
+        if tipo_feedback == 'confirmacao':
+            stats['confirmacoes'] += 1
+        elif tipo_feedback == 'correcao':
+            stats['correcoes'] += 1
+        
+        if tempo > 0:
+            stats['tempos'].append(tempo)
+    
+    # Calcular métricas por categoria
+    resultado = []
+    for categoria, stats in categorias_stats.items():
+        total = stats['total']
+        confirmacoes = stats['confirmacoes']
+        taxa_acerto = round((confirmacoes / total * 100), 1) if total > 0 else 0.0
+        tempo_medio = round(sum(stats['tempos']) / len(stats['tempos']), 0) if stats['tempos'] else 0.0
+        
+        resultado.append({
+            'categoria': categoria,
+            'total_classificacoes': total,
+            'confirmacoes': confirmacoes,
+            'correcoes': stats['correcoes'],
+            'taxa_acerto_percentual': taxa_acerto,
+            'tempo_medio_ms': tempo_medio
+        })
+    
+    # Ordenar por total de classificações (decrescente)
+    resultado.sort(key=lambda x: x['total_classificacoes'], reverse=True)
+    
+    return resultado
+
+def _calcular_variacao_periodo_anterior(self, valor_atual: float, periodo_inicio: datetime) -> Optional[float]:
+    """
+    Calcula variação em relação ao período anterior.
+    
+    Args:
+        valor_atual: Valor do período atual
+        periodo_inicio: Data de início do período atual
+        
+    Returns:
+        Variação percentual ou None se não houver dados anteriores
+    """
+    try:
+        # Calcular período anterior (mesma duração)
+        from datetime import timedelta
+        duracao = (datetime.now() - periodo_inicio).days
+        periodo_anterior_fim = periodo_inicio
+        periodo_anterior_inicio = periodo_inicio - timedelta(days=duracao)
+        
+        # Carregar logs do período anterior
+        logs_anteriores = self._carregar_logs_feedback_periodo(
+            periodo_anterior_inicio, 
+            periodo_anterior_fim
+        )
+        
+        if not logs_anteriores:
+            return None
+        
+        # Calcular valor do período anterior
+        total = len(logs_anteriores)
+        confirmacoes = len([log for log in logs_anteriores if log.get('tipo_feedback') == 'confirmacao'])
+        valor_anterior = (confirmacoes / total * 100) if total > 0 else 0.0
+        
+        # Calcular variação percentual
+        if valor_anterior == 0:
+            return None
+        
+        variacao = round(((valor_atual - valor_anterior) / valor_anterior * 100), 1)
+        return variacao
+        
+    except Exception as e:
+        logger.error(f"Erro ao calcular variação: {e}")
+        return None
+
+def _formatar_data_br(self, data_iso: str) -> str:
+    """
+    Formata data de YYYY-MM-DD para DD/MM/YYYY.
+    
+    Args:
+        data_iso: Data em formato ISO (YYYY-MM-DD)
+        
+    Returns:
+        Data formatada em padrão brasileiro
+    """
+    try:
+        data_obj = datetime.strptime(data_iso, '%Y-%m-%d')
+        return data_obj.strftime('%d/%m/%Y')
+    except ValueError:
+        return data_iso
+
+def _estatisticas_vazias(self) -> Dict[str, Any]:
+    """
+    Retorna estrutura de estatísticas vazia para casos de erro.
+    
+    Returns:
+        Dicionário com estrutura vazia mas válida
+    """
+    return {
+        'cards_principais': {
+            'taxa_acerto': {'valor': 0, 'unidade': '%', 'label': 'Taxa de Acerto', 'variacao': None},
+            'total_classificacoes': {'valor': 0, 'unidade': '', 'label': 'Classificações Automáticas', 'variacao': None},
+            'total_correcoes': {'valor': 0, 'unidade': '', 'label': 'Correções Manuais', 'variacao': None},
+            'tempo_medio': {'valor': 0, 'unidade': 'ms', 'label': 'Tempo Médio', 'variacao': None}
+        },
+        'estatisticas_periodo': {
+            'periodo_inicio': datetime.now().isoformat(),
+            'periodo_fim': datetime.now().isoformat(),
+            'total_dias': 0,
+            'total_classificacoes': 0,
+            'total_confirmacoes': 0,
+            'total_correcoes': 0,
+            'taxa_acerto_percentual': 0.0,
+            'tempo_medio_classificacao_ms': 0.0,
+            'classificacoes_por_dia': 0.0,
+            'classificacoes_por_data': {},
+            'taxa_acerto_por_data': {},
+            'top_10_categorias': [],
+            'distribuicao_tipo': {'automatica': 0, 'manual': 0}
+        },
+        'grafico_evolucao_temporal': [],
+        'grafico_distribuicao_tipo': [],
+        'grafico_top_categorias': [],
+        'grafico_taxa_acerto_temporal': [],
+        'tabela_categorias': [],
+        'data_geracao': datetime.now().isoformat(),
+        'filtros_aplicados': {}
+    }
+
+
+
+
+
 
 # ============================================================================
 # INSTÂNCIA GLOBAL DO CLASSIFICADOR

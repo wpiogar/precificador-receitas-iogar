@@ -86,14 +86,29 @@ def list_receitas(
     if ativo is not None:
         query = query.filter(Receita.ativo == ativo)
     
+    # DEBUG: Contar antes de aplicar paginação
+    total_antes_paginacao = query.count()
+    print("=" * 80)
+    print("📊 DEBUG LISTAGEM DE RECEITAS")
+    print(f"   Restaurante ID solicitado: {restaurante_id}")
+    print(f"   Restaurante ID do usuário: {current_user.restaurante_id}")
+    print(f"   Filtro restaurante_id final: {filtro_restaurante_id}")
+    print(f"   Total de receitas ANTES da paginação: {total_antes_paginacao}")
+    print(f"   Skip: {skip}, Limit: {limit}")
+    print("=" * 80)
+    
     # Aplicar paginação
     receitas = query.offset(skip).limit(limit).all()
     
-    # Buscar receitas básicas
-    receitas = crud_receita.get_receitas(
-        db, skip=skip, limit=limit, 
-        restaurante_id=restaurante_id, grupo=grupo, ativo=ativo
-    )
+    print("=" * 80)
+    print(f"📊 RESULTADO APÓS PAGINAÇÃO: {len(receitas)} receitas")
+    print("=" * 80)
+    
+    # Buscar receitas básicas (remover esta linha duplicada)
+    # receitas = crud_receita.get_receitas(
+    #     db, skip=skip, limit=limit, 
+    #     restaurante_id=restaurante_id, grupo=grupo, ativo=ativo
+    # )
     
     # Retornar receitas SEM calcular CMV em tempo real (performance crítica)
     receitas_com_cmv = []

@@ -1,0 +1,1370 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Food Cost System - Documentação Técnica | IOGAR</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-green: #22c55e;
+            --primary-pink: #ec4899;
+            --dark-bg: #0f172a;
+            --darker-bg: #020617;
+            --card-bg: #1e293b;
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+            --code-bg: #1e293b;
+            --gradient: linear-gradient(135deg, var(--primary-green), var(--primary-pink));
+        }
+
+        body {
+            font-family: 'Sora', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--darker-bg);
+            color: var(--text-primary);
+            line-height: 1.7;
+            overflow-x: hidden;
+        }
+
+        /* ============================================================================
+           HEADER COM GRADIENTE ANIMADO
+           ============================================================================ */
+        .hero-header {
+            position: relative;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        }
+
+        .gradient-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.3;
+            animation: float 20s infinite ease-in-out;
+        }
+
+        .gradient-orb.orb-1 {
+            width: 600px;
+            height: 600px;
+            background: var(--primary-green);
+            top: -200px;
+            left: -200px;
+            animation-delay: 0s;
+        }
+
+        .gradient-orb.orb-2 {
+            width: 500px;
+            height: 500px;
+            background: var(--primary-pink);
+            bottom: -100px;
+            right: -100px;
+            animation-delay: 5s;
+        }
+
+        .gradient-orb.orb-3 {
+            width: 400px;
+            height: 400px;
+            background: var(--primary-green);
+            top: 50%;
+            right: 20%;
+            animation-delay: 10s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(50px, -50px) scale(1.1); }
+            66% { transform: translate(-50px, 50px) scale(0.9); }
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 10;
+            text-align: center;
+            max-width: 900px;
+            padding: 2rem;
+            animation: fadeInUp 1s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .hero-badge {
+            display: inline-block;
+            padding: 0.5rem 1.5rem;
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            border-radius: 50px;
+            color: var(--primary-green);
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 2rem;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .hero-title {
+            font-size: clamp(2.5rem, 8vw, 5rem);
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: fadeInUp 1s ease-out 0.2s both;
+        }
+
+        .hero-subtitle {
+            font-size: clamp(1rem, 3vw, 1.5rem);
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            font-weight: 300;
+            animation: fadeInUp 1s ease-out 0.4s both;
+        }
+
+        .hero-meta {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 2rem;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            animation: fadeInUp 1s ease-out 0.6s both;
+        }
+
+        .hero-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .hero-meta-item::before {
+            content: "●";
+            color: var(--primary-green);
+        }
+
+        .scroll-indicator {
+            position: absolute;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateX(-50%) translateY(0); }
+            50% { transform: translateX(-50%) translateY(10px); }
+        }
+
+        .scroll-indicator svg {
+            width: 24px;
+            height: 24px;
+            stroke: var(--text-muted);
+        }
+
+        /* ============================================================================
+           NAVEGAÇÃO FIXA
+           ============================================================================ */
+        .nav-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 2rem;
+            transform: translateY(-100%);
+            transition: transform 0.3s ease;
+        }
+
+        .nav-bar.visible {
+            transform: translateY(0);
+        }
+
+        .nav-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-logo {
+            font-size: 1.25rem;
+            font-weight: 700;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary-green);
+        }
+
+        /* ============================================================================
+           CONTAINER PRINCIPAL
+           ============================================================================ */
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+        }
+
+        /* ============================================================================
+           ÍNDICE INTERATIVO
+           ============================================================================ */
+        .table-of-contents {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 4rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .table-of-contents::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--gradient);
+        }
+
+        .toc-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .toc-title::before {
+            content: '📑';
+            font-size: 2rem;
+        }
+
+        .toc-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+
+        .toc-item {
+            padding: 1rem;
+            background: rgba(34, 197, 94, 0.05);
+            border: 1px solid rgba(34, 197, 94, 0.1);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .toc-item:hover {
+            background: rgba(34, 197, 94, 0.1);
+            border-color: var(--primary-green);
+            transform: translateX(8px);
+        }
+
+        .toc-item a {
+            color: var(--text-primary);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 500;
+        }
+
+        .toc-number {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            background: var(--gradient);
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.875rem;
+            flex-shrink: 0;
+        }
+
+        /* ============================================================================
+           SEÇÕES DE CONTEÚDO
+           ============================================================================ */
+        .section {
+            margin-bottom: 6rem;
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .section-header {
+            margin-bottom: 3rem;
+            position: relative;
+        }
+
+        .section-number {
+            font-size: 5rem;
+            font-weight: 800;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            opacity: 0.3;
+            position: absolute;
+            top: -20px;
+            left: 0;
+            z-index: -1;
+        }
+
+        .section-title {
+            font-size: clamp(2rem, 5vw, 3rem);
+            font-weight: 700;
+            margin-bottom: 1rem;
+            padding-top: 2rem;
+        }
+
+        .section-subtitle {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            font-weight: 300;
+        }
+
+        /* ============================================================================
+           CARDS DE CONTEÚDO
+           ============================================================================ */
+        .content-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            transition: all 0.3s ease;
+        }
+
+        .content-card:hover {
+            border-color: var(--primary-green);
+            box-shadow: 0 8px 32px rgba(34, 197, 94, 0.1);
+        }
+
+        .card-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .card-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--gradient);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        /* ============================================================================
+           LISTAS E FEATURES
+           ============================================================================ */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .feature-item {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .feature-item:hover {
+            transform: translateY(-4px);
+            border-color: var(--primary-green);
+            box-shadow: 0 12px 32px rgba(34, 197, 94, 0.15);
+        }
+
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .feature-desc {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        /* ============================================================================
+           BLOCOS DE CÓDIGO
+           ============================================================================ */
+        .code-block {
+            background: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+            line-height: 1.6;
+        }
+
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .code-lang {
+            color: var(--primary-green);
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .code-content {
+            color: var(--text-secondary);
+        }
+
+        .code-content .keyword { color: #c678dd; }
+        .code-content .string { color: #98c379; }
+        .code-content .comment { color: #5c6370; font-style: italic; }
+        .code-content .function { color: #61afef; }
+
+        /* ============================================================================
+           TABELAS
+           ============================================================================ */
+        .data-table {
+            width: 100%;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            margin: 2rem 0;
+        }
+
+        .data-table thead {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(236, 72, 153, 0.2));
+        }
+
+        .data-table th {
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-primary);
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .data-table td {
+            padding: 1rem;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .data-table tbody tr:hover {
+            background: rgba(34, 197, 94, 0.05);
+        }
+
+        .data-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* ============================================================================
+           BADGES E TAGS
+           ============================================================================ */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-success {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--primary-green);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .badge-warning {
+            background: rgba(251, 191, 36, 0.2);
+            color: #fbbf24;
+            border: 1px solid rgba(251, 191, 36, 0.3);
+        }
+
+        .badge-info {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .badge-pink {
+            background: rgba(236, 72, 153, 0.2);
+            color: var(--primary-pink);
+            border: 1px solid rgba(236, 72, 153, 0.3);
+        }
+
+        /* ============================================================================
+           DIAGRAMAS ASCII
+           ============================================================================ */
+        .diagram-box {
+            background: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+            overflow-x: auto;
+        }
+
+        .diagram-content {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+            line-height: 1.4;
+            color: var(--text-secondary);
+            white-space: pre;
+        }
+
+        /* ============================================================================
+           ALERTAS E NOTAS
+           ============================================================================ */
+        .alert {
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin: 1.5rem 0;
+            border-left: 4px solid;
+        }
+
+        .alert-success {
+            background: rgba(34, 197, 94, 0.1);
+            border-color: var(--primary-green);
+        }
+
+        .alert-warning {
+            background: rgba(251, 191, 36, 0.1);
+            border-color: #fbbf24;
+        }
+
+        .alert-info {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: #3b82f6;
+        }
+
+        .alert-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* ============================================================================
+           FOOTER
+           ============================================================================ */
+        .footer {
+            background: var(--card-bg);
+            border-top: 1px solid var(--border-color);
+            padding: 4rem 2rem;
+            margin-top: 6rem;
+        }
+
+        .footer-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .footer-logo {
+            font-size: 2rem;
+            font-weight: 800;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 1rem;
+        }
+
+        .footer-text {
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+        }
+
+        .footer-meta {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            flex-wrap: wrap;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        /* ============================================================================
+           RESPONSIVO
+           ============================================================================ */
+        @media (max-width: 768px) {
+            .hero-title {
+                font-size: 2.5rem;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .toc-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .section-number {
+                font-size: 3rem;
+            }
+
+            .data-table {
+                font-size: 0.8rem;
+            }
+
+            .data-table th,
+            .data-table td {
+                padding: 0.75rem 0.5rem;
+            }
+        }
+
+        /* ============================================================================
+           ANIMAÇÕES DE SCROLL
+           ============================================================================ */
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.6s ease;
+        }
+
+        .reveal.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <!-- ============================================================================
+         HEADER HERO
+         ============================================================================ -->
+    <header class="hero-header">
+        <div class="gradient-orb orb-1"></div>
+        <div class="gradient-orb orb-2"></div>
+        <div class="gradient-orb orb-3"></div>
+        
+        <div class="hero-content">
+            <div class="hero-badge">Documentação Técnica</div>
+            <h1 class="hero-title">Food Cost System</h1>
+            <p class="hero-subtitle">Sistema Completo de Gestão de Custos para Restaurantes</p>
+            
+            <div class="hero-meta">
+                <div class="hero-meta-item">Versão 3.1</div>
+                <div class="hero-meta-item">Python 3.11 + React 18</div>
+                <div class="hero-meta-item">IOGAR Consultoria</div>
+                <div class="hero-meta-item">Dezembro 2025</div>
+            </div>
+        </div>
+
+        <div class="scroll-indicator">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+            </svg>
+        </div>
+    </header>
+
+    <!-- ============================================================================
+         NAVEGAÇÃO FIXA
+         ============================================================================ -->
+    <nav class="nav-bar" id="navbar">
+        <div class="nav-content">
+            <div class="nav-logo">Food Cost System</div>
+            <ul class="nav-links">
+                <li><a href="#visao-geral">Visão Geral</a></li>
+                <li><a href="#arquitetura">Arquitetura</a></li>
+                <li><a href="#stack">Stack</a></li>
+                <li><a href="#modulos">Módulos</a></li>
+                <li><a href="#instalacao">Instalação</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- ============================================================================
+         CONTAINER PRINCIPAL
+         ============================================================================ -->
+    <main class="main-container">
+        <!-- ÍNDICE -->
+        <section class="table-of-contents reveal">
+            <h2 class="toc-title">Índice de Conteúdo</h2>
+            <div class="toc-grid">
+                <div class="toc-item">
+                    <a href="#visao-geral">
+                        <span class="toc-number">1</span>
+                        <span>Visão Geral</span>
+                    </a>
+                </div>
+                <div class="toc-item">
+                    <a href="#objetivo">
+                        <span class="toc-number">2</span>
+                        <span>Objetivo do Projeto</span>
+                    </a>
+                </div>
+                <div class="toc-item">
+                    <a href="#arquitetura">
+                        <span class="toc-number">3</span>
+                        <span>Arquitetura do Sistema</span>
+                    </a>
+                </div>
+                <div class="toc-item">
+                    <a href="#stack">
+                        <span class="toc-number">4</span>
+                        <span>Stack Tecnológica</span>
+                    </a>
+                </div>
+                <div class="toc-item">
+                    <a href="#estrutura">
+                        <span class="toc-number">5</span>
+                        <span>Estrutura de Diretórios</span>
+                    </a>
+                </div>
+                <div class="toc-item">
+                    <a href="#banco-dados">
+                        <span class="toc-number">6</span>
+                        <span>Banco de Dados</span>
+                    </a>
+                </div>
+                <div class="toc-item">
+                    <a href="#modulos">
+                        <span class="toc-number">7</span>
+                        <span>Módulos do Sistema</span>
+                    </a>
+                </div>
+                <div class="toc-item">
+                    <a href="#api">
+                        <span class="toc-number">8</span>
+                        <span>API REST</span>
+                    </a>
+                </div>
+                <div class="toc-item">
+                    <a href="#autenticacao">
+                        <span class="toc-number">9</span>
+                        <span>Sistema de Autenticação</span>
+                    </a>
+                </div>
+                <div class="toc-item">
+                    <a href="#ia">
+                        <span class="toc-number">10</span>
+                        <span>Sistema de IA</span>
+                    </a>
+                </div>
+                <div class="toc-item">
+                    <a href="#fluxo">
+                        <span class="toc-number">11</span>
+                        <span>Fluxo Operacional</span>
+                    </a>
+                </div>
+                <div class="toc-item">
+                    <a href="#instalacao">
+                        <span class="toc-number">12</span>
+                        <span>Instalação</span>
+                    </a>
+                </div>
+                <div class="toc-item">
+                    <a href="#deploy">
+                        <span class="toc-number">13</span>
+                        <span>Deploy</span>
+                    </a>
+                </div>
+                <div class="toc-item">
+                    <a href="#desenvolvimento">
+                        <span class="toc-number">14</span>
+                        <span>Desenvolvimento</span>
+                    </a>
+                </div>
+                <div class="toc-item">
+                    <a href="#troubleshooting">
+                        <span class="toc-number">15</span>
+                        <span>Troubleshooting</span>
+                    </a>
+                </div>
+                <div class="toc-item">
+                    <a href="#melhorias">
+                        <span class="toc-number">16</span>
+                        <span>Melhorias Futuras</span>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- SEÇÃO 1: VISÃO GERAL -->
+        <section class="section reveal" id="visao-geral">
+            <div class="section-header">
+                <div class="section-number">01</div>
+                <h2 class="section-title">Visão Geral</h2>
+                <p class="section-subtitle">Contexto e características do Food Cost System</p>
+            </div>
+
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🎯</span>
+                    Contexto do Projeto
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                    O <strong>Food Cost System</strong> é uma solução completa de gestão de custos desenvolvida pela 
+                    <strong>IOGAR Consultoria</strong> para restaurantes e empresas de food service. O sistema permite 
+                    controle detalhado de ingredientes, receitas, fornecedores e análises de rentabilidade.
+                </p>
+            </div>
+
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <div class="feature-icon">💰</div>
+                    <div class="feature-title">Gestão de Custos</div>
+                    <div class="feature-desc">
+                        Controle completo de preços por fornecedor, cálculo automático de custos e histórico de variações
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🤖</div>
+                    <div class="feature-title">Inteligência Artificial</div>
+                    <div class="feature-desc">
+                        Classificação automática de ingredientes com NLP e sistema de aprendizado contínuo 100% gratuito
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🔐</div>
+                    <div class="feature-title">Segurança Total</div>
+                    <div class="feature-desc">
+                        JWT com refresh tokens, 5 níveis de acesso e permissões configuráveis por recurso
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">📊</div>
+                    <div class="feature-title">Relatórios Profissionais</div>
+                    <div class="feature-desc">
+                        PDFs com marca IOGAR, fichas técnicas, exportação Excel/CSV e cardápios personalizáveis
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🏢</div>
+                    <div class="feature-title">Multi-Tenancy</div>
+                    <div class="feature-desc">
+                        Suporte a múltiplos restaurantes com isolamento de dados e compartilhamento opcional
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">📈</div>
+                    <div class="feature-title">Receitas Hierárquicas</div>
+                    <div class="feature-desc">
+                        Receitas processadas como ingredientes, cálculo em cascata e mise en place automatizado
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SEÇÃO 2: OBJETIVO -->
+        <section class="section reveal" id="objetivo">
+            <div class="section-header">
+                <div class="section-number">02</div>
+                <h2 class="section-title">Objetivo do Projeto</h2>
+                <p class="section-subtitle">Problema, solução e benefícios esperados</p>
+            </div>
+
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">⚠️</span>
+                    Problema de Negócio
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Restaurantes enfrentam desafios críticos na gestão de custos:
+                </p>
+                <ul style="color: var(--text-secondary); margin-left: 1.5rem; line-height: 2;">
+                    <li>Descontrole de variação de preços sem rastreamento</li>
+                    <li>Cálculos manuais em planilhas Excel sem automação</li>
+                    <li>Falta de visão sobre custos reais de cada prato</li>
+                    <li>Dificuldade em comparar e negociar com fornecedores</li>
+                    <li>Desperdício por falta de controle de yield e perdas</li>
+                    <li>Precificação sem embasamento técnico adequado</li>
+                </ul>
+            </div>
+
+            <div class="alert alert-success">
+                <div class="alert-title">💡 Solução Proposta</div>
+                <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                    O Food Cost System resolve através de: <strong>automação completa de cálculos</strong>, 
+                    <strong>classificação inteligente com IA</strong>, <strong>importação em massa via Excel</strong>, 
+                    <strong>base única centralizada</strong> e <strong>relatórios profissionais prontos</strong>.
+                </p>
+            </div>
+
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <div class="feature-icon">🍽️</div>
+                    <div class="feature-title">Para o Restaurante</div>
+                    <div class="feature-desc">
+                        Redução de custos em 15-20%, aumento de margem e decisões baseadas em dados reais
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">👨‍💼</div>
+                    <div class="feature-title">Para o Consultor</div>
+                    <div class="feature-desc">
+                        Ferramenta profissional, ganho de 70% em produtividade e base compartilhada de conhecimento
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SEÇÃO 3: ARQUITETURA -->
+        <section class="section reveal" id="arquitetura">
+            <div class="section-header">
+                <div class="section-number">03</div>
+                <h2 class="section-title">Arquitetura do Sistema</h2>
+                <p class="section-subtitle">Estrutura em três camadas e padrões de projeto</p>
+            </div>
+
+            <div class="diagram-box">
+                <div class="diagram-content">┌─────────────────────────────────────────┐
+│    CAMADA DE APRESENTAÇÃO               │
+│  React 18 + TypeScript + Tailwind       │
+│  - SPA com routing                      │
+│  - State management local               │
+│  - Axios para HTTP                      │
+└─────────────────────────────────────────┘
+              │ HTTPS / REST API
+              ▼
+┌─────────────────────────────────────────┐
+│    CAMADA DE APLICAÇÃO                  │
+│  FastAPI + Python 3.11                  │
+│  - Endpoints REST                       │
+│  - Autenticação JWT                     │
+│  - Validação Pydantic                   │
+│  - Sistema de IA (spaCy)                │
+└─────────────────────────────────────────┘
+              │ SQLAlchemy ORM
+              ▼
+┌─────────────────────────────────────────┐
+│    CAMADA DE PERSISTÊNCIA               │
+│  PostgreSQL 15 + Redis 7                │
+│  - Dados principais                     │
+│  - Cache e sessões                      │
+└─────────────────────────────────────────┘</div>
+            </div>
+
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🏗️</span>
+                    Design Patterns Utilizados
+                </h3>
+                <div style="color: var(--text-secondary);">
+                    <p style="margin-bottom: 1rem;"><strong>Repository Pattern (crud/)</strong> - Abstração de acesso a dados, facilita testes e separa lógica de negócio do banco</p>
+                    <p style="margin-bottom: 1rem;"><strong>Service Layer Pattern (services/)</strong> - Lógica de negócio centralizada, reutilização entre endpoints e orquestração de operações complexas</p>
+                    <p style="margin-bottom: 1rem;"><strong>Dependency Injection</strong> - FastAPI dependency injection system, injeção de sessões de banco e usuário atual</p>
+                    <p><strong>DTO Pattern (schemas/)</strong> - Validação automática com Pydantic, serialização/deserialização e documentação automática da API</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- SEÇÃO 4: STACK TECNOLÓGICA -->
+        <section class="section reveal" id="stack">
+            <div class="section-header">
+                <div class="section-number">04</div>
+                <h2 class="section-title">Stack Tecnológica</h2>
+                <p class="section-subtitle">Tecnologias e versões utilizadas no projeto</p>
+            </div>
+
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🐍</span>
+                    Backend
+                </h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Tecnologia</th>
+                            <th>Versão</th>
+                            <th>Uso</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-success">Python</span></td>
+                            <td>3.11</td>
+                            <td>Linguagem principal</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">FastAPI</span></td>
+                            <td>0.104+</td>
+                            <td>Framework web</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">SQLAlchemy</span></td>
+                            <td>2.0+</td>
+                            <td>ORM</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">Alembic</span></td>
+                            <td>1.12+</td>
+                            <td>Migrations</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">PostgreSQL</span></td>
+                            <td>15</td>
+                            <td>Banco de dados</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-warning">Redis</span></td>
+                            <td>7</td>
+                            <td>Cache e sessões</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-pink">spaCy</span></td>
+                            <td>3.7+</td>
+                            <td>NLP/IA</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">⚛️</span>
+                    Frontend
+                </h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Tecnologia</th>
+                            <th>Versão</th>
+                            <th>Uso</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-info">React</span></td>
+                            <td>18.2</td>
+                            <td>Library UI</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">TypeScript</span></td>
+                            <td>5.2</td>
+                            <td>Type safety</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-pink">Vite</span></td>
+                            <td>5.0</td>
+                            <td>Build tool</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">Tailwind CSS</span></td>
+                            <td>3.3</td>
+                            <td>Styling</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-warning">Axios</span></td>
+                            <td>1.6</td>
+                            <td>HTTP client</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- SEÇÃO 5: ESTRUTURA DE DIRETÓRIOS -->
+        <section class="section reveal" id="estrutura">
+            <div class="section-header">
+                <div class="section-number">05</div>
+                <h2 class="section-title">Estrutura de Diretórios</h2>
+                <p class="section-subtitle">Organização de arquivos e pastas do projeto</p>
+            </div>
+
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-lang">Estrutura Backend</span>
+                </div>
+                <div class="code-content">backend/
+├── alembic/                 # Migrations
+│   └── versions/            # Arquivos de migration
+├── app/
+│   ├── main.py              # ⭐ Entry point
+│   ├── database.py          # Conexão DB
+│   ├── api/
+│   │   ├── deps.py          # Dependências globais
+│   │   └── endpoints/       # Controllers REST
+│   ├── models/              # Entidades SQLAlchemy
+│   ├── schemas/             # DTOs Pydantic
+│   ├── crud/                # Data Access Layer
+│   ├── services/            # Lógica de negócio
+│   ├── ai/                  # Sistema de IA
+│   ├── core/                # Infraestrutura
+│   └── utils/               # Utilitários
+├── uploads/                 # Arquivos temporários
+├── Dockerfile
+└── requirements.txt</div>
+            </div>
+
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-lang">Estrutura Frontend</span>
+                </div>
+                <div class="code-content">frontend/
+├── public/                  # Assets estáticos
+├── src/
+│   ├── App.tsx              # ⭐ Componente principal (9070+ linhas)
+│   ├── main.tsx             # Entry point
+│   ├── config.ts            # Configurações
+│   ├── api-service.ts       # Cliente HTTP
+│   ├── components/          # Componentes reutilizáveis
+│   ├── types/               # TypeScript types
+│   └── utils/               # Funções auxiliares
+├── Dockerfile
+├── nginx.conf
+└── package.json</div>
+            </div>
+        </section>
+
+        <!-- Continua com mais seções... -->
+        
+        <!-- SEÇÃO 12: INSTALAÇÃO -->
+        <section class="section reveal" id="instalacao">
+            <div class="section-header">
+                <div class="section-number">12</div>
+                <h2 class="section-title">Instalação e Configuração</h2>
+                <p class="section-subtitle">Guia completo para rodar o sistema localmente</p>
+            </div>
+
+            <div class="alert alert-info">
+                <div class="alert-title">📋 Pré-requisitos</div>
+                <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                    Antes de começar, certifique-se de ter: <strong>Docker Desktop</strong>, <strong>Git</strong> e 
+                    <strong>VS Code</strong> (recomendado) instalados no seu sistema.
+                </p>
+            </div>
+
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">1️⃣</span>
+                    Passo 1: Clonar Repositório
+                </h3>
+                <div class="code-block">
+                    <div class="code-content"><span class="comment"># Clone o projeto</span>
+git clone https://github.com/iogar/food-cost-system.git
+cd food-cost-system</div>
+                </div>
+            </div>
+
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">2️⃣</span>
+                    Passo 2: Configurar Variáveis
+                </h3>
+                <div class="code-block">
+                    <div class="code-content"><span class="comment"># Copiar template</span>
+cp .env.example .env
+
+<span class="comment"># Editar .env (IMPORTANTE: alterar senhas!)</span>
+DATABASE_URL=postgresql://postgres:senha@db:5432/foodcost_db
+SECRET_KEY=gerar_chave_segura_aqui
+ALLOWED_ORIGINS=http://localhost,http://localhost:3000</div>
+                </div>
+            </div>
+
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">3️⃣</span>
+                    Passo 3: Iniciar Sistema
+                </h3>
+                <div class="code-block">
+                    <div class="code-content"><span class="comment"># Iniciar containers</span>
+docker-compose up -d
+
+<span class="comment"># Verificar status</span>
+docker-compose ps
+
+<span class="comment"># Ver logs</span>
+docker-compose logs -f</div>
+                </div>
+            </div>
+
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🌐</span>
+                    Acessar o Sistema
+                </h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Serviço</th>
+                            <th>URL</th>
+                            <th>Descrição</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-success">Frontend</span></td>
+                            <td>http://localhost</td>
+                            <td>Interface principal</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">Backend API</span></td>
+                            <td>http://localhost:8000</td>
+                            <td>API REST</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-pink">Swagger</span></td>
+                            <td>http://localhost:8000/docs</td>
+                            <td>Documentação API</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-warning">PostgreSQL</span></td>
+                            <td>localhost:5432</td>
+                            <td>Banco de dados</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="alert alert-success">
+                <div class="alert-title">🎉 Login Padrão</div>
+                <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                    <strong>Usuário:</strong> admin<br>
+                    <strong>Senha:</strong> admin123
+                </p>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ============================================================================
+         FOOTER
+         ============================================================================ -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-logo">Food Cost System</div>
+            <p class="footer-text">Sistema Completo de Gestão de Custos para Restaurantes</p>
+            <div class="footer-meta">
+                <span>Versão 3.1</span>
+                <span>IOGAR Consultoria</span>
+                <span>Desenvolvido por Will</span>
+                <span>Dezembro 2025</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- ============================================================================
+         SCRIPTS
+         ============================================================================ -->
+    <script>
+        // Navbar aparece ao fazer scroll
+        window.addEventListener('scroll', () => {
+            const navbar = document.getElementById('navbar');
+            if (window.scrollY > 100) {
+                navbar.classList.add('visible');
+            } else {
+                navbar.classList.remove('visible');
+            }
+        });
+
+        // Animações de reveal ao fazer scroll
+        const reveals = document.querySelectorAll('.reveal');
+        
+        const revealObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('active');
+                }
+            });
+        }, {
+            threshold: 0.1
+        });
+
+        reveals.forEach(reveal => {
+            revealObserver.observe(reveal);
+        });
+
+        // Smooth scroll para links internos
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

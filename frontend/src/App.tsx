@@ -8959,11 +8959,6 @@ const Receitas = React.memo(() => {
       if (response.data) {
         console.log('✅ Entrando no bloco de sucesso');
         
-        // Recarregar receitas do restaurante atual
-        console.log('🔄 Recarregando receitas do restaurante:', selectedRestaurante.id);
-        await fetchReceitasByRestaurante(selectedRestaurante.id);
-        console.log('✅ Receitas recarregadas!');
-        
         // ===================================================================================================
         // LIMPEZA DO FORMULARIO APENAS EM CASO DE SUCESSO
         // Os dados do formulario sao limpos somente quando a operacao e bem-sucedida

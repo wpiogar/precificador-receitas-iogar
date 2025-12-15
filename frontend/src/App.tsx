@@ -3133,50 +3133,6 @@ const fetchInsumos = async (searchTerm?: string) => {
     }
   }, [selectedRestaurante]);
 
-  // Busca receitas de um restaurante específico
-  const fetchReceitas = useCallback(async () => {
-    if (!selectedRestaurante || !selectedRestaurante.id) {
-      console.log('⚠️  selectedRestaurante inválido');
-      setReceitas([]);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      
-      const restauranteId = Number(selectedRestaurante.id);
-      
-      console.log('✅ Buscando receitas:');
-      console.log('   Restaurante:', selectedRestaurante.nome);
-      console.log('   ID:', restauranteId);
-      
-      const response = await apiService.getReceitas(restauranteId);
-      
-      console.log('📦 Resposta da API:', response);
-      
-      if (response.data) {
-        // VALIDAÇÃO: Só atualizar se ainda for o mesmo restaurante
-        if (selectedRestaurante.id === restauranteId) {
-          setReceitas(response.data);
-          console.log(`✅ ${response.data.length} receitas carregadas`);
-        } else {
-          console.log('⚠️  Restaurante mudou durante a requisição, ignorando resposta');
-        }
-        
-      } else {
-        console.error('❌ Erro ao buscar receitas:', response.error);
-        setReceitas([]);
-        showErrorPopup('Erro de Conexão', 'Falha na conexão com o servidor ao buscar receitas.');
-      }
-    } catch (error) {
-      console.error('❌ Exceção ao buscar receitas:', error);
-      setReceitas([]);
-      showErrorPopup('Erro de Conexão', 'Falha na conexão com o servidor ao buscar receitas.');
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedRestaurante]);
-
   // ===================================================================================================
   // FUNÇÃO: BUSCAR DETALHES COMPLETOS DOS INSUMOS DE UMA RECEITA
   // ===================================================================================================

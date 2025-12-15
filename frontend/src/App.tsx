@@ -3326,29 +3326,56 @@ const fetchInsumos = async (searchTerm?: string) => {
    initializeApp();
   }, []); // IMPORTANTE: Array vazio para executar apenas uma vez
 
-  // Efeito específico para recarregar dados ao trocar restaurante
+  // UseEffect para carregar dados quando restaurante mudar
   useEffect(() => {
     const carregarDadosRestaurante = async () => {
-      if (selectedRestaurante && selectedRestaurante.id) {
-        console.log('🔄 Trocando para restaurante:', selectedRestaurante.nome, '(ID:', selectedRestaurante.id, ')');
+      // Validação: se não tem restaurante, limpar tudo e sair
+      if (!selectedRestaurante?.id) {
+        console.log('⏭️  Nenhum restaurante selecionado, limpando dados');
+        setReceitas([]);
+        setInsumos([]);
+        return;
+      }
+      
+      console.log('🔄 Carregando dados do restaurante:', selectedRestaurante.nome, '(ID:', selectedRestaurante.id, ')');
+      
+      try {
+        setLoading(true);
         
-        // Limpar dados antigos imediatamente
+        // CRÍTICO: Limpar dados do restaurante anterior IMEDIATAMENTE
         setReceitas([]);
         setInsumos([]);
         
-        // Aguardar um pouco para garantir limpeza
-        await new Promise(resolve => setTimeout(resolve, 50));
+        // Pequena pausa para garantir que a UI foi atualizada
+        await new Promise(resolve => setTimeout(resolve, 100));
         
-        // Carregar novos dados
+        // Carregar dados do novo restaurante
+        console.log('📡 Buscando receitas...');
         await fetchReceitas();
+        
+        console.log('📡 Buscando insumos...');
         await fetchInsumos();
         
-        console.log('✅ Dados do restaurante carregados');
+        console.log('✅ Dados do restaurante carregados com sucesso');
+        
+      } catch (error) {
+        console.error('❌ Erro ao carregar dados do restaurante:', error);
+        
+        // Em caso de erro, garantir que os dados estão limpos
+        setReceitas([]);
+        setInsumos([]);
+        
+        showErrorPopup(
+          'Erro ao Carregar Dados',
+          'Não foi possível carregar os dados do restaurante. Tente novamente.'
+        );
+      } finally {
+        setLoading(false);
       }
     };
     
     carregarDadosRestaurante();
-  }, [selectedRestaurante?.id]); // ← Importante: dependência no ID
+  }, [selectedRestaurante?.id]); // ← Dependência apenas no ID
 
   // ===================================================================================================
     // EFEITO: RECARREGAR INSUMOS AO MUDAR RESTAURANTE OU CHECKBOX DE GLOBAIS

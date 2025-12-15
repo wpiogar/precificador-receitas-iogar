@@ -578,6 +578,16 @@ async refreshAccessToken(): Promise<string | null> {
 
   // Listar todas as receitas com filtro opcional por restaurante
   async getReceitas(restauranteId?: number): Promise<ApiResponse<any[]>> {
+
+    // VALIDAÇÃO: Se não tem restauranteId, retornar erro
+    if (!restauranteId) {
+      console.error('❌ getReceitas chamado sem restauranteId!');
+      return {
+        data: [],
+        error: 'Restaurante não selecionado'
+      };
+    }
+    
     // Se restaurante_id fornecido, adicionar aos parâmetros
     const params = restauranteId ? `?restaurante_id=${restauranteId}` : '';
     

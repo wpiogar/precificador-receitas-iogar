@@ -120,6 +120,27 @@ def check_user_permission(
     if user.role.value == "ADMIN":
         return True, DataScope.TODOS
     
+    # CONSULTANT tem acesso total a todos os dados (escopo TODOS)
+    # mas ainda passa pela verificação de permissões no banco
+    # Este bypass garante que CONSULTANT possa acessar dados de todos restaurantes
+    if user.role.value == "CONSULTANT":
+        # Buscar permissões do banco para validar
+        permissions = _get_user_permissions(db, user)
+        
+        # Procurar permissão específica
+        for permission in permissions:
+            if permission['resource'] == resource.value and permission['action'] == action.value:
+                # CONSULTANT sempre tem escopo TODOS quando tem a permissão
+                return True, DataScope.TODOS
+        
+        # Verificar se tem permissão de GERENCIAR
+        for permission in permissions:
+            if permission['resource'] == resource.value and permission['action'] == ActionType.GERENCIAR.value:
+                return True, DataScope.TODOS
+        
+        # Se não encontrou permissão, negar acesso
+        return False, None
+    
     # ========================================================================
     # USUÁRIOS NÃO-ADMIN: Verificar permissões no banco de dados
     # ========================================================================

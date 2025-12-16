@@ -104,12 +104,6 @@ def list_receitas(
     print(f"📊 RESULTADO APÓS PAGINAÇÃO: {len(receitas)} receitas")
     print("=" * 80)
     
-    # Buscar receitas básicas (remover esta linha duplicada)
-    # receitas = crud_receita.get_receitas(
-    #     db, skip=skip, limit=limit, 
-    #     restaurante_id=restaurante_id, grupo=grupo, ativo=ativo
-    # )
-    
     # Retornar receitas SEM calcular CMV em tempo real (performance crítica)
     receitas_com_cmv = []
     for receita in receitas:

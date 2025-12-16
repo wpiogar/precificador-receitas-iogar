@@ -3593,9 +3593,6 @@ const fetchInsumos = async (searchTerm?: string) => {
               onChange={(e) => {
                 const restaurante = restaurantes.find(r => r.id === parseInt(e.target.value));
                 setSelectedRestaurante(restaurante || null);
-                if (restaurante) {
-                  fetchReceitasByRestaurante(restaurante.id);
-                }
               }}
               className="w-full p-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
             >

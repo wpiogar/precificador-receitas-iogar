@@ -98,8 +98,13 @@ class ApiService {
       const token = localStorage.getItem('foodcost_access_token');
       console.log('🔑 Token encontrado:', token ? 'SIM' : 'NÃO', token?.substring(0, 20) + '...'); // Ver se tem token
       
+      // Criar controller para timeout de 60 segundos (aumentado de 10s para 60s)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      
       const config = {
         ...options,
+        signal: controller.signal,
         headers: {
           ...API_CONFIG.headers,
           ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
@@ -110,6 +115,9 @@ class ApiService {
       console.log('🌐 Fazendo requisição:', { method: options.method || 'GET', url, body: options.body });
 
       const response = await fetch(url, config);
+      
+      // Limpar timeout se requisição completar antes
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         // ============================================================================
@@ -577,7 +585,7 @@ async refreshAccessToken(): Promise<string | null> {
   // ================================
 
   // Listar todas as receitas com filtro opcional por restaurante
-  async getReceitas(restauranteId?: number): Promise<ApiResponse<any[]>> {
+  async getReceitas(restauranteId?: number, skip: number = 0, limit: number = 1000): Promise<ApiResponse<any[]>> {
 
     // VALIDAÇÃO: Se não tem restauranteId, retornar erro
     if (!restauranteId) {
@@ -588,12 +596,17 @@ async refreshAccessToken(): Promise<string | null> {
       };
     }
     
-    // Se restaurante_id fornecido, adicionar aos parâmetros
-    const params = restauranteId ? `?restaurante_id=${restauranteId}` : '';
+    // Construir parâmetros de query com paginação
+    const queryParams = new URLSearchParams();
+    queryParams.append('restaurante_id', restauranteId.toString());
+    queryParams.append('skip', skip.toString());
+    queryParams.append('limit', limit.toString());
     
-    console.log('📡 API getReceitas:', `/api/v1/receitas/${params}`);
+    const url = `/api/v1/receitas?${queryParams.toString()}`;
     
-    return this.request<any[]>(`/api/v1/receitas/${params}`);
+    console.log('📡 API getReceitas:', url);
+    
+    return this.request<any[]>(url);
   }
 
   // Buscar receitas por restaurante

@@ -15,7 +15,7 @@ from datetime import datetime, date
 from pydantic import BaseModel, Field
 
 # Importar dependências
-from app.api.deps import get_db, get_admin_user
+from app.api.deps import get_db, get_admin_user, get_current_user
 from app.models.user import User
 from app.models.receita import Receita, ReceitaInsumo, Restaurante
 from app.models.insumo import Insumo
@@ -61,11 +61,11 @@ class ResultadoLimpeza(BaseModel):
 def obter_estatisticas(
     restaurante_id: Optional[int] = Query(None, description="Filtrar estatísticas por restaurante"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_admin_user)
+    current_user: User = Depends(get_current_user)
 ):
     """
     Retorna estatísticas gerais de dados no sistema.
-    Acesso: Apenas ADMIN
+    Acesso: ADMIN e CONSULTANT
     
     Parâmetros:
     - restaurante_id: Se fornecido, retorna apenas estatísticas daquele restaurante
@@ -75,13 +75,20 @@ def obter_estatisticas(
     - Usuários: mantém o admin atual
     """
     # Query base para receitas
+    # Query base para receitas
     query_receitas = db.query(func.count(Receita.id))
     query_insumos = db.query(func.count(Insumo.id))
     
     # Aplicar filtro por restaurante se fornecido
+    # CONSULTANT e ADMIN veem todos os dados, outros perfis apenas do seu restaurante
     if restaurante_id:
         query_receitas = query_receitas.filter(Receita.restaurante_id == restaurante_id)
         query_insumos = query_insumos.filter(Insumo.restaurante_id == restaurante_id)
+    elif current_user.role.value not in ["ADMIN", "CONSULTANT"]:
+        # Outros perfis (OWNER, MANAGER, OPERATOR) só veem seu restaurante
+        if current_user.restaurante_id:
+            query_receitas = query_receitas.filter(Receita.restaurante_id == current_user.restaurante_id)
+            query_insumos = query_insumos.filter(Insumo.restaurante_id == current_user.restaurante_id)
     
     # Contar registros em cada tabela
     stats = EstatisticasLimpeza(

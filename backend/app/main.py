@@ -272,7 +272,7 @@ def run_migrations_on_startup():
             print("🔄 Executando migrações do Alembic...")
             alembic_cfg = Config(str(alembic_ini))
             alembic_cfg.set_main_option("script_location", str(Path(__file__).parent.parent / "alembic"))
-            command.upgrade(alembic_cfg, "head")
+            command.upgrade(alembic_cfg, "heads")
             print("✅ Migrações concluídas!")
         
         print("=" * 80)

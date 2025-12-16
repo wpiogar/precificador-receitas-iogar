@@ -266,21 +266,20 @@ def create_receita_endpoint(
     current_user: User = Depends(get_current_user),
     data_scope = Depends(PermissionChecker(ResourceType.RECEITAS, ActionType.CRIAR))
 ):
+    """
+    Cria ou atualiza uma receita.
+    Permissoes:
+    - Requer permissao de CRIAR RECEITAS
+    - Validacoes por escopo:
+      * LOJA: so pode criar para seu restaurante
+      * REDE: pode criar para qualquer restaurante da rede
+      * TODOS: pode criar para qualquer restaurante
+    """
     # Rollback de qualquer transacao travada
     try:
         db.rollback()
     except:
         pass
-    """
-    Cria ou atualiza uma receita.
-    
-    Permissões:
-    - Requer permissão de CRIAR RECEITAS
-    - Validações por escopo:
-      * LOJA: só pode criar para seu restaurante
-      * REDE: pode criar para qualquer restaurante da rede
-      * TODOS: pode criar para qualquer restaurante
-    """
     from app.utils.permissions import can_access_resource
     from fastapi import HTTPException, status
     from app.models.permission import DataScope

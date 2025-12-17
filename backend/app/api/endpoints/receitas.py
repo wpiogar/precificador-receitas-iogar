@@ -106,48 +106,39 @@ def list_receitas(
     print("=" * 80)
     
     # Aplicar paginação
-    print(f"⚙️  Aplicando paginação: offset={skip}, limit={limit}")
+    print(f"⚙️  Aplicando paginacao: offset={skip}, limit={limit}")
+    
+    # OTIMIZACAO: Buscar com eager loading para evitar N+1 queries
+    from sqlalchemy.orm import joinedload
+    query = query.options(joinedload(Receita.receita_insumos))
+    
     try:
         receitas = query.offset(skip).limit(limit).all()
-        print(f"✅ Query executada com sucesso")
+        print(f"✅ Query executada com sucesso: {len(receitas)} receitas")
     except Exception as e:
         print(f"❌ Erro na query: {e}")
         import traceback
         traceback.print_exc()
         receitas = []
 
-    print("=" * 80)
-    print(f"📊 RESULTADO APÓS PAGINAÇÃO: {len(receitas)} receitas")
-    if len(receitas) > 0:
-        print(f"   Primeira receita: ID={receitas[0].id}, Nome={receitas[0].nome}")
-    print("=" * 80)
-    
-    # Retornar receitas SEM calcular CMV em tempo real (performance crítica)
-    receitas_com_cmv = []
+    # Retornar formato simplificado SEM processamento pesado
+    receitas_response = []
     for receita in receitas:
-        # Usar CMV já salvo no banco (calculado em background)
+        # Usar CMV ja salvo no banco
         preco_compra = (receita.cmv / 100) if receita.cmv else 0
-        
-        # Calcular CMVs com diferentes margens usando valor já salvo
-        cmv_20 = preco_compra / 0.20 if preco_compra > 0 else 0
-        cmv_25 = preco_compra / 0.25 if preco_compra > 0 else 0
-        cmv_30 = preco_compra / 0.30 if preco_compra > 0 else 0
-        
-        # Contar insumos SEM buscar do banco (usar relacionamento lazy)
-        total_insumos = len(receita.receita_insumos) if hasattr(receita, 'receita_insumos') else 0
-        
-        receitas_com_cmv.append({
+
+        receitas_response.append({
             'id': receita.id,
             'nome': receita.nome,
             'codigo': receita.codigo,
             'grupo': receita.grupo,
             'subgrupo': receita.subgrupo,
-            'responsavel': receita.responsavel if hasattr(receita, 'responsavel') else None,
+            'responsavel': getattr(receita, 'responsavel', None),
             'preco_compra': preco_compra,
             'cmv_real': preco_compra,
-            'cmv_20_porcento': cmv_20,
-            'cmv_25_porcento': cmv_25,
-            'cmv_30_porcento': cmv_30,
+            'cmv_20_porcento': preco_compra / 0.20 if preco_compra > 0 else 0,
+            'cmv_25_porcento': preco_compra / 0.25 if preco_compra > 0 else 0,
+            'cmv_30_porcento': preco_compra / 0.30 if preco_compra > 0 else 0,
             'restaurante_id': receita.restaurante_id,
             'ativo': receita.ativo,
             'created_at': receita.created_at,
@@ -160,14 +151,15 @@ def list_receitas(
             'fator': getattr(receita, 'fator', 1.0),
             'processada': getattr(receita, 'processada', False),
             'rendimento': float(receita.rendimento) if receita.rendimento else 0,
-            'total_insumos': total_insumos,
-            'insumos_processados': 0,  # Calcular depois se necessário
+            'total_insumos': len(receita.receita_insumos),
+            'insumos_processados': 0,
             'tem_insumos_sem_preco': receita.tem_insumos_sem_preco,
             'insumos_pendentes': receita.insumos_pendentes,
-            'receita_insumos': []  # NÃO carregar insumos na listagem
+            'receita_insumos': []
         })
        
-    return receitas_com_cmv
+    print(f"📊 Retornando {len(receitas_response)} receitas")
+    return receitas_response
 
 # ===================================================================================================
 # FUNÇÃO AUXILIAR PARA CALCULAR CUSTO DA RECEITA

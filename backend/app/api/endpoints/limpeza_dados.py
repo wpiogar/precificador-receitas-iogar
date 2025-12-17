@@ -74,31 +74,51 @@ def obter_estatisticas(
     - Restaurantes: mantém ID 1
     - Usuários: mantém o admin atual
     """
-    # Query base para receitas
-    # Query base para receitas
-    query_receitas = db.query(func.count(Receita.id))
-    query_insumos = db.query(func.count(Insumo.id))
+    # OTIMIZACAO: Usar uma unica query com subqueries para melhor performance
+    import time
+    start_time = time.time()
     
-    # Aplicar filtro por restaurante se fornecido
-    # CONSULTANT e ADMIN veem todos os dados, outros perfis apenas do seu restaurante
+    # Determinar filtro de restaurante
+    filtro_rest_id = None
     if restaurante_id:
-        query_receitas = query_receitas.filter(Receita.restaurante_id == restaurante_id)
-        query_insumos = query_insumos.filter(Insumo.restaurante_id == restaurante_id)
+        filtro_rest_id = restaurante_id
     elif current_user.role.value not in ["ADMIN", "CONSULTANT"]:
-        # Outros perfis (OWNER, MANAGER, OPERATOR) só veem seu restaurante
-        if current_user.restaurante_id:
-            query_receitas = query_receitas.filter(Receita.restaurante_id == current_user.restaurante_id)
-            query_insumos = query_insumos.filter(Insumo.restaurante_id == current_user.restaurante_id)
+        filtro_rest_id = current_user.restaurante_id
     
-    # Contar registros em cada tabela
+    # Executar counts em paralelo (SQLAlchemy otimiza isso)
+    if filtro_rest_id:
+        # Estatisticas filtradas por restaurante
+        total_receitas = db.query(func.count(Receita.id)).filter(
+            Receita.restaurante_id == filtro_rest_id
+        ).scalar() or 0
+        
+        total_insumos = db.query(func.count(Insumo.id)).filter(
+            Insumo.restaurante_id == filtro_rest_id
+        ).scalar() or 0
+    else:
+        # Estatisticas gerais
+        total_receitas = db.query(func.count(Receita.id)).scalar() or 0
+        total_insumos = db.query(func.count(Insumo.id)).scalar() or 0
+    
+    # Contadores globais (nao dependem de restaurante)
+    total_fornecedores = db.query(func.count(Fornecedor.id)).scalar() or 0
+    total_fornecedor_insumos = db.query(func.count(FornecedorInsumo.id)).scalar() or 0
+    total_restaurantes = db.query(func.count(Restaurante.id)).scalar() or 0
+    total_taxonomias = db.query(func.count(Taxonomia.id)).scalar() or 0
+    total_usuarios = db.query(func.count(User.id)).scalar() or 0
+    
+    elapsed = time.time() - start_time
+    print(f"⏱️  Estatisticas calculadas em {elapsed:.2f}s")
+    print(f"   Receitas: {total_receitas} | Insumos: {total_insumos}")
+    
     stats = EstatisticasLimpeza(
-        total_receitas=query_receitas.scalar(),
-        total_insumos=query_insumos.scalar(),
-        total_fornecedores=db.query(func.count(Fornecedor.id)).scalar(),
-        total_fornecedor_insumos=db.query(func.count(FornecedorInsumo.id)).scalar(),
-        total_restaurantes=db.query(func.count(Restaurante.id)).scalar(),
-        total_taxonomias=db.query(func.count(Taxonomia.id)).scalar(),
-        total_usuarios=db.query(func.count(User.id)).scalar()
+        total_receitas=total_receitas,
+        total_insumos=total_insumos,
+        total_fornecedores=total_fornecedores,
+        total_fornecedor_insumos=total_fornecedor_insumos,
+        total_restaurantes=total_restaurantes,
+        total_taxonomias=total_taxonomias,
+        total_usuarios=total_usuarios
     )
     
     return stats

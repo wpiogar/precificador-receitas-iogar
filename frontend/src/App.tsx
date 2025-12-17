@@ -96,6 +96,7 @@ interface Insumo {
   unidade: string;
   preco_compra_real: number;
   fator: number;
+  operacao_fator: string; // 'MULTIPLICAR' ou 'DIVIDIR'
   codigo?: string;
   grupo?: string;     
   subgrupo?: string;  
@@ -256,6 +257,7 @@ const [formData, setFormData] = useState(() => {
     unidade: editingInsumo?.unidade || 'kg',
     quantidade: editingInsumo?.quantidade || 1,
     fator: editingInsumo?.fator || 1.0,
+    operacao_fator: editingInsumo?.operacao_fator || 'MULTIPLICAR',
     subgrupo: editingInsumo?.subgrupo || '',
     grupo: editingInsumo?.grupo || '',
     descricao: editingInsumo?.descricao || '',
@@ -832,6 +834,24 @@ const resetForm = useCallback(() => {
                   />
                   <p className="text-xs text-gray-600 mt-1">
                     💡 <strong>Exemplo:</strong> 0.75 para 750ml, 50 para caixa com 50 unidades
+                  </p>
+                </div>
+
+                {/* Campo Operação do Fator */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Operação do Fator <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.operacao_fator || 'MULTIPLICAR'}
+                    onChange={(e) => updateField('operacao_fator', e.target.value)}
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none transition-colors bg-white"
+                  >
+                    <option value="MULTIPLICAR">Multiplicar</option>
+                    <option value="DIVIDIR">Dividir</option>
+                  </select>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Define se o fator multiplica ou divide no cálculo do preço unitário.
                   </p>
                 </div>
 
@@ -2320,6 +2340,8 @@ const CIDADES_POR_ESTADO: Record<string, string[]> = {
     unidade: 'kg',
     preco_compra_real: 0,
     quantidade: 1,
+    fator: 1.0,
+    operacao_fator: 'MULTIPLICAR',
     grupo: 'Geral',
     subgrupo: 'Geral'
   }));
@@ -9305,7 +9327,8 @@ Receitas.displayName = 'Receitas';
       unidade: 'kg',
       preco_compra_real: 0,
       quantidade: 1,
-      fator: 1.0
+      fator: 1.0,
+      operacao_fator: 'MULTIPLICAR'
     });
 
     const [showPopupFornecedor, setShowPopupFornecedor] = useState(false);
@@ -10807,6 +10830,24 @@ const cancelarExclusao = () => {
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     Padrão: 1.0. Usado para cálculo de preço unitário.
+                  </p>
+                </div>
+
+                {/* Campo Operação do Fator */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Operação do Fator
+                  </label>
+                  <select
+                    value={novoInsumo.operacao_fator || 'MULTIPLICAR'}
+                    onChange={(e) => setNovoInsumo({...novoInsumo, operacao_fator: e.target.value})}
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none transition-colors bg-white"
+                  >
+                    <option value="MULTIPLICAR">Multiplicar</option>
+                    <option value="DIVIDIR">Dividir</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Define se o fator multiplica ou divide no cálculo do preço unitário.
                   </p>
                 </div>
 

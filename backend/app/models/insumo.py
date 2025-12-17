@@ -5,7 +5,7 @@
 #   Autor: Will - Empresa: IOGAR
 #   ===================================================================================================
 
-from sqlalchemy import Column, Float, ForeignKey, Integer, Boolean, UniqueConstraint
+from sqlalchemy import Column, Float, ForeignKey, Integer, Boolean, String, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
 
@@ -46,6 +46,22 @@ class Insumo(BaseModel):
         default=1.0,
         nullable=True,
         comment="Fator multiplicador para cálculo de preço unitário (default: 1.0)"
+    )
+
+    # ========================================================================
+    # CAMPO OPERACAO_FATOR - Define se fator multiplica ou divide
+    # ========================================================================
+    # Campo para definir a operação do fator no cálculo de quantidade total
+    # Valores aceitos: 'MULTIPLICAR' ou 'DIVIDIR'
+    # Valor padrão: 'MULTIPLICAR' (comportamento original)
+    # 
+    # MULTIPLICAR: quantidade_total = quantidade × fator
+    # DIVIDIR: quantidade_total = quantidade ÷ fator
+    operacao_fator = Column(
+        String(15),
+        default='MULTIPLICAR',
+        nullable=False,
+        comment="Operação do fator: MULTIPLICAR ou DIVIDIR (default: MULTIPLICAR)"
     )
 
     #   ===================================================================================================
@@ -214,15 +230,27 @@ class Insumo(BaseModel):
     @property
     def preco_unitario_real(self) -> float:
         """
-        Calcula o preço unitário real considerando o fator.
+        Calcula o preço unitário real considerando o fator e operação (multiplicar ou dividir).
         
-        Fórmula: Preço Unitário = (Preço de Compra Total) / (Quantidade × Fator)
+        Fórmulas:
+        - MULTIPLICAR: Preço Unitário = (Preço Total) / (Quantidade × Fator)
+        - DIVIDIR: Preço Unitário = (Preço Total) / (Quantidade ÷ Fator)
         
-        Exemplo:
+        Exemplos:
+        
+        MULTIPLICAR (padrão):
         - Compra: 3 caixas de Nori por R$ 150,00
         - Cada caixa tem 50 folhas (fator = 50)
+        - operacao_fator = 'MULTIPLICAR'
         - Total de unidades: 3 × 50 = 150 folhas
         - Preço unitário: R$ 150,00 / 150 = R$ 1,00 por folha
+        
+        DIVIDIR:
+        - Compra: 10 litros de óleo por R$ 100,00
+        - Quer preço por 100ml (fator = 10 para dividir 1L em 10 partes de 100ml)
+        - operacao_fator = 'DIVIDIR'
+        - Total de unidades: 10 ÷ 10 = 1 unidade base
+        - Preço unitário: R$ 100,00 / 1 = R$ 100,00 por unidade base
         
         Returns:
             float: Preço unitário real por unidade base
@@ -236,8 +264,20 @@ class Insumo(BaseModel):
         # Converter preço de centavos para reais
         preco_real = float(self.preco_compra) / 100.0
         
-        # Calcular preço unitário: Preço Total / (Quantidade × Fator)
-        quantidade_total = float(self.quantidade) * fator_usado
+        # ========================================================================
+        # CALCULAR QUANTIDADE TOTAL BASEADO NA OPERAÇÃO DO FATOR
+        # ========================================================================
+        operacao = getattr(self, 'operacao_fator', 'MULTIPLICAR') or 'MULTIPLICAR'
+        
+        if operacao == 'DIVIDIR':
+            # Dividir a quantidade pelo fator
+            # Exemplo: 10 litros ÷ fator(10) = 1 unidade base
+            quantidade_total = float(self.quantidade) / fator_usado
+        else:
+            # MULTIPLICAR (comportamento padrão/original)
+            # Multiplicar a quantidade pelo fator
+            # Exemplo: 3 caixas × fator(50) = 150 unidades
+            quantidade_total = float(self.quantidade) * fator_usado
         
         if quantidade_total <= 0:
             return 0.0

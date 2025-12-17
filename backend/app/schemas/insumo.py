@@ -21,6 +21,9 @@ class InsumoBase(BaseModel):
     
     CAMPO FATOR: Reativado para cálculo correto de preço unitário.
     Exemplo: Compra 3 caixas com 50 unidades cada = quantidade: 3, fator: 50
+    
+    CAMPO OPERACAO_FATOR: Define se o fator multiplica ou divide a quantidade.
+    Valores: 'MULTIPLICAR' (padrão) ou 'DIVIDIR'
     """
     grupo: Optional[str] = Field(default="", max_length=100, description="Grupo de insumo (legado)")
     subgrupo: Optional[str] = Field(default="", max_length=100, description="Subgrupo do insumo (legado)")
@@ -28,6 +31,10 @@ class InsumoBase(BaseModel):
     nome: str = Field(..., min_length=1, max_length=255, description="Nome do produto")
     quantidade: int = Field(default=1, ge=1, description="Quantidade padrão")
     fator: Optional[float] = Field(default=1.0, description="Fator multiplicador para cálculo de preço unitário")
+    operacao_fator: Optional[str] = Field(
+        default='MULTIPLICAR',
+        description="Operação do fator no cálculo: MULTIPLICAR ou DIVIDIR"
+    )
     unidade: str = Field(..., description="Unidade de medida")
     preco_compra_real: Optional[float] = Field(None, ge=0, description="Preço de compra em reais")
     valor_compra_por_kg: Optional[float] = Field(None, ge=0, description="Valor de compra por Kg", example=85.0)
@@ -131,6 +138,39 @@ class InsumoBase(BaseModel):
         fator_arredondado = round(float(v), 4)
         print(f"✅ VALIDADOR FATOR - Valor final: {fator_arredondado}")
         return fator_arredondado
+    
+    @field_validator('operacao_fator', mode='before')
+    @classmethod
+    def validar_operacao_fator(cls, v):
+        """
+        Valida se a operação do fator é válida.
+        
+        Regras:
+        - Deve ser 'MULTIPLICAR' ou 'DIVIDIR'
+        - Valor padrão: 'MULTIPLICAR'
+        - Case-insensitive (converte para uppercase)
+        
+        Exemplos:
+        - 'multiplicar' -> 'MULTIPLICAR'
+        - 'Dividir' -> 'DIVIDIR'
+        - None -> 'MULTIPLICAR'
+        """
+        # Se None ou vazio, retornar padrão
+        if v is None or (isinstance(v, str) and v.strip() == ''):
+            return 'MULTIPLICAR'
+        
+        # Converter para uppercase e remover espaços
+        v_upper = str(v).strip().upper()
+        
+        # Validar valores aceitos
+        valores_validos = ['MULTIPLICAR', 'DIVIDIR']
+        if v_upper not in valores_validos:
+            raise ValueError(
+                f"Operação do fator inválida: '{v}'. "
+                f"Valores aceitos: {', '.join(valores_validos)}"
+            )
+        
+        return v_upper
     
     @field_validator('codigo', mode='before')
     @classmethod

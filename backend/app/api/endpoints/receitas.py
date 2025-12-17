@@ -106,10 +106,20 @@ def list_receitas(
     print("=" * 80)
     
     # Aplicar paginação
-    receitas = query.offset(skip).limit(limit).all()
-    
+    print(f"⚙️  Aplicando paginação: offset={skip}, limit={limit}")
+    try:
+        receitas = query.offset(skip).limit(limit).all()
+        print(f"✅ Query executada com sucesso")
+    except Exception as e:
+        print(f"❌ Erro na query: {e}")
+        import traceback
+        traceback.print_exc()
+        receitas = []
+
     print("=" * 80)
     print(f"📊 RESULTADO APÓS PAGINAÇÃO: {len(receitas)} receitas")
+    if len(receitas) > 0:
+        print(f"   Primeira receita: ID={receitas[0].id}, Nome={receitas[0].nome}")
     print("=" * 80)
     
     # Retornar receitas SEM calcular CMV em tempo real (performance crítica)

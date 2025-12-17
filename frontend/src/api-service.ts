@@ -602,7 +602,7 @@ async refreshAccessToken(): Promise<string | null> {
     queryParams.append('skip', skip.toString());
     queryParams.append('limit', limit.toString());
     
-    const url = `/api/v1/receitas?${queryParams.toString()}`;
+    const url = `/api/v1/receitas/list?${queryParams.toString()}`;
     
     console.log('📡 API getReceitas:', url);
     

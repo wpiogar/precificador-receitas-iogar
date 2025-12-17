@@ -37,6 +37,14 @@ router = APIRouter()
 # ENDPOINTS RECEITAS (FUNCIONALIDADE PRINCIPAL)
 # ===================================================================
 
+# Endpoint de teste temporario para diagnostico
+@router.get("/test", summary="Teste de conectividade")
+def test_endpoint():
+    """
+    Endpoint de teste sem autenticacao
+    """
+    return {"status": "ok", "message": "Endpoint de receitas funcionando"}
+
 @router.get("/", summary="Listar receitas")
 def list_receitas(
     skip: int = Query(0, ge=0, description="Pular N registros"),

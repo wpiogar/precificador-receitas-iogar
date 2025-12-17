@@ -45,7 +45,7 @@ def test_endpoint():
     """
     return {"status": "ok", "message": "Endpoint de receitas funcionando"}
 
-@router.get("/", summary="Listar receitas")
+@router.get("/list", summary="Listar receitas")
 def list_receitas(
     skip: int = Query(0, ge=0, description="Pular N registros"),
     limit: int = Query(1000, ge=1, le=5000, description="Limite de registros"),  # Aumentado de 100 para 1000, máximo 5000

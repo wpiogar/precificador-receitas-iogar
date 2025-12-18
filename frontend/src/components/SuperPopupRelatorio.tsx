@@ -632,15 +632,74 @@ const calcularCustoPorPorcao = () => {
     if (!receita) return null;
 
     // ===================================================================================================
+    // DEBUG: VERIFICAR DADOS RECEBIDOS
+    // ===================================================================================================
+    console.log('🔍 TabInsumos - Receita completa:', receita);
+    console.log('🔍 TabInsumos - receita.receita_insumos:', receita.receita_insumos);
+    console.log('🔍 TabInsumos - receita.total_insumos:', receita.total_insumos);
+
+    // ===================================================================================================
+    // CARREGAR INSUMOS DA API SE NÃO ESTIVEREM PRESENTES
+    // ===================================================================================================
+    const [insumosCarregados, setInsumosCarregados] = React.useState<any[]>([]);
+    const [carregando, setCarregando] = React.useState(false);
+
+    React.useEffect(() => {
+      const carregarInsumos = async () => {
+        if (!receita.receita_insumos || receita.receita_insumos.length === 0) {
+          console.log('⚠️ receita_insumos vazio, buscando da API...');
+          setCarregando(true);
+          
+          try {
+            const token = localStorage.getItem('foodcost_access_token');
+            const response = await fetch(`${API_BASE_URL}/api/v1/receitas/${receita.id}`, {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              console.log('✅ Dados completos da receita:', data);
+              setInsumosCarregados(data.receita_insumos || []);
+            }
+          } catch (error) {
+            console.error('❌ Erro ao carregar insumos:', error);
+          } finally {
+            setCarregando(false);
+          }
+        } else {
+          setInsumosCarregados(receita.receita_insumos);
+        }
+      };
+      
+      carregarInsumos();
+    }, [receita.id]);
+
+    // ===================================================================================================
     // SEPARAR INSUMOS NORMAIS DE RECEITAS PROCESSADAS
     // ===================================================================================================
-    const insumosNormais = receita.receita_insumos?.filter(ri => 
+    const insumosNormais = insumosCarregados.filter(ri => 
       ri.insumo && !ri.receita_processada_id
-    ) || [];
+    );
     
-    const receitasProcessadas = receita.receita_insumos?.filter(ri => 
+    const receitasProcessadas = insumosCarregados.filter(ri => 
       ri.receita_processada_id
-    ) || [];
+    );
+
+    // ===================================================================================================
+    // MOSTRAR LOADING ENQUANTO CARREGA
+    // ===================================================================================================
+    if (carregando) {
+      return (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600">Carregando insumos...</p>
+          </div>
+        </div>
+      );
+    }
 
     // ===================================================================================================
     // DEBUG TEMPORÁRIO: Verificar estrutura dos dados

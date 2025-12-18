@@ -248,22 +248,52 @@ async def processar_importacao_receitas(
 
                 print(f"✅ Receita criada com ID: {nova_receita.id}")
 
+                # LOG: Debug completo dos insumos recebidos
+                print("=" * 80)
+                print(f"🔍 DEBUG - INSUMOS RECEBIDOS PARA RECEITA: {receita_data['nome']}")
+                print(f"   Total de insumos no array: {len(receita_data.get('insumos', []))}")
+                for idx, insumo_data in enumerate(receita_data.get("insumos", [])):
+                    print(f"   Insumo {idx + 1}:")
+                    print(f"     - Nome: {insumo_data.get('nome', 'N/A')}")
+                    print(f"     - Código: {insumo_data.get('codigo', 'N/A')}")
+                    print(f"     - ID Matched: {insumo_data.get('insumo_id', 'N/A')}")
+                    print(f"     - Tipo Match: {insumo_data.get('tipo_match', 'N/A')}")
+                    print(f"     - Quantidade: {insumo_data.get('quantidade', 'N/A')} {insumo_data.get('unidade', 'N/A')}")
+                print("=" * 80)
+
+                # VERIFICAÇÃO CRÍTICA: Garantir que receita_data["insumos"] existe e não está vazio
+                if "insumos" not in receita_data:
+                    print(f"❌ ERRO CRÍTICO: Campo 'insumos' não existe em receita_data!")
+                    print(f"   Campos disponíveis: {list(receita_data.keys())}")
+                    receita_data["insumos"] = []
+                elif not receita_data["insumos"]:
+                    print(f"⚠️ AVISO: Campo 'insumos' está vazio para receita {receita_data['nome']}")
+                else:
+                    print(f"✅ Campo 'insumos' existe e contém {len(receita_data['insumos'])} item(ns)")
+
                 # Vincular insumos à receita
                 insumos_vinculados = 0
+                insumos_ignorados = 0
                 if "insumos" in receita_data and receita_data["insumos"]:
                     from app.models.receita import ReceitaInsumo
                     
                     for insumo_data in receita_data["insumos"]:
-                        receita_insumo = ReceitaInsumo(
-                            receita_id=nova_receita.id,
-                            insumo_id=insumo_data["insumo_id"],
-                            quantidade_necessaria=insumo_data["quantidade"],
-                            unidade_medida=insumo_data["unidade"]
-                        )
-                        db.add(receita_insumo)
-                        insumos_vinculados += 1
+                        # Verificar se insumo_id é válido (não None)
+                        if insumo_data.get("insumo_id") is not None:
+                            receita_insumo = ReceitaInsumo(
+                                receita_id=nova_receita.id,
+                                insumo_id=insumo_data["insumo_id"],
+                                quantidade_necessaria=insumo_data["quantidade"],
+                                unidade_medida=insumo_data["unidade"]
+                            )
+                            db.add(receita_insumo)
+                            insumos_vinculados += 1
+                            print(f"  ✅ Insumo vinculado: {insumo_data.get('nome', 'sem nome')} (ID: {insumo_data['insumo_id']})")
+                        else:
+                            insumos_ignorados += 1
+                            print(f"  ⚠️ Insumo não encontrado, ignorado: {insumo_data.get('nome', 'sem nome')}")
                     
-                    print(f"✅ {insumos_vinculados} insumos vinculados")
+                    print(f"✅ {insumos_vinculados} insumos vinculados, {insumos_ignorados} ignorados (não encontrados)")
 
                 db.commit()
                 

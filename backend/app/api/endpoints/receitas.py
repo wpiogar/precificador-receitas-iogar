@@ -108,9 +108,13 @@ def list_receitas(
     # Aplicar paginação
     print(f"⚙️  Aplicando paginacao: offset={skip}, limit={limit}")
     
-    # OTIMIZACAO: Buscar com eager loading para evitar N+1 queries
+    # OTIMIZACAO: Buscar com eager loading para evitar N+1 queries  
     from sqlalchemy.orm import joinedload
-    query = query.options(joinedload(Receita.receita_insumos))
+    from app.models.receita import ReceitaInsumo
+    query = query.options(
+        joinedload(Receita.receita_insumos).joinedload(ReceitaInsumo.insumo),
+        joinedload(Receita.receita_insumos).joinedload(ReceitaInsumo.receita_processada)
+    )
     
     try:
         receitas = query.offset(skip).limit(limit).all()
@@ -155,7 +159,28 @@ def list_receitas(
             'insumos_processados': 0,
             'tem_insumos_sem_preco': receita.tem_insumos_sem_preco,
             'insumos_pendentes': receita.insumos_pendentes,
-            'receita_insumos': []
+            'receita_insumos': [
+                {
+                    'id': ri.id,
+                    'insumo_id': ri.insumo_id,
+                    'quantidade_necessaria': ri.quantidade_necessaria,
+                    'unidade_medida': ri.unidade_medida,
+                    'custo_calculado': ri.custo_calculado,
+                    'receita_processada_id': ri.receita_processada_id,
+                    'insumo': {
+                        'id': ri.insumo.id,
+                        'nome': ri.insumo.nome,
+                        'unidade': ri.insumo.unidade,
+                        'preco_compra_real': ri.insumo.preco_compra_real
+                    } if ri.insumo else None,
+                    'receita_processada': {
+                        'id': ri.receita_processada.id,
+                        'nome': ri.receita_processada.nome,
+                        'unidade': ri.receita_processada.unidade
+                    } if ri.receita_processada else None
+                }
+                for ri in (receita.receita_insumos or [])
+            ]
         })
        
     print(f"📊 Retornando {len(receitas_response)} receitas")

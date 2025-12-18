@@ -121,12 +121,14 @@ class ReceitaImportService:
                     "insumos": [
                         {
                             "insumo_id": ins.insumo_id_matched,
+                            "codigo": ins.codigo,
                             "nome": ins.nome,
                             "quantidade": ins.quantidade,
                             "unidade": ins.unidade,
                             "custo": ins.custo,
                             "valor": ins.valor,
-                            "tipo_match": ins.tipo_match
+                            "tipo_match": ins.tipo_match,
+                            "score_similaridade": ins.score_similaridade
                         }
                         for ins in receita.insumos
                     ]

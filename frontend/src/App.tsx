@@ -261,7 +261,7 @@ const [formData, setFormData] = useState(() => {
     subgrupo: editingInsumo?.subgrupo || '',
     grupo: editingInsumo?.grupo || '',
     descricao: editingInsumo?.descricao || '',
-    preco_compra_total: editingInsumo?.preco_compra_real || 0,  // Usar o valor direto, SEM multiplicar
+    preco_compra_total: editingInsumo?.preco_compra_real || 0,
     preco_compra_real: 0,
     eh_fornecedor_anonimo: editingInsumo?.eh_fornecedor_anonimo !== undefined ? editingInsumo.eh_fornecedor_anonimo : true,
     fornecedor_insumo_id: editingInsumo?.fornecedor_insumo_id || null
@@ -270,6 +270,39 @@ const [formData, setFormData] = useState(() => {
   console.log('🔄 FormData INICIALIZADO com:', initialData);
   return initialData;
 });
+
+// Estado para o preço calculado
+const [precoCalculado, setPrecoCalculado] = useState('0.00');
+
+// useEffect para recalcular quando formData mudar
+useEffect(() => {
+  if (!formData.preco_compra_total || !formData.quantidade || formData.quantidade <= 0) {
+    setPrecoCalculado('0.00');
+    return;
+  }
+  
+  const fator = parseFloat(formData.fator) || 1.0;
+  const operacao = formData.operacao_fator || 'MULTIPLICAR';
+
+  let precoUnitarioReal;
+  if (operacao === 'DIVIDIR') {
+    // DIVIDIR: (Preço Total ÷ Fator) ÷ Quantidade
+    precoUnitarioReal = (formData.preco_compra_total / fator) / formData.quantidade;
+  } else {
+    // MULTIPLICAR: (Preço Total × Fator) ÷ Quantidade
+    precoUnitarioReal = (formData.preco_compra_total * fator) / formData.quantidade;
+  }
+
+  console.log('💰 RECALCULANDO PREÇO:', {
+    preco_total: formData.preco_compra_total,
+    quantidade: formData.quantidade,
+    fator: fator,
+    operacao: operacao,
+    resultado: precoUnitarioReal.toFixed(2)
+  });
+
+  setPrecoCalculado(precoUnitarioReal.toFixed(2));
+}, [formData.preco_compra_total, formData.quantidade, formData.fator, formData.operacao_fator]);
 
 // Flag de Carregamento Específica
 const [loadingRestauranteData, setLoadingRestauranteData] = useState(false);
@@ -290,8 +323,13 @@ const [restauranteSelecionado, setRestauranteSelecionado] = useState(() => {
   // 🔧 FUNÇÃO OTIMIZADA para atualizar campos
   const updateField = useCallback((field, value) => {
     console.log(`🔄 Atualizando campo ${field}:`, value);
-    setFormData(prev => ({ ...prev, [field]: value }));
-  }, []);
+    console.log('🔍 FormData ANTES:', formData);
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value };
+      console.log('✅ FormData DEPOIS:', updated);
+      return updated;
+    });
+  }, [formData]);
 
   // 🔧 FUNÇÃO OTIMIZADA para controle de fornecedor anônimo
   const handleFornecedorAnonimoChange = useCallback((checked) => {
@@ -1038,25 +1076,25 @@ const resetForm = useCallback(() => {
                   </div>
                   <div className="text-center">
                     <p className="text-3xl font-bold text-green-600 mb-2">
-                      R$ {(() => {
-                        if (!formData.preco_compra_total || !formData.quantidade || formData.quantidade <= 0) {
-                          return '0.00';
-                        }
-                        
-                        // Obter fator (padrão 1.0 se não informado)
-                        const fator = parseFloat(formData.fator) || 1.0;
-                        
-                        // Cálculo correto: Preço Total ÷ (Quantidade × Fator)
-                        const precoUnitarioReal = formData.preco_compra_total / (formData.quantidade * fator);
-                        
-                        return precoUnitarioReal.toFixed(2);
-                      })()}
+                      R$ {precoCalculado}
                     </p>
                     <p className="text-sm text-gray-600">
-                      R$ {(formData.preco_compra_total || 0).toFixed(2)} ÷ ({formData.quantidade || 1} × {parseFloat(formData.fator) || 1}) = R$ {
-                        formData.preco_compra_total && formData.quantidade && formData.quantidade > 0 ?
-                        (formData.preco_compra_total / (formData.quantidade * (parseFloat(formData.fator) || 1))).toFixed(2) :
-                        '0.00'
+                      R$ {(formData.preco_compra_total || 0).toFixed(2)} ÷ {formData.quantidade || 1} {formData.operacao_fator === 'DIVIDIR' ? '÷' : '×'} {parseFloat(formData.fator) || 1} = R$ {
+                        formData.preco_compra_total && formData.quantidade && formData.quantidade > 0 ? (() => {
+                          const fator = parseFloat(formData.fator) || 1;
+                          const operacao = formData.operacao_fator || 'MULTIPLICAR';
+                          
+                          let precoUnitario;
+                          if (operacao === 'DIVIDIR') {
+                            // DIVIDIR: Preço Total ÷ Quantidade ÷ Fator
+                            precoUnitario = (formData.preco_compra_total / formData.quantidade) / fator;
+                          } else {
+                            // MULTIPLICAR: Preço Total ÷ (Quantidade × Fator)
+                            precoUnitario = formData.preco_compra_total / (formData.quantidade * fator);
+                          }
+                          
+                          return precoUnitario.toFixed(2);
+                        })() : '0.00'
                       }/unidade
                     </p>
                   </div>
@@ -5990,6 +6028,7 @@ const fetchInsumos = async (searchTerm?: string) => {
         preco_unitario: dadosInsumo.preco_compra_total || dadosInsumo.preco_compra_real || null,
         quantidade: dadosInsumo.quantidade || 0,
         fator: parseFloat(dadosInsumo.fator) || 1.0,
+        operacao_fator: dadosInsumo.operacao_fator || 'MULTIPLICAR',
           
           // CRITICAL: Garantir que restaurante_id seja um número válido
           // Prioridade: 1) dadosInsumo.restaurante_id, 2) selectedRestaurante
@@ -6713,12 +6752,23 @@ const fetchInsumos = async (searchTerm?: string) => {
                           R$ {insumo.tipo_origem === 'fornecedor' 
                             ? insumo.preco_compra_real?.toFixed(2) || '0.00'
                             : (() => {
-                                // Calcular preço unitário: (Preço Total ÷ Quantidade) ÷ Fator
+                                // Calcular preço unitário considerando operação do fator
                                 if (!insumo.preco_compra_real || !insumo.quantidade || insumo.quantidade <= 0) {
                                   return '0.00';
                                 }
+                                
                                 const fator = parseFloat(insumo.fator) || 1.0;
-                                const precoUnitario = insumo.preco_compra_real / (insumo.quantidade * fator);
+                                const operacao = insumo.operacao_fator || 'MULTIPLICAR';
+                                
+                                let precoUnitario;
+                                if (operacao === 'DIVIDIR') {
+                                  // DIVIDIR: Preço Total ÷ Quantidade ÷ Fator
+                                  precoUnitario = (insumo.preco_compra_real / insumo.quantidade) / fator;
+                                } else {
+                                  // MULTIPLICAR: Preço Total ÷ (Quantidade × Fator)
+                                  precoUnitario = insumo.preco_compra_real / (insumo.quantidade * fator);
+                                }
+                                
                                 return precoUnitario.toFixed(2);
                               })()
                           }
@@ -6847,12 +6897,23 @@ const fetchInsumos = async (searchTerm?: string) => {
                           R$ {insumo.tipo_origem === 'fornecedor' 
                             ? insumo.preco_compra_real?.toFixed(2) || '0.00'
                             : (() => {
-                                // Calcular preço unitário: (Preço Total ÷ Quantidade) ÷ Fator
+                                // Calcular preço unitário considerando operação do fator
                                 if (!insumo.preco_compra_real || !insumo.quantidade || insumo.quantidade <= 0) {
                                   return '0.00';
                                 }
+                                
                                 const fator = parseFloat(insumo.fator) || 1.0;
-                                const precoUnitario = insumo.preco_compra_real / (insumo.quantidade * fator);
+                                const operacao = insumo.operacao_fator || 'MULTIPLICAR';
+                                
+                                let precoUnitario;
+                                if (operacao === 'DIVIDIR') {
+                                  // DIVIDIR: Preço Total ÷ Quantidade ÷ Fator
+                                  precoUnitario = (insumo.preco_compra_real / insumo.quantidade) / fator;
+                                } else {
+                                  // MULTIPLICAR: Preço Total ÷ (Quantidade × Fator)
+                                  precoUnitario = insumo.preco_compra_real / (insumo.quantidade * fator);
+                                }
+                                
                                 return precoUnitario.toFixed(2);
                               })()
                           }
@@ -7105,8 +7166,19 @@ const fetchInsumos = async (searchTerm?: string) => {
                             if (!insumo.preco_compra_real || !insumo.quantidade || insumo.quantidade <= 0) {
                               return '0,00';
                             }
+                            
                             const fator = parseFloat(insumo.fator) || 1.0;
-                            const precoUnitario = insumo.preco_compra_real / (insumo.quantidade * fator);
+                            const operacao = insumo.operacao_fator || 'MULTIPLICAR';
+                            
+                            let precoUnitario;
+                            if (operacao === 'DIVIDIR') {
+                              // DIVIDIR: Preço Total ÷ Quantidade ÷ Fator
+                              precoUnitario = (insumo.preco_compra_real / insumo.quantidade) / fator;
+                            } else {
+                              // MULTIPLICAR: Preço Total ÷ (Quantidade × Fator)
+                              precoUnitario = insumo.preco_compra_real / (insumo.quantidade * fator);
+                            }
+                            
                             return precoUnitario.toFixed(2);
                           })()
                       }
@@ -10860,8 +10932,20 @@ const cancelarExclusao = () => {
                 <div className="col-span-2 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <h5 className="font-medium text-blue-800 mb-2">Valor unitário</h5>
                   <div className="text-xl font-bold text-blue-800">
-                    R$ {novoInsumo.quantidade > 0 ? 
-                      (novoInsumo.preco_compra_real / novoInsumo.quantidade).toFixed(2) : '0.00'} por unidade
+                    R$ {novoInsumo.quantidade > 0 ? (() => {
+                      const fator = parseFloat(novoInsumo.fator) || 1;
+                      const operacao = novoInsumo.operacao_fator || 'MULTIPLICAR';
+                      
+                      let precoUnitario;
+                      if (operacao === 'DIVIDIR') {
+                        // DIVIDIR: Preço Total ÷ Quantidade ÷ Fator
+                        precoUnitario = (novoInsumo.preco_compra_total / novoInsumo.quantidade) / fator;
+                      } else {
+                        // MULTIPLICAR: Preço Total ÷ (Quantidade × Fator)
+                        precoUnitario = novoInsumo.preco_compra_total / (novoInsumo.quantidade * fator);
+                      }
+                      return precoUnitario.toFixed(2);
+                    })() : '0.00'}/unidade
                   </div>
                 </div>
 

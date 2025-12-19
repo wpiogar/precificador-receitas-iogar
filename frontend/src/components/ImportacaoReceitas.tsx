@@ -432,6 +432,11 @@ const ImportacaoReceitas: React.FC<ImportacaoReceitasProps> = ({
                     </div>
                     <div className="mt-2 text-sm text-gray-600">
                       {receita.total_insumos} insumos | Custo: R$ {receita.custo_total.toFixed(2)}
+                      {receita.insumos_nao_encontrados > 0 && (
+                        <span className="ml-2 text-xs text-orange-600 font-medium">
+                          ({receita.insumos_nao_encontrados} não encontrado{receita.insumos_nao_encontrados > 1 ? 's' : ''})
+                        </span>
+                      )}
                     </div>
                   </div>
                   <CheckCircle className="h-5 w-5 text-green-600" />
@@ -474,9 +479,17 @@ const ImportacaoReceitas: React.FC<ImportacaoReceitasProps> = ({
                       <div className="mt-2 text-sm text-orange-800">
                         {receita.insumos_nao_encontrados} insumo(s) não encontrado(s):
                         <ul className="mt-1 ml-4 list-disc">
-                          {receita.insumos.map((insumo, idx) => (
-                            <li key={idx}>
-                              {insumo.nome} ({insumo.quantidade} {insumo.unidade})
+                          {receita.insumos
+                            .filter((insumo: InsumoReceitaPreview) => insumo.tipo_match === 'NAO_ENCONTRADO')
+                            .map((insumo, idx) => (
+                            <li key={idx} className="text-orange-700">
+                              <span className="font-medium">{insumo.nome}</span>
+                              <span className="text-orange-600 ml-1">
+                                ({insumo.quantidade} {insumo.unidade})
+                              </span>
+                              <span className="text-xs text-orange-500 ml-2">
+                                - não encontrado no sistema
+                              </span>
                             </li>
                           ))}
                         </ul>

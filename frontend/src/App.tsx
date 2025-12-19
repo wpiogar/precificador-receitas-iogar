@@ -2517,6 +2517,7 @@ console.log('🌐 API Base URL:', API_BASE);
   // Busca todos os insumos do backend
 const fetchInsumos = async (searchTerm?: string) => {
   console.log('>>> fetchInsumos CHAMADO com searchTerm:', searchTerm);
+  console.log('>>> STACK TRACE:', new Error().stack);
   
   try {
     setLoading(true);
@@ -2551,9 +2552,11 @@ const fetchInsumos = async (searchTerm?: string) => {
     // ========================================================================
     // ADICIONAR BUSCA POR NOME OU CÓDIGO
     // ========================================================================
-    if (searchTerm && searchTerm.trim()) {
-      params.nome = searchTerm.trim();
-      params.codigo = searchTerm.trim();
+    // Usar searchTermInsumos do estado se searchTerm não for fornecido
+    const termoBusca = searchTerm !== undefined ? searchTerm : searchTermInsumos;
+    
+    if (termoBusca && termoBusca.trim()) {
+      params.nome = termoBusca.trim();
     }
 
     console.log('🔍 Buscando insumos com parâmetros (paginação server-side):', params);
@@ -3318,7 +3321,6 @@ const fetchInsumos = async (searchTerm?: string) => {
         const connected = await apiService.testConnection();
         if (connected) {
           console.log('✅ API conectada com sucesso!');
-          await fetchInsumos();
           await fetchRestaurantes();
           // NÃO carregar receitas aqui - será carregado quando selecionar restaurante
           await carregarFornecedoresDisponiveis();
@@ -3366,13 +3368,11 @@ const fetchInsumos = async (searchTerm?: string) => {
         await new Promise(resolve => setTimeout(resolve, 100));
         
         // Carregar dados do novo restaurante
-        console.log('📡 Buscando receitas...');
+        console.log('Buscando receitas...');
         await fetchReceitas();
-        
-        console.log('📡 Buscando insumos...');
-        await fetchInsumos();
-        
-        console.log('✅ Dados do restaurante carregados com sucesso');
+        console.log('Buscando insumos...');
+        await fetchInsumos('');
+        console.log('Dados do restaurante carregados com sucesso');
         
       } catch (error) {
         console.error('❌ Erro ao carregar dados do restaurante:', error);
@@ -3391,106 +3391,30 @@ const fetchInsumos = async (searchTerm?: string) => {
     };
     
     carregarDadosRestaurante();
-  }, [selectedRestaurante?.id]); // ← Dependência apenas no ID
+  }, [selectedRestaurante?.id]); // <- Dependencia apenas no ID
 
-  // ===================================================================================================
-    // EFEITO: RECARREGAR INSUMOS AO MUDAR RESTAURANTE OU CHECKBOX DE GLOBAIS
-    // ===================================================================================================
-    useEffect(() => {
-      console.log('=== useEffect selectedRestaurante DISPAROU ===');
-      console.log('selectedRestaurante:', selectedRestaurante);
-      console.log('selectedRestaurante?.id:', selectedRestaurante?.id);
-      console.log('activeTab:', activeTab);
-      
-      if (selectedRestaurante?.id) {
-        console.log('Condicao atendida - Buscando insumos do restaurante:', selectedRestaurante.nome);
-        // Resetar pagina para 1 ao trocar de restaurante
-        setPaginaAtualInsumos(1);
-        // Limpar termo de busca ao trocar de restaurante
-        setSearchTermInsumos('');
-        // Buscar insumos do novo restaurante
-        fetchInsumos('');
-      } else {
-        console.log('Condicao NAO atendida - selectedRestaurante?.id e falsy');
-      }
-    }, [selectedRestaurante?.id, incluirInsumosGlobais]);
-
-  // ===================================================================================================
+  // ============================================================================
   // EFEITO: BUSCAR INSUMOS QUANDO TERMO DE BUSCA OU PAGINA MUDAR
-  // ===================================================================================================
+  // ============================================================================
+  // Este useEffect e responsavel por disparar a busca quando:
+  // 1. O usuario digita algo no campo de busca (searchTermInsumos muda)
+  // 2. O usuario clica em um botao de paginacao (paginaAtualInsumos muda)
+  // Importante: So executa se estiver na aba de insumos e tiver restaurante selecionado
   useEffect(() => {
-    if (activeTab === 'insumos' && selectedRestaurante?.id) {
-      fetchInsumos(searchTermInsumos);
+    // Evitar execucao se nao estiver na aba de insumos ou sem restaurante
+    if (activeTab !== 'insumos' || !selectedRestaurante?.id) {
+      return;
     }
+    
+    fetchInsumos(searchTermInsumos);
   }, [searchTermInsumos, paginaAtualInsumos]);
 
-  // Carregar estatísticas quando um restaurante é selecionado na aba restaurantes
-  // useEffect(() => {
-  //   if (selectedRestaurante && activeTab === 'restaurantes') {
-  //     carregarEstatisticasRestaurante(selectedRestaurante.id);
-  //   }
-  // }, [selectedRestaurante, activeTab]);
-
-  // ✨ NOVO: Recarregar dados ao trocar de aba - ADICIONAR AQUI
-  useEffect(() => {
-    const recarregarDadosDaAba = async () => {
-      console.log(`🔄 Recarregando dados da aba: ${activeTab}`);
-      
-      try {
-        switch (activeTab) {
-          case 'insumos':
-            await fetchInsumos(searchTermInsumos);
-            console.log('Insumos recarregados');
-            break;
-            
-          case 'receitas':
-            // fetchReceitas será chamado pelo useEffect específico do componente Receitas
-            console.log('✅ Aba receitas ativada - carregamento será feito pelo componente');
-            break;
-            
-          case 'restaurantes':
-            await fetchRestaurantes();
-            console.log('✅ Restaurantes recarregados');
-            break;
-            
-          case 'dashboard':
-            // Recarregar todos os dados para o dashboard
-            await Promise.all([
-              fetchInsumos(searchTermInsumos),
-              fetchReceitas(),
-              fetchRestaurantes()
-            ]);
-            console.log('Dashboard recarregado');
-            break;
-
-          case 'settings':
-            // Carregar usuários quando acessar a aba de usuários em configurações
-            if (activeConfigTab === 'usuarios') {
-              await fetchUsuarios();
-              console.log('✅ Usuários recarregados');
-            }
-            break;
-            
-          default:
-            console.log(`ℹ️ Aba ${activeTab} não precisa de recarregamento`);
-        }
-      } catch (error) {
-        console.error('❌ Erro ao recarregar dados da aba:', error);
-      }
-    };
-
-    // Só recarregar se não for o carregamento inicial
-    if (activeTab && activeTab !== 'dashboard') {
-      recarregarDadosDaAba();
-    }
-  }, [activeTab]);
-
   // ============================================================================
-  // EFEITO: CARREGAR USUÁRIOS AO ACESSAR ABA DE USUÁRIOS
+  // EFEITO: CARREGAR USUARIOS AO ACESSAR ABA DE USUARIOS
   // ============================================================================
 
   useEffect(() => {
-    // Carregar usuários quando acessar a sub-aba de usuários em configurações
+    // Carregar usuarios quando acessar a sub-aba de usuarios em configuracoes
     if (activeTab === 'settings' && activeConfigTab === 'usuarios') {
       fetchUsuarios();
     }
@@ -5986,11 +5910,14 @@ const fetchInsumos = async (searchTerm?: string) => {
     // ============================================================================
     // CALLBACK PARA BUSCA DE INSUMOS (NOME OU CODIGO) - SERVER-SIDE
     // ============================================================================
+    // Atualiza o termo de busca e reseta paginacao
+    // O useEffect que observa searchTermInsumos e paginaAtualInsumos
+    // sera responsavel por chamar fetchInsumos automaticamente
     const handleSearchChange = useCallback((term: string) => {
       setSearchTermInsumos(term);
-      // Resetar para primeira pagina ao buscar
       setPaginaAtualInsumos(1);
-    }, [setSearchTermInsumos, setPaginaAtualInsumos]);
+      // NAO chamar fetchInsumos aqui - o useEffect cuida disso
+    }, []);
     
     // ============================================================================
     // PAGINACAO SERVER-SIDE - DADOS JA VEM FILTRADOS DO BACKEND
@@ -6558,7 +6485,11 @@ const fetchInsumos = async (searchTerm?: string) => {
                   {/* Mobile - Botões Anterior/Próxima */}
                   <div className="flex flex-1 justify-between sm:hidden">
                     <button
-                      onClick={() => setPaginaAtualInsumos(Math.max(1, paginaAtualInsumos - 1))}
+                      onClick={() => {
+                        const novaPagina = Math.max(1, paginaAtualInsumos - 1);
+                        setPaginaAtualInsumos(novaPagina);
+                        // NAO chamar fetchInsumos aqui - o useEffect cuida disso
+                      }}
                       disabled={paginaAtualInsumos === 1}
                       className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -6568,7 +6499,11 @@ const fetchInsumos = async (searchTerm?: string) => {
                       {paginaAtualInsumos} / {totalPaginasInsumos}
                     </span>
                     <button
-                      onClick={() => setPaginaAtualInsumos(Math.min(totalPaginasInsumos, paginaAtualInsumos + 1))}
+                      onClick={() => {
+                        const novaPagina = Math.min(totalPaginasInsumos, paginaAtualInsumos + 1);
+                        setPaginaAtualInsumos(novaPagina);
+                        // NAO chamar fetchInsumos aqui - o useEffect cuida disso
+                      }}
                       disabled={paginaAtualInsumos === totalPaginasInsumos}
                       className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -6619,7 +6554,10 @@ const fetchInsumos = async (searchTerm?: string) => {
                             paginas.push(
                               <button
                                 key={1}
-                                onClick={() => setPaginaAtualInsumos(1)}
+                                onClick={() => {
+                                  setPaginaAtualInsumos(1);
+                                  // NAO chamar fetchInsumos aqui - o useEffect cuida disso
+                                }}
                                 className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
                               >
                                 1
@@ -6634,12 +6572,15 @@ const fetchInsumos = async (searchTerm?: string) => {
                             }
                           }
                           
-                          // Páginas do meio
+                          // Paginas do meio
                           for (let i = paginaInicio; i <= paginaFim; i++) {
                             paginas.push(
                               <button
                                 key={i}
-                                onClick={() => setPaginaAtualInsumos(i)}
+                                onClick={() => {
+                                  setPaginaAtualInsumos(i);
+                                  // NAO chamar fetchInsumos aqui - o useEffect cuida disso
+                                }}
                                 className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
                                   paginaAtualInsumos === i
                                     ? 'z-10 bg-green-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600'
@@ -6663,7 +6604,10 @@ const fetchInsumos = async (searchTerm?: string) => {
                             paginas.push(
                               <button
                                 key={totalPaginasInsumos}
-                                onClick={() => setPaginaAtualInsumos(totalPaginasInsumos)}
+                                onClick={() => {
+                                  setPaginaAtualInsumos(totalPaginasInsumos);
+                                  // NAO chamar fetchInsumos aqui - o useEffect cuida disso
+                                }}
                                 className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
                               >
                                 {totalPaginasInsumos}
@@ -7398,7 +7342,7 @@ const fetchInsumos = async (searchTerm?: string) => {
     //   showUnidadeForm || 
     //   deleteRestauranteConfirm.isOpen
     // );
-        
+
     // Calcular índices para paginação
     const indexUltimoRestaurante = paginaAtual * restaurantesPorPagina;
     const indexPrimeiroRestaurante = indexUltimoRestaurante - restaurantesPorPagina;

@@ -810,7 +810,7 @@
                     </a>
                 </div>
                 <div class="toc-item">
-                    <a href="#api">
+                    <a href="#api-rest">
                         <span class="toc-number">8</span>
                         <span>API REST</span>
                     </a>
@@ -1193,8 +1193,3733 @@
             </div>
         </section>
 
-        <!-- Continua com mais seções... -->
+
+        <!-- ============================================================================
+             SEÇÃO 06: BANCO DE DADOS
+             ============================================================================ -->
+        <section class="section reveal active" id="banco-dados">
+            <div class="section-header">
+                <div class="section-number">06</div>
+                <h2 class="section-title">Banco de Dados</h2>
+                <p class="section-subtitle">Estrutura completa do PostgreSQL com relacionamentos e constraints</p>
+            </div>
+
+            <div class="alert alert-info">
+                <div class="alert-title">🗄️ PostgreSQL 15</div>
+                <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                    O sistema utiliza PostgreSQL 15 como banco de dados principal, com suporte a JSON, UUID e extensões avançadas.
+                    Todas as migrations são gerenciadas via Alembic para garantir versionamento e consistência.
+                </p>
+            </div>
+
+            <!-- Diagrama de Relacionamentos -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">📊</span>
+                    Diagrama de Relacionamentos (ER)
+                </h3>
+                <div class="diagram-box">
+                    <div class="diagram-content">
+┌─────────────────┐       ┌──────────────────┐       ┌─────────────────┐
+│     USERS       │       │  RESTAURANTES    │       │    INSUMOS      │
+├─────────────────┤       ├──────────────────┤       ├─────────────────┤
+│ id (PK)         │───┐   │ id (PK)          │   ┌───│ id (PK)         │
+│ username        │   │   │ nome             │   │   │ codigo_insumo   │
+│ email           │   │   │ cnpj             │   │   │ descricao       │
+│ password_hash   │   │   │ responsavel      │   │   │ unidade         │
+│ role (ENUM)     │   │   │ telefone         │   │   │ quantidade      │
+│ restaurante_id  │───┼──▶│ rede_id (FK)     │   │   │ preco_unitario  │──┐
+│ ativo           │   │   │ created_at       │   │   │ restaurante_id  │  │
+│ primeiro_acesso │   │   └──────────────────┘   │   │ taxonomia_id    │  │
+└─────────────────┘   │            │             │   │ fornecedor_id   │  │
+                      │            │ 1:N         │   │ importacao_id   │  │
+┌─────────────────┐   │   ┌────────▼──────────┐ │   │ aguardando_ia   │  │
+│  PERMISSIONS    │   │   │    RECEITAS       │ │   │ created_by      │  │
+├─────────────────┤   │   ├───────────────────┤ │   └─────────────────┘  │
+│ id (PK)         │   │   │ id (PK)           │ │            │            │
+│ user_id (FK)    │───┘   │ codigo_receita    │ │            │            │
+│ restaurante_id  │───────│ nome_receita      │ │            │ N:1        │
+│ role (ENUM)     │       │ tipo_receita      │ │   ┌────────▼──────────┐ │
+│ can_read        │       │ custo_total       │ │   │  TAXONOMIAS       │ │
+│ can_create      │       │ restaurante_id    │─┼───│                   │ │
+│ can_update      │       │ categoria         │ │   ├───────────────────┤ │
+│ can_delete      │       │ created_by        │ │   │ id (PK)           │ │
+└─────────────────┘       └───────────────────┘ │   │ categoria         │ │
+                                   │             │   │ subcategoria      │ │
+                                   │ N:N         │   │ especificacao     │ │
+                          ┌────────▼─────────┐   │   │ variante          │ │
+                          │ RECEITA_INSUMO   │   │   │ codigo_taxonomia  │ │
+                          ├──────────────────┤   │   │ nome_completo     │ │
+                          │ id (PK)          │   │   │ ativo             │ │
+                          │ receita_id (FK)  │───┘   └───────────────────┘ │
+                          │ insumo_id (FK)   │───────────────────────────────┘
+                          │ quantidade       │            │
+                          │ custo_unitario   │            │ 1:N
+                          │ custo_total      │   ┌────────▼──────────┐
+                          └──────────────────┘   │ TAXONOMIA_ALIAS   │
+                                                 ├───────────────────┤
+┌──────────────────┐     ┌──────────────────┐   │ id (PK)           │
+│  FORNECEDORES    │     │ FORNECEDOR_INSUMO│   │ taxonomia_id (FK) │
+├──────────────────┤     ├──────────────────┤   │ alias             │
+│ id (PK)          │─┐   │ id (PK)          │   │ vezes_usado       │
+│ nome_razao_social│ │   │ fornecedor_id    │───┐│ origem            │
+│ cpf_cnpj         │ │   │ codigo           │   │└───────────────────┘
+│ telefone         │ │   │ nome             │   │
+│ ramo             │ │   │ unidade          │   │ ┌──────────────────┐
+│ cidade           │ │   │ preco_unitario   │   │ │ CODIGO_DISPONIVEL│
+│ estado           │ │   │ created_at       │   │ ├──────────────────┤
+│ created_by       │ │   └──────────────────┘   │ │ id (PK)          │
+└──────────────────┘ │                           │ │ codigo           │
+         │           └───────────────────────────┘ │ tipo_codigo      │
+         │ 1:N                                     │ restaurante_id   │
+         │                                         │ usado            │
+┌────────▼──────────────┐                         └──────────────────┘
+│ IMPORTACOES_INSUMOS   │
+├───────────────────────┤         ┌──────────────────┐
+│ id (PK)               │         │ CODIGO_SEQUENCE  │
+│ nome_arquivo          │         ├──────────────────┤
+│ tipo_importacao       │         │ id (PK)          │
+│ total_linhas          │         │ restaurante_id   │
+│ linhas_processadas    │         │ ultimo_codigo    │
+│ linhas_sucesso        │         │ tipo_codigo      │
+│ linhas_erro           │         └──────────────────┘
+│ status                │
+│ restaurante_id (FK)   │
+│ user_id (FK)          │
+│ created_at            │
+└───────────────────────┘
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabela: USERS -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">👥</span>
+                    Tabela: USERS
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Armazena usuários do sistema com autenticação JWT e controle de permissões.
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Campo</th>
+                            <th>Tipo</th>
+                            <th>Descrição</th>
+                            <th>Constraints</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-pink">id</span></td>
+                            <td>Integer</td>
+                            <td>Identificador único</td>
+                            <td>PRIMARY KEY, AUTO_INCREMENT</td>
+                        </tr>
+                        <tr>
+                            <td>username</td>
+                            <td>String(100)</td>
+                            <td>Nome de usuário para login</td>
+                            <td>UNIQUE, NOT NULL, INDEX</td>
+                        </tr>
+                        <tr>
+                            <td>email</td>
+                            <td>String(255)</td>
+                            <td>Email do usuário</td>
+                            <td>UNIQUE, NOT NULL, INDEX</td>
+                        </tr>
+                        <tr>
+                            <td>password_hash</td>
+                            <td>String(255)</td>
+                            <td>Senha criptografada (bcrypt)</td>
+                            <td>NOT NULL</td>
+                        </tr>
+                        <tr>
+                            <td>role</td>
+                            <td>ENUM</td>
+                            <td>Nível de acesso: ADMIN, CONSULTANT, OWNER, MANAGER, OPERATOR</td>
+                            <td>NOT NULL, DEFAULT='OPERATOR'</td>
+                        </tr>
+                        <tr>
+                            <td>restaurante_id</td>
+                            <td>Integer</td>
+                            <td>Restaurante vinculado (NULL para ADMIN)</td>
+                            <td>FOREIGN KEY, INDEX</td>
+                        </tr>
+                        <tr>
+                            <td>ativo</td>
+                            <td>Boolean</td>
+                            <td>Status do usuário (ativo/inativo)</td>
+                            <td>NOT NULL, DEFAULT=TRUE</td>
+                        </tr>
+                        <tr>
+                            <td>primeiro_acesso</td>
+                            <td>Boolean</td>
+                            <td>Controla se é primeiro login</td>
+                            <td>NOT NULL, DEFAULT=TRUE</td>
+                        </tr>
+                        <tr>
+                            <td>created_at</td>
+                            <td>DateTime</td>
+                            <td>Data/hora de criação</td>
+                            <td>DEFAULT=NOW()</td>
+                        </tr>
+                        <tr>
+                            <td>updated_at</td>
+                            <td>DateTime</td>
+                            <td>Data/hora de atualização</td>
+                            <td>ON UPDATE NOW()</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Tabela: RESTAURANTES -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🏪</span>
+                    Tabela: RESTAURANTES
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Gerencia estabelecimentos individuais ou redes de restaurantes com isolamento de dados.
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Campo</th>
+                            <th>Tipo</th>
+                            <th>Descrição</th>
+                            <th>Constraints</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-pink">id</span></td>
+                            <td>Integer</td>
+                            <td>Identificador único</td>
+                            <td>PRIMARY KEY, AUTO_INCREMENT</td>
+                        </tr>
+                        <tr>
+                            <td>nome</td>
+                            <td>String(255)</td>
+                            <td>Nome do restaurante ou rede</td>
+                            <td>NOT NULL</td>
+                        </tr>
+                        <tr>
+                            <td>cnpj</td>
+                            <td>String(18)</td>
+                            <td>CNPJ da empresa</td>
+                            <td>UNIQUE, NOT NULL, INDEX</td>
+                        </tr>
+                        <tr>
+                            <td>responsavel</td>
+                            <td>String(200)</td>
+                            <td>Nome do responsável legal</td>
+                            <td>NULLABLE</td>
+                        </tr>
+                        <tr>
+                            <td>telefone</td>
+                            <td>String(20)</td>
+                            <td>Telefone de contato</td>
+                            <td>NULLABLE</td>
+                        </tr>
+                        <tr>
+                            <td>rede_id</td>
+                            <td>Integer</td>
+                            <td>ID da rede (para unidades)</td>
+                            <td>FOREIGN KEY, INDEX, NULLABLE</td>
+                        </tr>
+                        <tr>
+                            <td>created_at</td>
+                            <td>DateTime</td>
+                            <td>Data/hora de criação</td>
+                            <td>DEFAULT=NOW()</td>
+                        </tr>
+                        <tr>
+                            <td>updated_at</td>
+                            <td>DateTime</td>
+                            <td>Data/hora de atualização</td>
+                            <td>ON UPDATE NOW()</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Tabela: INSUMOS -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🥗</span>
+                    Tabela: INSUMOS
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Cadastro completo de ingredientes e matérias-primas com controle de estoque e classificação IA.
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Campo</th>
+                            <th>Tipo</th>
+                            <th>Descrição</th>
+                            <th>Constraints</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-pink">id</span></td>
+                            <td>Integer</td>
+                            <td>Identificador único</td>
+                            <td>PRIMARY KEY, AUTO_INCREMENT</td>
+                        </tr>
+                        <tr>
+                            <td>codigo_insumo</td>
+                            <td>Integer</td>
+                            <td>Código automático (5000-5999)</td>
+                            <td>UNIQUE, NOT NULL, INDEX</td>
+                        </tr>
+                        <tr>
+                            <td>descricao</td>
+                            <td>String(255)</td>
+                            <td>Nome/descrição do ingrediente</td>
+                            <td>NOT NULL</td>
+                        </tr>
+                        <tr>
+                            <td>unidade</td>
+                            <td>String(20)</td>
+                            <td>Unidade de medida (kg, L, un)</td>
+                            <td>NOT NULL</td>
+                        </tr>
+                        <tr>
+                            <td>quantidade</td>
+                            <td>Numeric(10,3)</td>
+                            <td>Quantidade por embalagem</td>
+                            <td>NOT NULL</td>
+                        </tr>
+                        <tr>
+                            <td>fator_compra</td>
+                            <td>Numeric(10,4)</td>
+                            <td>Fator de conversão para compra</td>
+                            <td>DEFAULT=1.0</td>
+                        </tr>
+                        <tr>
+                            <td>preco_unitario</td>
+                            <td>Numeric(10,2)</td>
+                            <td>Preço por unidade</td>
+                            <td>NOT NULL</td>
+                        </tr>
+                        <tr>
+                            <td>restaurante_id</td>
+                            <td>Integer</td>
+                            <td>Restaurante proprietário</td>
+                            <td>FOREIGN KEY, NOT NULL, INDEX</td>
+                        </tr>
+                        <tr>
+                            <td>taxonomia_id</td>
+                            <td>Integer</td>
+                            <td>Classificação hierárquica (IA)</td>
+                            <td>FOREIGN KEY, INDEX, NULLABLE</td>
+                        </tr>
+                        <tr>
+                            <td>fornecedor_id</td>
+                            <td>Integer</td>
+                            <td>Fornecedor principal</td>
+                            <td>FOREIGN KEY, INDEX, NULLABLE</td>
+                        </tr>
+                        <tr>
+                            <td>importacao_id</td>
+                            <td>Integer</td>
+                            <td>ID da importação (NULL=manual)</td>
+                            <td>FOREIGN KEY, INDEX, NULLABLE</td>
+                        </tr>
+                        <tr>
+                            <td>aguardando_classificacao</td>
+                            <td>Boolean</td>
+                            <td>Flag para processamento IA</td>
+                            <td>DEFAULT=FALSE</td>
+                        </tr>
+                        <tr>
+                            <td>created_by</td>
+                            <td>Integer</td>
+                            <td>Usuário que criou</td>
+                            <td>FOREIGN KEY, INDEX, NULLABLE</td>
+                        </tr>
+                        <tr>
+                            <td>created_at</td>
+                            <td>DateTime</td>
+                            <td>Data/hora de criação</td>
+                            <td>DEFAULT=NOW()</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Tabela: RECEITAS -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">📖</span>
+                    Tabela: RECEITAS
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Armazena receitas e pratos do restaurante, incluindo receitas processadas (semi-prontos).
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Campo</th>
+                            <th>Tipo</th>
+                            <th>Descrição</th>
+                            <th>Constraints</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-pink">id</span></td>
+                            <td>Integer</td>
+                            <td>Identificador único</td>
+                            <td>PRIMARY KEY, AUTO_INCREMENT</td>
+                        </tr>
+                        <tr>
+                            <td>codigo_receita</td>
+                            <td>Integer</td>
+                            <td>Código automático (3000-4999)</td>
+                            <td>UNIQUE, NOT NULL, INDEX</td>
+                        </tr>
+                        <tr>
+                            <td>nome_receita</td>
+                            <td>String(255)</td>
+                            <td>Nome do prato/receita</td>
+                            <td>NOT NULL</td>
+                        </tr>
+                        <tr>
+                            <td>tipo_receita</td>
+                            <td>String(50)</td>
+                            <td>NORMAL (3000-3999) ou PROCESSADA (4000-4999)</td>
+                            <td>NOT NULL, DEFAULT='NORMAL'</td>
+                        </tr>
+                        <tr>
+                            <td>custo_total</td>
+                            <td>Numeric(10,2)</td>
+                            <td>CMV calculado automaticamente</td>
+                            <td>COMPUTED</td>
+                        </tr>
+                        <tr>
+                            <td>rendimento_porcoes</td>
+                            <td>Integer</td>
+                            <td>Número de porções geradas</td>
+                            <td>NULLABLE</td>
+                        </tr>
+                        <tr>
+                            <td>restaurante_id</td>
+                            <td>Integer</td>
+                            <td>Restaurante proprietário</td>
+                            <td>FOREIGN KEY, NOT NULL, INDEX</td>
+                        </tr>
+                        <tr>
+                            <td>categoria</td>
+                            <td>String(100)</td>
+                            <td>Categoria do prato</td>
+                            <td>NULLABLE</td>
+                        </tr>
+                        <tr>
+                            <td>created_by</td>
+                            <td>Integer</td>
+                            <td>Usuário que criou</td>
+                            <td>FOREIGN KEY, INDEX, NULLABLE</td>
+                        </tr>
+                        <tr>
+                            <td>created_at</td>
+                            <td>DateTime</td>
+                            <td>Data/hora de criação</td>
+                            <td>DEFAULT=NOW()</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Tabela: RECEITA_INSUMO -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🔗</span>
+                    Tabela: RECEITA_INSUMO (N:N)
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Relacionamento muitos-para-muitos entre receitas e insumos, armazenando quantidades e custos.
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Campo</th>
+                            <th>Tipo</th>
+                            <th>Descrição</th>
+                            <th>Constraints</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-pink">id</span></td>
+                            <td>Integer</td>
+                            <td>Identificador único</td>
+                            <td>PRIMARY KEY, AUTO_INCREMENT</td>
+                        </tr>
+                        <tr>
+                            <td>receita_id</td>
+                            <td>Integer</td>
+                            <td>ID da receita</td>
+                            <td>FOREIGN KEY, NOT NULL, INDEX</td>
+                        </tr>
+                        <tr>
+                            <td>insumo_id</td>
+                            <td>Integer</td>
+                            <td>ID do ingrediente</td>
+                            <td>FOREIGN KEY, NOT NULL, INDEX</td>
+                        </tr>
+                        <tr>
+                            <td>quantidade</td>
+                            <td>Numeric(10,3)</td>
+                            <td>Quantidade usada na receita</td>
+                            <td>NOT NULL</td>
+                        </tr>
+                        <tr>
+                            <td>custo_unitario</td>
+                            <td>Numeric(10,2)</td>
+                            <td>Custo unitário do insumo (snapshot)</td>
+                            <td>NOT NULL</td>
+                        </tr>
+                        <tr>
+                            <td>custo_total</td>
+                            <td>Numeric(10,2)</td>
+                            <td>Custo total deste item (qtd × custo_unit)</td>
+                            <td>COMPUTED</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="alert alert-warning" style="margin-top: 1rem;">
+                    <div class="alert-title">⚠️ Constraint Única</div>
+                    <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                        A combinação (receita_id, insumo_id) é única, impedindo duplicatas de ingredientes na mesma receita.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Tabela: TAXONOMIAS -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🏷️</span>
+                    Tabela: TAXONOMIAS
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Sistema hierárquico de classificação de produtos em 4 níveis para IA.
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Campo</th>
+                            <th>Tipo</th>
+                            <th>Descrição</th>
+                            <th>Constraints</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-pink">id</span></td>
+                            <td>Integer</td>
+                            <td>Identificador único</td>
+                            <td>PRIMARY KEY, AUTO_INCREMENT</td>
+                        </tr>
+                        <tr>
+                            <td>categoria</td>
+                            <td>String(100)</td>
+                            <td>Nível 1: Carnes, Peixes, Verduras, etc</td>
+                            <td>NOT NULL, INDEX</td>
+                        </tr>
+                        <tr>
+                            <td>subcategoria</td>
+                            <td>String(100)</td>
+                            <td>Nível 2: Bovino, Salmão, Tomate, etc</td>
+                            <td>NOT NULL, INDEX</td>
+                        </tr>
+                        <tr>
+                            <td>especificacao</td>
+                            <td>String(100)</td>
+                            <td>Nível 3: Filé, Inteiro, Moído, etc</td>
+                            <td>NULLABLE, INDEX</td>
+                        </tr>
+                        <tr>
+                            <td>variante</td>
+                            <td>String(100)</td>
+                            <td>Nível 4: Premium, Orgânico, Marca, etc</td>
+                            <td>NULLABLE</td>
+                        </tr>
+                        <tr>
+                            <td>codigo_taxonomia</td>
+                            <td>String(50)</td>
+                            <td>Código hierárquico (ex: CAR-BOV-FIL-PRE)</td>
+                            <td>UNIQUE, NOT NULL, INDEX</td>
+                        </tr>
+                        <tr>
+                            <td>nome_completo</td>
+                            <td>String(500)</td>
+                            <td>Nome concatenado dos 4 níveis</td>
+                            <td>GENERATED</td>
+                        </tr>
+                        <tr>
+                            <td>ativo</td>
+                            <td>Boolean</td>
+                            <td>Status da taxonomia</td>
+                            <td>NOT NULL, DEFAULT=TRUE</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="code-block" style="margin-top: 1rem;">
+                    <div class="code-content">
+<span class="comment"># Exemplo de hierarquia</span>
+Carnes > Bovino > Filé > Premium
+├── categoria: "Carnes"
+├── subcategoria: "Bovino"
+├── especificacao: "Filé"
+└── variante: "Premium"
+codigo_taxonomia: "CAR-BOV-FIL-PRE"
+nome_completo: "Carnes > Bovino > Filé > Premium"
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabela: FORNECEDORES -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🚚</span>
+                    Tabela: FORNECEDORES
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Cadastro de fornecedores de insumos para o restaurante.
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Campo</th>
+                            <th>Tipo</th>
+                            <th>Descrição</th>
+                            <th>Constraints</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-pink">id</span></td>
+                            <td>Integer</td>
+                            <td>Identificador único</td>
+                            <td>PRIMARY KEY, AUTO_INCREMENT</td>
+                        </tr>
+                        <tr>
+                            <td>nome_razao_social</td>
+                            <td>String(255)</td>
+                            <td>Nome ou razão social</td>
+                            <td>NOT NULL</td>
+                        </tr>
+                        <tr>
+                            <td>cpf_cnpj</td>
+                            <td>String(18)</td>
+                            <td>CPF ou CNPJ (apenas números)</td>
+                            <td>UNIQUE, NOT NULL, INDEX</td>
+                        </tr>
+                        <tr>
+                            <td>telefone</td>
+                            <td>String(20)</td>
+                            <td>Telefone de contato</td>
+                            <td>NULLABLE</td>
+                        </tr>
+                        <tr>
+                            <td>ramo</td>
+                            <td>String(100)</td>
+                            <td>Ramo de atividade</td>
+                            <td>NULLABLE</td>
+                        </tr>
+                        <tr>
+                            <td>cidade</td>
+                            <td>String(100)</td>
+                            <td>Cidade da empresa</td>
+                            <td>NULLABLE</td>
+                        </tr>
+                        <tr>
+                            <td>estado</td>
+                            <td>String(2)</td>
+                            <td>Estado (sigla UF)</td>
+                            <td>NULLABLE</td>
+                        </tr>
+                        <tr>
+                            <td>created_by</td>
+                            <td>Integer</td>
+                            <td>Usuário que criou</td>
+                            <td>FOREIGN KEY, INDEX, NULLABLE</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Tabela: PERMISSIONS -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🔐</span>
+                    Tabela: PERMISSIONS
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Sistema granular de permissões por usuário e restaurante com controle CRUD.
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Campo</th>
+                            <th>Tipo</th>
+                            <th>Descrição</th>
+                            <th>Constraints</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-pink">id</span></td>
+                            <td>Integer</td>
+                            <td>Identificador único</td>
+                            <td>PRIMARY KEY, AUTO_INCREMENT</td>
+                        </tr>
+                        <tr>
+                            <td>user_id</td>
+                            <td>Integer</td>
+                            <td>ID do usuário</td>
+                            <td>FOREIGN KEY, NOT NULL, INDEX</td>
+                        </tr>
+                        <tr>
+                            <td>restaurante_id</td>
+                            <td>Integer</td>
+                            <td>ID do restaurante</td>
+                            <td>FOREIGN KEY, NOT NULL, INDEX</td>
+                        </tr>
+                        <tr>
+                            <td>role</td>
+                            <td>ENUM</td>
+                            <td>Nível de acesso específico</td>
+                            <td>NOT NULL</td>
+                        </tr>
+                        <tr>
+                            <td>can_read</td>
+                            <td>Boolean</td>
+                            <td>Permissão de leitura</td>
+                            <td>NOT NULL, DEFAULT=TRUE</td>
+                        </tr>
+                        <tr>
+                            <td>can_create</td>
+                            <td>Boolean</td>
+                            <td>Permissão de criação</td>
+                            <td>NOT NULL, DEFAULT=FALSE</td>
+                        </tr>
+                        <tr>
+                            <td>can_update</td>
+                            <td>Boolean</td>
+                            <td>Permissão de edição</td>
+                            <td>NOT NULL, DEFAULT=FALSE</td>
+                        </tr>
+                        <tr>
+                            <td>can_delete</td>
+                            <td>Boolean</td>
+                            <td>Permissão de exclusão</td>
+                            <td>NOT NULL, DEFAULT=FALSE</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="alert alert-warning" style="margin-top: 1rem;">
+                    <div class="alert-title">⚠️ Constraint Única</div>
+                    <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                        A combinação (user_id, restaurante_id) é única, garantindo uma permissão por usuário/restaurante.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Tabela: CODIGO_DISPONIVEL -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🔢</span>
+                    Tabela: CODIGO_DISPONIVEL
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Pool de códigos disponíveis para geração automática sequencial.
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Campo</th>
+                            <th>Tipo</th>
+                            <th>Descrição</th>
+                            <th>Constraints</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-pink">id</span></td>
+                            <td>Integer</td>
+                            <td>Identificador único</td>
+                            <td>PRIMARY KEY, AUTO_INCREMENT</td>
+                        </tr>
+                        <tr>
+                            <td>codigo</td>
+                            <td>Integer</td>
+                            <td>Código numérico disponível</td>
+                            <td>NOT NULL, INDEX</td>
+                        </tr>
+                        <tr>
+                            <td>tipo_codigo</td>
+                            <td>String(50)</td>
+                            <td>RECEITA (3000-3999), PROCESSADA (4000-4999), INSUMO (5000-5999)</td>
+                            <td>NOT NULL, INDEX</td>
+                        </tr>
+                        <tr>
+                            <td>restaurante_id</td>
+                            <td>Integer</td>
+                            <td>ID do restaurante</td>
+                            <td>FOREIGN KEY, NOT NULL, INDEX</td>
+                        </tr>
+                        <tr>
+                            <td>usado</td>
+                            <td>Boolean</td>
+                            <td>Flag de uso (TRUE=ocupado)</td>
+                            <td>NOT NULL, DEFAULT=FALSE</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Constraints e Índices -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🔒</span>
+                    Constraints e Índices Importantes
+                </h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Tabela</th>
+                            <th>Constraint/Índice</th>
+                            <th>Descrição</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-success">users</span></td>
+                            <td>UNIQUE(username)</td>
+                            <td>Impede usernames duplicados</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">users</span></td>
+                            <td>UNIQUE(email)</td>
+                            <td>Impede emails duplicados</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">restaurantes</span></td>
+                            <td>UNIQUE(cnpj)</td>
+                            <td>Impede CNPJs duplicados</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">insumos</span></td>
+                            <td>UNIQUE(codigo_insumo, restaurante_id)</td>
+                            <td>Código único por restaurante</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">receitas</span></td>
+                            <td>UNIQUE(codigo_receita, restaurante_id)</td>
+                            <td>Código único por restaurante</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-pink">receita_insumo</span></td>
+                            <td>UNIQUE(receita_id, insumo_id)</td>
+                            <td>Impede ingrediente duplicado em receita</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-warning">taxonomias</span></td>
+                            <td>UNIQUE(codigo_taxonomia)</td>
+                            <td>Código taxonomia único global</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-warning">permissions</span></td>
+                            <td>UNIQUE(user_id, restaurante_id)</td>
+                            <td>Uma permissão por usuário/restaurante</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">insumos</span></td>
+                            <td>INDEX(restaurante_id)</td>
+                            <td>Otimiza queries filtradas por restaurante</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">receitas</span></td>
+                            <td>INDEX(restaurante_id)</td>
+                            <td>Otimiza queries filtradas por restaurante</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-pink">receita_insumo</span></td>
+                            <td>INDEX(receita_id, insumo_id)</td>
+                            <td>Otimiza JOINs de ingredientes</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Relacionamentos -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🔗</span>
+                    Tipos de Relacionamentos
+                </h3>
+                <div class="code-block">
+                    <div class="code-content">
+<span class="comment"># Relacionamento 1:N (Um para Muitos)</span>
+1 restaurante → N insumos
+1 restaurante → N receitas
+1 restaurante → N users
+1 fornecedor → N insumos
+1 taxonomia → N insumos
+1 user → N insumos (created_by)
+1 user → N receitas (created_by)
+
+<span class="comment"># Relacionamento N:N (Muitos para Muitos)</span>
+N receitas ↔ N insumos (via receita_insumo)
+
+<span class="comment"># Relacionamento Hierárquico</span>
+1 restaurante (rede) → N restaurantes (unidades)
+↳ campo: rede_id REFERENCES restaurantes(id)
+
+<span class="comment"># Relacionamento Recursivo (Receitas Processadas)</span>
+1 receita_processada → pode ser usada como insumo → em outra receita
+↳ tipo_receita = 'PROCESSADA'
+↳ codigo_receita em faixa 4000-4999
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-success">
+                <div class="alert-title">✅ Migrations com Alembic</div>
+                <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                    Todas as alterações de schema são versionadas via Alembic. Commands principais:<br>
+                    <code>alembic revision --autogenerate -m "descrição"</code><br>
+                    <code>alembic upgrade head</code><br>
+                    <code>alembic downgrade -1</code>
+                </p>
+            </div>
+        </section>
+
+
+        <!-- ============================================================================
+             SEÇÃO 07: MÓDULOS DO SISTEMA
+             ============================================================================ -->
+        <section class="section reveal active" id="modulos">
+            <div class="section-header">
+                <div class="section-number">07</div>
+                <h2 class="section-title">Módulos do Sistema</h2>
+                <p class="section-subtitle">Funcionalidades e componentes principais da aplicação</p>
+            </div>
+
+            <div class="alert alert-info">
+                <div class="alert-title">🎯 Visão Geral dos Módulos</div>
+                <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                    O sistema é organizado em 10 módulos funcionais independentes mas integrados, cobrindo desde
+                    gestão de ingredientes até geração de relatórios com IA.
+                </p>
+            </div>
+
+            <!-- Módulo 1: Dashboard -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">📊</span>
+                    1. Dashboard
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Painel principal com visão geral e estatísticas do sistema.
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Funcionalidade</th>
+                            <th>Descrição</th>
+                            <th>Acesso Mínimo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Visão Geral</td>
+                            <td>Cards com totais de insumos, receitas e fornecedores</td>
+                            <td><span class="badge badge-info">OPERATOR</span></td>
+                        </tr>
+                        <tr>
+                            <td>Gráficos de Custos</td>
+                            <td>Análise visual de distribuição de custos por categoria</td>
+                            <td><span class="badge badge-success">MANAGER</span></td>
+                        </tr>
+                        <tr>
+                            <td>Estatísticas IA</td>
+                            <td>Métricas de classificação automática e acurácia</td>
+                            <td><span class="badge badge-warning">CONSULTANT</span></td>
+                        </tr>
+                        <tr>
+                            <td>Alertas de Preço</td>
+                            <td>Notificações de variações significativas de custo</td>
+                            <td><span class="badge badge-success">MANAGER</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Módulo 2: Insumos -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🥗</span>
+                    2. Insumos (Ingredientes)
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Gestão completa de ingredientes com classificação automática por IA.
+                </p>
+                <div class="code-block">
+                    <div class="code-content">
+<span class="comment"># Funcionalidades Principais</span>
+
+CADASTRO:
+├── Código automático (5000-5999)
+├── Nome/descrição do ingrediente
+├── Unidade de medida (kg, L, un, g, ml)
+├── Quantidade por embalagem
+├── Fator de conversão
+├── Preço unitário
+├── Fornecedor vinculado
+└── Classificação IA automática
+
+IMPORTAÇÃO:
+├── Upload de Excel (.xlsx)
+├── Template TOTVS compatível
+├── Validação de estrutura
+├── Classificação em lote
+└── Relatório de erros/sucessos
+
+FILTROS:
+├── Busca por nome/código
+├── Filtro por categoria (taxonomia)
+├── Filtro por grupo
+├── Filtro por subgrupo
+├── Filtro por fornecedor
+└── Filtro por faixa de preço
+
+AÇÕES:
+├── Criar novo insumo
+├── Editar insumo existente
+├── Excluir insumo (com validação)
+├── Comparar preços entre fornecedores
+├── Histórico de preços (30 dias)
+└── Classificar com IA manualmente
+                    </div>
+                </div>
+                <div class="alert alert-success" style="margin-top: 1rem;">
+                    <div class="alert-title">🤖 Classificação IA Automática</div>
+                    <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                        Ao cadastrar um insumo, a IA analisa o nome e sugere automaticamente a categoria,
+                        grupo e subgrupo baseado em uma taxonomia hierárquica de 4 níveis.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Módulo 3: Receitas -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">📖</span>
+                    3. Receitas
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Criação e gestão de receitas com suporte hierárquico e cálculo automático de custos.
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Tipo de Receita</th>
+                            <th>Faixa de Código</th>
+                            <th>Características</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-success">NORMAL</span></td>
+                            <td>3000-3999</td>
+                            <td>Pratos finais para venda (ex: Pizza, Hambúrguer)</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-pink">PROCESSADA</span></td>
+                            <td>4000-4999</td>
+                            <td>Semi-prontos usados em outras receitas (ex: Molho, Massa)</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <div class="code-block" style="margin-top: 1rem;">
+                    <div class="code-content">
+<span class="comment"># Estrutura de uma Receita</span>
+
+DADOS BÁSICOS:
+├── Código automático
+├── Nome da receita
+├── Tipo (NORMAL ou PROCESSADA)
+├── Categoria (entrada, prato principal, sobremesa)
+├── Rendimento em porções
+└── Foto (upload Cloudinary)
+
+INGREDIENTES:
+├── Lista de insumos necessários
+├── Quantidade de cada ingrediente
+├── Unidade de medida
+├── Custo unitário (snapshot)
+└── Custo total calculado automaticamente
+
+CÁLCULOS:
+├── CMV Total = Σ (quantidade × custo_unitário)
+├── Custo por Porção = CMV / rendimento_porcoes
+├── Margem de Lucro = (Preço Venda - CMV) / Preço Venda × 100
+└── Sugestão de Preço = CMV / (1 - markup_desejado)
+
+HIERARQUIA:
+├── Receitas processadas podem ser ingredientes
+├── Cálculo em cascata de custos
+├── Atualização automática ao mudar preços
+└── Detalhamento completo em PDF
+                    </div>
+                </div>
+
+                <div class="alert alert-warning" style="margin-top: 1rem;">
+                    <div class="alert-title">⚠️ Receitas Hierárquicas</div>
+                    <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                        Uma receita PROCESSADA (4000-4999) pode ser usada como ingrediente em outra receita NORMAL (3000-3999).
+                        Por exemplo: "Molho Especial" (4001) pode ser ingrediente de "Pizza Margherita" (3050).
+                    </p>
+                </div>
+            </div>
+
+            <!-- Módulo 4: Fornecedores -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🚚</span>
+                    4. Fornecedores
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Gestão de fornecedores com comparativo de preços e histórico.
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Funcionalidade</th>
+                            <th>Descrição</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Cadastro Completo</td>
+                            <td>Nome, CPF/CNPJ, telefone, ramo, cidade, estado</td>
+                        </tr>
+                        <tr>
+                            <td>Vinculação de Insumos</td>
+                            <td>Associar ingredientes específicos a fornecedores</td>
+                        </tr>
+                        <tr>
+                            <td>Comparativo de Preços</td>
+                            <td>Visualizar preços do mesmo insumo entre fornecedores</td>
+                        </tr>
+                        <tr>
+                            <td>Histórico de Compras</td>
+                            <td>Registro de pedidos e variações de preço</td>
+                        </tr>
+                        <tr>
+                            <td>Análise de Economia</td>
+                            <td>Calcular economia potencial ao trocar fornecedor</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Módulo 5: Restaurantes -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🏪</span>
+                    5. Restaurantes (Multi-tenant)
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Gestão de estabelecimentos com suporte a redes e unidades independentes.
+                </p>
+                <div class="diagram-box">
+                    <div class="diagram-content">
+┌────────────────────────────────────────────────────────────────┐
+│                  ESTRUTURA MULTI-TENANT                        │
+├────────────────────────────────────────────────────────────────┤
+│                                                                │
+│  Modelo 1: RESTAURANTE INDEPENDENTE                           │
+│  ┌─────────────────────────┐                                  │
+│  │  Restaurante X          │                                  │
+│  │  ├── Insumos próprios   │                                  │
+│  │  ├── Receitas próprias  │                                  │
+│  │  └── Usuários próprios  │                                  │
+│  └─────────────────────────┘                                  │
+│                                                                │
+│  Modelo 2: REDE DE RESTAURANTES                               │
+│  ┌─────────────────────────────────────────────┐              │
+│  │  REDE MATRIZ (rede_id = NULL)               │              │
+│  │  ├── Insumos globais (compartilhados)       │              │
+│  │  ├── Receitas padrão (compartilhadas)       │              │
+│  │  └── Usuários consultores                   │              │
+│  │      │                                       │              │
+│  │      ├── Unidade A (rede_id = matriz_id)    │              │
+│  │      │   ├── Insumos locais                 │              │
+│  │      │   └── Receitas customizadas          │              │
+│  │      │                                       │              │
+│  │      ├── Unidade B (rede_id = matriz_id)    │              │
+│  │      │   ├── Insumos locais                 │              │
+│  │      │   └── Receitas customizadas          │              │
+│  │      │                                       │              │
+│  │      └── Unidade C (rede_id = matriz_id)    │              │
+│  │          ├── Insumos locais                 │              │
+│  │          └── Receitas customizadas          │              │
+│  └─────────────────────────────────────────────┘              │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
+                    </div>
+                </div>
+                <div class="alert alert-info" style="margin-top: 1rem;">
+                    <div class="alert-title">🔐 Isolamento de Dados</div>
+                    <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                        Cada restaurante tem seus dados completamente isolados. Apenas usuários ADMIN e CONSULTANT
+                        podem visualizar dados de múltiplos restaurantes. Códigos de receitas/insumos são únicos
+                        por restaurante, não globalmente.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Módulo 6: IA Classificação -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🤖</span>
+                    6. IA - Classificação Automática
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Sistema de inteligência artificial para classificação hierárquica de ingredientes.
+                </p>
+                <div class="code-block">
+                    <div class="code-content">
+<span class="comment"># Tecnologias e Componentes</span>
+
+STACK DE IA:
+├── spaCy (pt_core_news_sm) - NLP em português
+├── fuzzywuzzy - Similaridade de strings
+├── Base de conhecimento - 400+ taxonomias
+└── Sistema de aliases - Aprendizado contínuo
+
+TAXONOMIA HIERÁRQUICA (4 NÍVEIS):
+├── Nível 1: CATEGORIA
+│   └── Exemplos: Carnes, Peixes, Verduras, Laticínios, Grãos
+├── Nível 2: SUBCATEGORIA
+│   └── Exemplos: Bovino, Suíno, Frango / Salmão, Tilápia
+├── Nível 3: ESPECIFICACAO
+│   └── Exemplos: Filé, Inteiro, Moído / Fresco, Congelado
+└── Nível 4: VARIANTE
+    └── Exemplos: Premium, Orgânico, Marca Específica
+
+PROCESSO DE CLASSIFICAÇÃO:
+1. Usuário cadastra insumo "Filé Mignon Premium"
+2. IA processa o nome com spaCy
+3. Busca matches na base de taxonomias
+4. Calcula score de confiança (0-100%)
+5. Retorna sugestão: Carnes > Bovino > Filé > Premium
+6. Usuário aceita ou corrige manualmente
+7. Sistema aprende com correções (aliases)
+
+MÉTRICAS:
+├── Acurácia geral: ~85%
+├── Tempo de processamento: <200ms
+├── Classificações automáticas: 100% gratuitas
+└── Aprendizado: Melhora com uso
+                    </div>
+                </div>
+            </div>
+
+            <!-- Módulo 7: Importação -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">📥</span>
+                    7. Importação de Dados
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Sistema de importação em massa via Excel com validação e preview.
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Tipo</th>
+                            <th>Formato</th>
+                            <th>Recursos</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-success">Insumos</span></td>
+                            <td>.xlsx (Excel)</td>
+                            <td>
+                                • Template TOTVS compatível<br>
+                                • Classificação IA automática<br>
+                                • Matching de fornecedores<br>
+                                • Relatório de erros/sucessos
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-pink">Receitas</span></td>
+                            <td>.xlsx (Excel)</td>
+                            <td>
+                                • Matching inteligente de insumos<br>
+                                • Criação automática de ingredientes<br>
+                                • Preview antes de importar<br>
+                                • Cálculo de CMV automático
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <div class="code-block" style="margin-top: 1rem;">
+                    <div class="code-content">
+<span class="comment"># Fluxo de Importação de Insumos</span>
+
+ETAPA 1: UPLOAD
+├── Usuário seleciona arquivo .xlsx
+├── Sistema valida estrutura das colunas
+└── Retorna erros se formato inválido
+
+ETAPA 2: VALIDAÇÃO
+├── Verifica campos obrigatórios
+├── Valida tipos de dados (números, textos)
+├── Identifica duplicatas no arquivo
+└── Gera preview para usuário
+
+ETAPA 3: PROCESSAMENTO
+├── Para cada linha:
+│   ├── Verifica se insumo já existe (por nome)
+│   ├── Classifica com IA se novo
+│   ├── Vincula fornecedor se informado
+│   └── Cria registro no banco
+└── Registra log de auditoria
+
+ETAPA 4: RELATÓRIO
+├── Total de linhas processadas
+├── Sucessos vs Erros
+├── Lista de erros detalhados
+└── Download do relatório em PDF
+                    </div>
+                </div>
+            </div>
+
+            <!-- Módulo 8: Relatórios -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">📄</span>
+                    8. Relatórios e PDFs
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Geração de documentos profissionais com marca IOGAR.
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Tipo de Relatório</th>
+                            <th>Conteúdo</th>
+                            <th>Formato</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Ficha Técnica Completa</td>
+                            <td>
+                                • Dados da receita<br>
+                                • Lista de ingredientes<br>
+                                • Custos detalhados<br>
+                                • Modo de preparo<br>
+                                • Foto do prato
+                            </td>
+                            <td><span class="badge badge-pink">PDF</span></td>
+                        </tr>
+                        <tr>
+                            <td>Ficha de Cozinha</td>
+                            <td>
+                                • Versão simplificada<br>
+                                • Apenas ingredientes e quantidades<br>
+                                • Sem custos visíveis<br>
+                                • Otimizada para impressão
+                            </td>
+                            <td><span class="badge badge-pink">PDF</span></td>
+                        </tr>
+                        <tr>
+                            <td>Lista de Insumos</td>
+                            <td>
+                                • Exportação completa<br>
+                                • Filtros aplicados<br>
+                                • Classificação IA<br>
+                                • Preços e fornecedores
+                            </td>
+                            <td><span class="badge badge-success">Excel/CSV</span></td>
+                        </tr>
+                        <tr>
+                            <td>Comparativo de Preços</td>
+                            <td>
+                                • Análise entre fornecedores<br>
+                                • Economia potencial<br>
+                                • Gráficos comparativos
+                            </td>
+                            <td><span class="badge badge-pink">PDF</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <div class="alert alert-success" style="margin-top: 1rem;">
+                    <div class="alert-title">🎨 Design Profissional</div>
+                    <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                        Todos os PDFs incluem:<br>
+                        • Marca IOGAR no header<br>
+                        • Gradiente verde-rosa (#22c55e e #ec4899)<br>
+                        • Layout responsivo e profissional<br>
+                        • Metadados de geração (data, usuário, versão)
+                    </p>
+                </div>
+            </div>
+
+            <!-- Módulo 9: Usuários -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">👥</span>
+                    9. Usuários e Permissões
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Sistema granular de controle de acesso com 5 níveis hierárquicos.
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Role</th>
+                            <th>Escopo</th>
+                            <th>Permissões</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-pink">ADMIN</span></td>
+                            <td>Global</td>
+                            <td>
+                                • Acesso total ao sistema<br>
+                                • Gerenciar todos os restaurantes<br>
+                                • Criar consultores<br>
+                                • Configurações globais<br>
+                                • Logs e auditoria
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-warning">CONSULTANT</span></td>
+                            <td>Multi-restaurante</td>
+                            <td>
+                                • Múltiplos restaurantes<br>
+                                • Criar receitas e insumos<br>
+                                • Classificar com IA<br>
+                                • Gerar relatórios<br>
+                                • Não pode criar usuários
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">OWNER</span></td>
+                            <td>Rede</td>
+                            <td>
+                                • Gerenciar rede inteira<br>
+                                • Criar unidades<br>
+                                • Visualizar todos os dados<br>
+                                • Criar gerentes<br>
+                                • Relatórios consolidados
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">MANAGER</span></td>
+                            <td>Loja</td>
+                            <td>
+                                • Gerenciar uma loja<br>
+                                • Editar receitas e insumos<br>
+                                • Gerar relatórios locais<br>
+                                • Criar operadores
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">OPERATOR</span></td>
+                            <td>Leitura</td>
+                            <td>
+                                • Visualizar receitas<br>
+                                • Visualizar insumos<br>
+                                • Gerar PDFs de cozinha<br>
+                                • Sem edição
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Módulo 10: Configurações -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">⚙️</span>
+                    10. Configurações do Sistema
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Painel de configurações gerais e preferências do usuário.
+                </p>
+                <div class="code-block">
+                    <div class="code-content">
+<span class="comment"># Configurações Disponíveis</span>
+
+PERFIL DO USUÁRIO:
+├── Alterar nome e email
+├── Trocar senha
+├── Foto de perfil
+└── Preferências de notificações
+
+CONFIGURAÇÕES DO RESTAURANTE:
+├── Logo da empresa
+├── Dados de contato
+├── Tipo de cozinha
+├── Markup padrão
+└── Moeda e formatação
+
+SISTEMA DE IA:
+├── Ativar/desativar classificação automática
+├── Score mínimo de confiança
+├── Gerenciar taxonomias customizadas
+└── Histórico de classificações
+
+INTEGRAÇÕES:
+├── Cloudinary (upload de imagens)
+├── Email (notificações)
+├── Backup automático
+└── Exportação de dados (LGPD)
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-success">
+                <div class="alert-title">✅ Arquitetura Modular</div>
+                <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                    Cada módulo é independente mas integrado via API REST. Isso permite manutenção facilitada,
+                    testes isolados e expansão futura sem impactar outros módulos. O frontend em React
+                    renderiza todos os módulos em uma SPA (Single Page Application).
+                </p>
+            </div>
+        </section>
+
+
+        <!-- ============================================================================
+             SEÇÃO 08: API REST - ENDPOINTS
+             ============================================================================ -->
+        <section class="section reveal active" id="api-rest">
+            <div class="section-header">
+                <div class="section-number">08</div>
+                <h2 class="section-title">API REST - Endpoints</h2>
+                <p class="section-subtitle">Documentação completa dos endpoints da API</p>
+            </div>
+
+            <div class="alert alert-info">
+                <div class="alert-title">🔌 Base URL da API</div>
+                <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                    <strong>Produção:</strong> https://food-cost-backend.onrender.com<br>
+                    <strong>Staging:</strong> https://food-cost-backend-staging.onrender.com<br>
+                    <strong>Local:</strong> http://localhost:8000<br>
+                    <strong>Documentação Interativa:</strong> /docs (Swagger UI)
+                </p>
+            </div>
+
+            <!-- Autenticação -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🔐</span>
+                    1. Autenticação (Auth)
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Endpoints para login, logout e renovação de tokens JWT.
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Método</th>
+                            <th>Endpoint</th>
+                            <th>Descrição</th>
+                            <th>Auth</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-success">POST</span></td>
+                            <td>/api/v1/auth/login</td>
+                            <td>Login com email e senha</td>
+                            <td><span class="badge badge-info">Não</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">POST</span></td>
+                            <td>/api/v1/auth/refresh</td>
+                            <td>Renovar access_token com refresh_token</td>
+                            <td><span class="badge badge-info">Não</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">POST</span></td>
+                            <td>/api/v1/auth/logout</td>
+                            <td>Logout (invalidar tokens)</td>
+                            <td><span class="badge badge-warning">Sim</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <div class="code-block" style="margin-top: 1rem;">
+                    <div class="code-content">
+<span class="comment"># Exemplo: Login</span>
+POST /api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@iogar.com",
+  "password": "admin123"
+}
+
+<span class="comment"># Resposta de Sucesso</span>
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer",
+  "user": {
+    "id": 1,
+    "username": "admin",
+    "email": "admin@iogar.com",
+    "role": "ADMIN",
+    "restaurante_id": null
+  }
+}
+
+<span class="comment"># Exemplo: Refresh Token</span>
+POST /api/v1/auth/refresh
+Content-Type: application/json
+
+{
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+
+<span class="comment"># Resposta</span>
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer"
+}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Usuários -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">👥</span>
+                    2. Usuários (Users)
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    CRUD completo de usuários com controle de roles e permissões.
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Método</th>
+                            <th>Endpoint</th>
+                            <th>Descrição</th>
+                            <th>Acesso Mínimo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/users/</td>
+                            <td>Listar todos os usuários</td>
+                            <td><span class="badge badge-pink">ADMIN</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/users/{id}</td>
+                            <td>Buscar usuário por ID</td>
+                            <td><span class="badge badge-pink">ADMIN</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">POST</span></td>
+                            <td>/api/v1/users/</td>
+                            <td>Criar novo usuário</td>
+                            <td><span class="badge badge-pink">ADMIN</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-warning">PUT</span></td>
+                            <td>/api/v1/users/{id}</td>
+                            <td>Atualizar usuário</td>
+                            <td><span class="badge badge-pink">ADMIN</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-pink">DELETE</span></td>
+                            <td>/api/v1/users/{id}</td>
+                            <td>Deletar usuário</td>
+                            <td><span class="badge badge-pink">ADMIN</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-warning">PATCH</span></td>
+                            <td>/api/v1/users/{id}/toggle-active</td>
+                            <td>Ativar/Desativar usuário</td>
+                            <td><span class="badge badge-pink">ADMIN</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="alert alert-warning" style="margin-top: 1rem;">
+                    <div class="alert-title">⚠️ Autenticação Necessária</div>
+                    <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                        Todos os endpoints de usuários requerem autenticação JWT e role ADMIN.
+                        Envie o token no header: <code>Authorization: Bearer {token}</code>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Restaurantes -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🏪</span>
+                    3. Restaurantes
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Gestão de estabelecimentos com suporte a redes e unidades.
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Método</th>
+                            <th>Endpoint</th>
+                            <th>Descrição</th>
+                            <th>Acesso Mínimo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/restaurantes/</td>
+                            <td>Listar restaurantes</td>
+                            <td><span class="badge badge-warning">CONSULTANT</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/restaurantes/grid</td>
+                            <td>Listar em formato grid otimizado</td>
+                            <td><span class="badge badge-warning">CONSULTANT</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/restaurantes/{id}</td>
+                            <td>Buscar restaurante específico</td>
+                            <td><span class="badge badge-warning">CONSULTANT</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">POST</span></td>
+                            <td>/api/v1/restaurantes/</td>
+                            <td>Criar restaurante (matriz)</td>
+                            <td><span class="badge badge-pink">ADMIN</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">POST</span></td>
+                            <td>/api/v1/restaurantes/unidade</td>
+                            <td>Criar unidade vinculada à rede</td>
+                            <td><span class="badge badge-success">OWNER</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-warning">PUT</span></td>
+                            <td>/api/v1/restaurantes/{id}</td>
+                            <td>Atualizar restaurante</td>
+                            <td><span class="badge badge-success">OWNER</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-pink">DELETE</span></td>
+                            <td>/api/v1/restaurantes/{id}</td>
+                            <td>Deletar restaurante</td>
+                            <td><span class="badge badge-pink">ADMIN</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Insumos -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🥗</span>
+                    4. Insumos (Ingredientes)
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    CRUD de ingredientes com classificação IA e importação Excel.
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Método</th>
+                            <th>Endpoint</th>
+                            <th>Descrição</th>
+                            <th>Acesso Mínimo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/insumos/</td>
+                            <td>Listar insumos (com filtros)</td>
+                            <td><span class="badge badge-info">OPERATOR</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/insumos/list</td>
+                            <td>Listar com paginação avançada</td>
+                            <td><span class="badge badge-info">OPERATOR</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/insumos/{id}</td>
+                            <td>Buscar insumo específico</td>
+                            <td><span class="badge badge-info">OPERATOR</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">POST</span></td>
+                            <td>/api/v1/insumos/</td>
+                            <td>Criar novo insumo (com IA)</td>
+                            <td><span class="badge badge-success">MANAGER</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-warning">PUT</span></td>
+                            <td>/api/v1/insumos/{id}</td>
+                            <td>Atualizar insumo</td>
+                            <td><span class="badge badge-success">MANAGER</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-pink">DELETE</span></td>
+                            <td>/api/v1/insumos/{id}</td>
+                            <td>Deletar insumo</td>
+                            <td><span class="badge badge-success">MANAGER</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">POST</span></td>
+                            <td>/api/v1/insumos/importar</td>
+                            <td>Importar via Excel (.xlsx)</td>
+                            <td><span class="badge badge-warning">CONSULTANT</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/insumos/template</td>
+                            <td>Download template Excel</td>
+                            <td><span class="badge badge-info">OPERATOR</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <div class="code-block" style="margin-top: 1rem;">
+                    <div class="code-content">
+<span class="comment"># Exemplo: Criar Insumo com Classificação IA</span>
+POST /api/v1/insumos/
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "descricao": "Filé Mignon Premium",
+  "unidade": "kg",
+  "quantidade": 1.0,
+  "preco_unitario": 89.90,
+  "restaurante_id": 1,
+  "fornecedor_id": 5,
+  "classificar_ia": true
+}
+
+<span class="comment"># Resposta (IA classificou automaticamente)</span>
+{
+  "id": 2301,
+  "codigo_insumo": 5234,
+  "descricao": "Filé Mignon Premium",
+  "unidade": "kg",
+  "quantidade": 1.0,
+  "preco_unitario": 89.90,
+  "taxonomia_id": 45,
+  "taxonomia": {
+    "id": 45,
+    "nome_completo": "Carnes > Bovino > Filé > Premium",
+    "score_confianca": 95
+  },
+  "created_at": "2025-12-19T14:30:00Z"
+}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Receitas -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">📖</span>
+                    5. Receitas
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    CRUD de receitas com cálculo automático de CMV e geração de PDF.
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Método</th>
+                            <th>Endpoint</th>
+                            <th>Descrição</th>
+                            <th>Acesso Mínimo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/receitas/</td>
+                            <td>Listar receitas</td>
+                            <td><span class="badge badge-info">OPERATOR</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/receitas/list</td>
+                            <td>Listar com cálculo de CMV</td>
+                            <td><span class="badge badge-info">OPERATOR</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/receitas/{id}</td>
+                            <td>Buscar receita específica</td>
+                            <td><span class="badge badge-info">OPERATOR</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">POST</span></td>
+                            <td>/api/v1/receitas/</td>
+                            <td>Criar nova receita</td>
+                            <td><span class="badge badge-success">MANAGER</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-warning">PUT</span></td>
+                            <td>/api/v1/receitas/{id}</td>
+                            <td>Atualizar receita</td>
+                            <td><span class="badge badge-success">MANAGER</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-pink">DELETE</span></td>
+                            <td>/api/v1/receitas/{id}</td>
+                            <td>Deletar receita</td>
+                            <td><span class="badge badge-success">MANAGER</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/receitas/{id}/pdf</td>
+                            <td>Gerar ficha técnica em PDF</td>
+                            <td><span class="badge badge-info">OPERATOR</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">POST</span></td>
+                            <td>/api/v1/receitas/{id}/foto</td>
+                            <td>Upload de foto da receita</td>
+                            <td><span class="badge badge-success">MANAGER</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">POST</span></td>
+                            <td>/api/v1/receitas/calcular-custos</td>
+                            <td>Recalcular CMV de todas</td>
+                            <td><span class="badge badge-warning">CONSULTANT</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Fornecedores -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🚚</span>
+                    6. Fornecedores
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Gestão de fornecedores e vinculação de insumos.
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Método</th>
+                            <th>Endpoint</th>
+                            <th>Descrição</th>
+                            <th>Acesso Mínimo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/fornecedores/</td>
+                            <td>Listar fornecedores</td>
+                            <td><span class="badge badge-info">OPERATOR</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/fornecedores/{id}</td>
+                            <td>Buscar fornecedor específico</td>
+                            <td><span class="badge badge-info">OPERATOR</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">POST</span></td>
+                            <td>/api/v1/fornecedores/</td>
+                            <td>Criar novo fornecedor</td>
+                            <td><span class="badge badge-success">MANAGER</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-warning">PUT</span></td>
+                            <td>/api/v1/fornecedores/{id}</td>
+                            <td>Atualizar fornecedor</td>
+                            <td><span class="badge badge-success">MANAGER</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-pink">DELETE</span></td>
+                            <td>/api/v1/fornecedores/{id}</td>
+                            <td>Deletar fornecedor</td>
+                            <td><span class="badge badge-success">MANAGER</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">POST</span></td>
+                            <td>/api/v1/fornecedores/{id}/insumos</td>
+                            <td>Vincular insumo ao fornecedor</td>
+                            <td><span class="badge badge-success">MANAGER</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/fornecedores/{id}/insumos</td>
+                            <td>Listar insumos do fornecedor</td>
+                            <td><span class="badge badge-info">OPERATOR</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Taxonomias -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🏷️</span>
+                    7. Taxonomias (IA)
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Gestão da base de conhecimento hierárquica para classificação.
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Método</th>
+                            <th>Endpoint</th>
+                            <th>Descrição</th>
+                            <th>Acesso Mínimo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/taxonomias/</td>
+                            <td>Listar todas as taxonomias</td>
+                            <td><span class="badge badge-info">OPERATOR</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/taxonomias/{id}</td>
+                            <td>Buscar taxonomia específica</td>
+                            <td><span class="badge badge-info">OPERATOR</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/taxonomias/categorias</td>
+                            <td>Listar categorias (nível 1)</td>
+                            <td><span class="badge badge-info">OPERATOR</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/taxonomias/grupos/{categoria}</td>
+                            <td>Listar grupos de uma categoria</td>
+                            <td><span class="badge badge-info">OPERATOR</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">POST</span></td>
+                            <td>/api/v1/taxonomias/</td>
+                            <td>Criar taxonomia customizada</td>
+                            <td><span class="badge badge-warning">CONSULTANT</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-warning">PUT</span></td>
+                            <td>/api/v1/taxonomias/{id}</td>
+                            <td>Atualizar taxonomia</td>
+                            <td><span class="badge badge-warning">CONSULTANT</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- IA Classificação -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🤖</span>
+                    8. IA - Classificação
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Endpoints para classificação automática de ingredientes.
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Método</th>
+                            <th>Endpoint</th>
+                            <th>Descrição</th>
+                            <th>Acesso Mínimo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-success">POST</span></td>
+                            <td>/api/v1/ia/classificar</td>
+                            <td>Classificar um ingrediente</td>
+                            <td><span class="badge badge-success">MANAGER</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">POST</span></td>
+                            <td>/api/v1/ia/classificar-lote</td>
+                            <td>Classificar múltiplos ingredientes</td>
+                            <td><span class="badge badge-warning">CONSULTANT</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">POST</span></td>
+                            <td>/api/v1/ia/feedback</td>
+                            <td>Enviar correção (aprendizado)</td>
+                            <td><span class="badge badge-success">MANAGER</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/ia/historico</td>
+                            <td>Histórico de classificações</td>
+                            <td><span class="badge badge-warning">CONSULTANT</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/ia/estatisticas</td>
+                            <td>Métricas e acurácia da IA</td>
+                            <td><span class="badge badge-warning">CONSULTANT</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <div class="code-block" style="margin-top: 1rem;">
+                    <div class="code-content">
+<span class="comment"># Exemplo: Classificar Ingrediente</span>
+POST /api/v1/ia/classificar
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "nome_ingrediente": "Alcatra bovina resfriada"
+}
+
+<span class="comment"># Resposta</span>
+{
+  "nome_original": "Alcatra bovina resfriada",
+  "taxonomia_sugerida": {
+    "id": 23,
+    "categoria": "Carnes",
+    "subcategoria": "Bovino",
+    "especificacao": "Alcatra",
+    "variante": "Resfriada",
+    "nome_completo": "Carnes > Bovino > Alcatra > Resfriada",
+    "codigo_taxonomia": "CAR-BOV-ALC-RES"
+  },
+  "score_confianca": 92,
+  "alternativas": [
+    {
+      "taxonomia_id": 24,
+      "nome": "Carnes > Bovino > Alcatra > Congelada",
+      "score": 78
+    }
+  ],
+  "tempo_processamento_ms": 145
+}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Importações -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">📥</span>
+                    9. Importações
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Importação em massa via Excel com validação e preview.
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Método</th>
+                            <th>Endpoint</th>
+                            <th>Descrição</th>
+                            <th>Acesso Mínimo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-success">POST</span></td>
+                            <td>/api/v1/importacoes/upload</td>
+                            <td>Upload de arquivo Excel</td>
+                            <td><span class="badge badge-warning">CONSULTANT</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">POST</span></td>
+                            <td>/api/v1/importacoes/confirmar</td>
+                            <td>Confirmar e executar importação</td>
+                            <td><span class="badge badge-warning">CONSULTANT</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/importacoes/</td>
+                            <td>Listar histórico de importações</td>
+                            <td><span class="badge badge-success">MANAGER</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/importacoes/{id}</td>
+                            <td>Detalhes de uma importação</td>
+                            <td><span class="badge badge-success">MANAGER</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/importacoes/template</td>
+                            <td>Download template Excel</td>
+                            <td><span class="badge badge-info">OPERATOR</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Códigos -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🔢</span>
+                    10. Códigos Automáticos
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Sistema de geração e gestão de códigos sequenciais.
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Método</th>
+                            <th>Endpoint</th>
+                            <th>Descrição</th>
+                            <th>Acesso Mínimo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/codigos/proximo</td>
+                            <td>Obter próximo código disponível</td>
+                            <td><span class="badge badge-success">MANAGER</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">POST</span></td>
+                            <td>/api/v1/codigos/reservar</td>
+                            <td>Reservar código temporariamente</td>
+                            <td><span class="badge badge-success">MANAGER</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">POST</span></td>
+                            <td>/api/v1/codigos/liberar</td>
+                            <td>Liberar código reservado</td>
+                            <td><span class="badge badge-success">MANAGER</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/codigos/disponiveis</td>
+                            <td>Listar códigos disponíveis</td>
+                            <td><span class="badge badge-warning">CONSULTANT</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Permissions -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🔐</span>
+                    11. Permissões
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Gestão granular de permissões por usuário e restaurante.
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Método</th>
+                            <th>Endpoint</th>
+                            <th>Descrição</th>
+                            <th>Acesso Mínimo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/permissions/</td>
+                            <td>Listar todas as permissões</td>
+                            <td><span class="badge badge-pink">ADMIN</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/permissions/user/{id}</td>
+                            <td>Permissões de um usuário</td>
+                            <td><span class="badge badge-pink">ADMIN</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">POST</span></td>
+                            <td>/api/v1/permissions/</td>
+                            <td>Criar nova permissão</td>
+                            <td><span class="badge badge-pink">ADMIN</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-warning">PUT</span></td>
+                            <td>/api/v1/permissions/{id}</td>
+                            <td>Atualizar permissão</td>
+                            <td><span class="badge badge-pink">ADMIN</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-pink">DELETE</span></td>
+                            <td>/api/v1/permissions/{id}</td>
+                            <td>Deletar permissão</td>
+                            <td><span class="badge badge-pink">ADMIN</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Health Check -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🏥</span>
+                    12. Health Check
+                </h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Endpoints para monitoramento e verificação de saúde do sistema.
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Método</th>
+                            <th>Endpoint</th>
+                            <th>Descrição</th>
+                            <th>Auth</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/</td>
+                            <td>Status básico da API</td>
+                            <td><span class="badge badge-info">Não</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/health</td>
+                            <td>Health check simplificado</td>
+                            <td><span class="badge badge-info">Não</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/api/v1/health</td>
+                            <td>Health check completo (DB, Redis)</td>
+                            <td><span class="badge badge-info">Não</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">GET</span></td>
+                            <td>/test-db</td>
+                            <td>Testar conexão com PostgreSQL</td>
+                            <td><span class="badge badge-info">Não</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Códigos de Status HTTP -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">📡</span>
+                    Códigos de Status HTTP
+                </h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Significado</th>
+                            <th>Quando Ocorre</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-success">200</span></td>
+                            <td>OK</td>
+                            <td>Requisição bem-sucedida (GET, PUT)</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">201</span></td>
+                            <td>Created</td>
+                            <td>Recurso criado com sucesso (POST)</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">204</span></td>
+                            <td>No Content</td>
+                            <td>Sucesso sem retorno (DELETE)</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-warning">400</span></td>
+                            <td>Bad Request</td>
+                            <td>Dados inválidos na requisição</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-warning">401</span></td>
+                            <td>Unauthorized</td>
+                            <td>Token ausente ou inválido</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-warning">403</span></td>
+                            <td>Forbidden</td>
+                            <td>Permissão insuficiente</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-warning">404</span></td>
+                            <td>Not Found</td>
+                            <td>Recurso não encontrado</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-warning">422</span></td>
+                            <td>Unprocessable Entity</td>
+                            <td>Erro de validação de dados</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-pink">500</span></td>
+                            <td>Internal Server Error</td>
+                            <td>Erro interno do servidor</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="alert alert-success">
+                <div class="alert-title">📖 Documentação Interativa</div>
+                <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                    Acesse <strong>/docs</strong> em qualquer ambiente para visualizar a documentação
+                    Swagger UI completa com testes interativos de todos os endpoints.<br><br>
+                    Exemplo: https://food-cost-backend.onrender.com/docs
+                </p>
+            </div>
+        </section>
+
+
+        <!-- ============================================================================
+             SEÇÃO 09: SISTEMA DE AUTENTICAÇÃO
+             ============================================================================ -->
+        <section class="section reveal active" id="autenticacao">
+            <div class="section-header">
+                <div class="section-number">09</div>
+                <h2 class="section-title">Sistema de Autenticação</h2>
+                <p class="section-subtitle">Autenticação JWT com tokens de acesso e renovação</p>
+            </div>
+
+            <div class="alert alert-info">
+                <div class="alert-title">🔐 Autenticação Stateless</div>
+                <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                    O sistema utiliza JSON Web Tokens (JWT) para autenticação stateless, eliminando a necessidade
+                    de gerenciar sessões no servidor. Cada requisição é validada independentemente através do token.
+                </p>
+            </div>
+
+            <!-- Tipos de Tokens -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🎫</span>
+                    Tipos de Tokens JWT
+                </h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Token</th>
+                            <th>Validade</th>
+                            <th>Uso</th>
+                            <th>Armazenamento</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-success">Access Token</span></td>
+                            <td>30 minutos</td>
+                            <td>
+                                Autenticação em todas as requisições à API.<br>
+                                Enviado no header: <code>Authorization: Bearer {token}</code>
+                            </td>
+                            <td>localStorage do navegador</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-pink">Refresh Token</span></td>
+                            <td>7 dias</td>
+                            <td>
+                                Renovação do access token sem novo login.<br>
+                                Usado apenas no endpoint <code>/api/v1/auth/refresh</code>
+                            </td>
+                            <td>localStorage do navegador</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Estrutura do Token -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">📦</span>
+                    Estrutura do Access Token
+                </h3>
+                <div class="code-block">
+                    <div class="code-content">
+<span class="comment"># Payload do Access Token (decodificado)</span>
+{
+  "sub": "1",                    <span class="comment"># ID do usuário</span>
+  "username": "admin",            <span class="comment"># Nome de usuário</span>
+  "role": "ADMIN",                <span class="comment"># Nível de acesso</span>
+  "exp": 1703012400,              <span class="comment"># Timestamp de expiração (30min)</span>
+  "iat": 1703010600,              <span class="comment"># Timestamp de criação</span>
+  "type": "access"                <span class="comment"># Tipo do token</span>
+}
+
+<span class="comment"># Algoritmo de Assinatura</span>
+ALGORITHM: HS256 (HMAC with SHA-256)
+
+<span class="comment"># Chave Secreta</span>
+SECRET_KEY: Armazenada em variável de ambiente (.env)
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fluxo de Login -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🔄</span>
+                    Fluxo Completo de Autenticação
+                </h3>
+                <div class="diagram-box">
+                    <div class="diagram-content">
+┌─────────────────────────────────────────────────────────────────────┐
+│                     FLUXO DE LOGIN E AUTENTICAÇÃO                   │
+└─────────────────────────────────────────────────────────────────────┘
+
+ETAPA 1: LOGIN
+──────────────────────────────────────────────────────────────────────
+  Frontend                          Backend                  Database
+  ────────                          ───────                  ────────
+     │                                 │                         │
+     │  POST /api/v1/auth/login        │                         │
+     │  {username, password}           │                         │
+     ├────────────────────────────────>│                         │
+     │                                 │                         │
+     │                                 │  SELECT * FROM users    │
+     │                                 │  WHERE username = ?     │
+     │                                 ├────────────────────────>│
+     │                                 │                         │
+     │                                 │<────────────────────────┤
+     │                                 │  Retorna usuário        │
+     │                                 │                         │
+     │                                 │  bcrypt.verify()        │
+     │                                 │  (valida senha)         │
+     │                                 │                         │
+     │                                 │  Verifica is_active     │
+     │                                 │                         │
+     │                                 │  jwt.encode()           │
+     │                                 │  (gera tokens)          │
+     │                                 │                         │
+     │<────────────────────────────────┤                         │
+     │  {access_token, refresh_token}  │                         │
+     │                                 │                         │
+     │  localStorage.setItem()         │                         │
+     │  (armazena tokens)              │                         │
+     │                                 │                         │
+
+ETAPA 2: REQUISIÇÕES AUTENTICADAS
+──────────────────────────────────────────────────────────────────────
+  Frontend                          Backend                  Database
+  ────────                          ───────                  ────────
+     │                                 │                         │
+     │  GET /api/v1/receitas/          │                         │
+     │  Authorization: Bearer {token}  │                         │
+     ├────────────────────────────────>│                         │
+     │                                 │                         │
+     │                                 │  jwt.decode()           │
+     │                                 │  (valida token)         │
+     │                                 │                         │
+     │                                 │  Verifica expiração     │
+     │                                 │  Verifica assinatura    │
+     │                                 │                         │
+     │                                 │  Extrai user_id         │
+     │                                 │                         │
+     │                                 │  SELECT * FROM receitas │
+     │                                 │  WHERE user_id = ?      │
+     │                                 ├────────────────────────>│
+     │                                 │                         │
+     │                                 │<────────────────────────┤
+     │                                 │  Retorna dados          │
+     │                                 │                         │
+     │<────────────────────────────────┤                         │
+     │  {receitas: [...]}              │                         │
+     │                                 │                         │
+
+ETAPA 3: TOKEN EXPIRADO - REFRESH
+──────────────────────────────────────────────────────────────────────
+  Frontend                          Backend                  Database
+  ────────                          ───────                  ────────
+     │                                 │                         │
+     │  GET /api/v1/receitas/          │                         │
+     │  Authorization: Bearer {token}  │                         │
+     ├────────────────────────────────>│                         │
+     │                                 │                         │
+     │                                 │  jwt.decode()           │
+     │                                 │  Token expirado!        │
+     │                                 │                         │
+     │<────────────────────────────────┤                         │
+     │  401 Unauthorized               │                         │
+     │                                 │                         │
+     │  Detecta 401                    │                         │
+     │                                 │                         │
+     │  POST /api/v1/auth/refresh      │                         │
+     │  {refresh_token}                │                         │
+     ├────────────────────────────────>│                         │
+     │                                 │                         │
+     │                                 │  jwt.decode()           │
+     │                                 │  (valida refresh_token) │
+     │                                 │                         │
+     │                                 │  Verifica se ainda      │
+     │                                 │  está dentro dos 7 dias │
+     │                                 │                         │
+     │                                 │  SELECT * FROM users    │
+     │                                 │  WHERE id = ?           │
+     │                                 ├────────────────────────>│
+     │                                 │                         │
+     │                                 │<────────────────────────┤
+     │                                 │  Verifica is_active     │
+     │                                 │                         │
+     │                                 │  jwt.encode()           │
+     │                                 │  (gera novo access)     │
+     │                                 │                         │
+     │<────────────────────────────────┤                         │
+     │  {access_token}                 │                         │
+     │                                 │                         │
+     │  localStorage.setItem()         │                         │
+     │  (atualiza token)               │                         │
+     │                                 │                         │
+     │  Repete requisição original     │                         │
+     │  com novo token                 │                         │
+     ├────────────────────────────────>│                         │
+     │                                 │                         │
+                    </div>
+                </div>
+            </div>
+
+            <!-- Implementação Backend -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">⚙️</span>
+                    Implementação Backend (Python)
+                </h3>
+                <div class="code-block">
+                    <div class="code-content">
+<span class="comment"># backend/app/core/security.py</span>
+
+from datetime import datetime, timedelta
+from jose import jwt, JWTError
+from passlib.context import CryptContext
+
+<span class="comment"># Configurações</span>
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+REFRESH_TOKEN_EXPIRE_DAYS = 7
+
+<span class="comment"># Contexto para hash de senhas (bcrypt)</span>
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+<span class="comment"># Função: Criar Access Token</span>
+def create_access_token(data: dict) -> str:
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    
+    to_encode.update({
+        "exp": expire,
+        "iat": datetime.utcnow(),
+        "type": "access"
+    })
+    
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+<span class="comment"># Função: Criar Refresh Token</span>
+def create_refresh_token(data: dict) -> str:
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    
+    to_encode.update({
+        "exp": expire,
+        "iat": datetime.utcnow(),
+        "type": "refresh"
+    })
+    
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+<span class="comment"># Função: Decodificar e Validar Token</span>
+def decode_token(token: str) -> dict:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
+        return None
+
+<span class="comment"># Função: Verificar Senha</span>
+def verify_password(plain: str, hashed: str) -> bool:
+    return pwd_context.verify(plain, hashed)
+
+<span class="comment"># Função: Hash de Senha</span>
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
+                    </div>
+                </div>
+            </div>
+
+            <!-- Endpoint de Login -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🚪</span>
+                    Endpoint de Login
+                </h3>
+                <div class="code-block">
+                    <div class="code-content">
+<span class="comment"># backend/app/api/endpoints/auth.py</span>
+
+@router.post("/login")
+def login(login_data: LoginRequest, db: Session = Depends(get_db)):
+    <span class="comment"># 1. Buscar usuário por username ou email</span>
+    user = db.query(User).filter(
+        (User.username == login_data.username) | 
+        (User.email == login_data.username)
+    ).first()
+    
+    <span class="comment"># 2. Validar se usuário existe e senha está correta</span>
+    if not user or not verify_password(login_data.password, user.password_hash):
+        raise HTTPException(
+            status_code=401,
+            detail="Usuário ou senha incorretos"
+        )
+    
+    <span class="comment"># 3. Verificar se usuário está ativo</span>
+    if not user.ativo:
+        raise HTTPException(
+            status_code=403,
+            detail="Usuário inativo"
+        )
+    
+    <span class="comment"># 4. Preparar dados para o token</span>
+    token_data = {
+        "sub": str(user.id),
+        "username": user.username,
+        "role": user.role.value
+    }
+    
+    <span class="comment"># 5. Gerar tokens</span>
+    access_token = create_access_token(data=token_data)
+    refresh_token = create_refresh_token(data={"sub": str(user.id)})
+    
+    <span class="comment"># 6. Retornar resposta</span>
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "user": user.to_dict()
+    }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Proteção de Rotas -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🛡️</span>
+                    Proteção de Rotas
+                </h3>
+                <div class="code-block">
+                    <div class="code-content">
+<span class="comment"># backend/app/api/deps.py - Dependency para proteger rotas</span>
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+security = HTTPBearer()
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+) -> User:
+    <span class="comment"># 1. Extrair token do header Authorization</span>
+    token = credentials.credentials
+    
+    <span class="comment"># 2. Decodificar e validar token</span>
+    payload = decode_token(token)
+    if not payload:
+        raise HTTPException(
+            status_code=401,
+            detail="Token inválido ou expirado"
+        )
+    
+    <span class="comment"># 3. Verificar se é access token (não refresh)</span>
+    if payload.get("type") != "access":
+        raise HTTPException(
+            status_code=401,
+            detail="Token inválido"
+        )
+    
+    <span class="comment"># 4. Buscar usuário no banco</span>
+    user_id = payload.get("sub")
+    user = db.query(User).filter(User.id == int(user_id)).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Usuário não encontrado"
+        )
+    
+    <span class="comment"># 5. Verificar se usuário está ativo</span>
+    if not user.ativo:
+        raise HTTPException(
+            status_code=403,
+            detail="Usuário inativo"
+        )
+    
+    return user
+
+<span class="comment"># Uso em endpoints protegidos</span>
+@router.get("/receitas/")
+def listar_receitas(current_user: User = Depends(get_current_user)):
+    <span class="comment"># current_user já está autenticado e validado</span>
+    return {"receitas": [...]}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Implementação Frontend -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">💻</span>
+                    Implementação Frontend (React/TypeScript)
+                </h3>
+                <div class="code-block">
+                    <div class="code-content">
+<span class="comment">// Função de Login</span>
+const handleLogin = async (username: string, password: string) => {
+  try {
+    const response = await fetch('http://localhost:8000/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+
+    if (!response.ok) {
+      throw new Error('Login failed');
+    }
+
+    const data = await response.json();
+    
+    <span class="comment">// Armazenar tokens no localStorage</span>
+    localStorage.setItem('foodcost_access_token', data.access_token);
+    localStorage.setItem('foodcost_refresh_token', data.refresh_token);
+    localStorage.setItem('foodcost_user', JSON.stringify(data.user));
+    
+    <span class="comment">// Redirecionar para dashboard</span>
+    navigate('/dashboard');
+  } catch (error) {
+    console.error('Login error:', error);
+  }
+};
+
+<span class="comment">// Função para fazer requisições autenticadas</span>
+const apiRequest = async (url: string, options: RequestInit = {}) => {
+  <span class="comment">// Adicionar token no header</span>
+  const token = localStorage.getItem('foodcost_access_token');
+  
+  const headers = {
+    ...options.headers,
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  };
+
+  let response = await fetch(url, { ...options, headers });
+
+  <span class="comment">// Se retornou 401, tentar refresh</span>
+  if (response.status === 401) {
+    const refreshToken = localStorage.getItem('foodcost_refresh_token');
+    
+    const refreshResponse = await fetch('http://localhost:8000/api/v1/auth/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken })
+    });
+
+    if (refreshResponse.ok) {
+      const data = await refreshResponse.json();
+      <span class="comment">// Atualizar access token</span>
+      localStorage.setItem('foodcost_access_token', data.access_token);
+      
+      <span class="comment">// Repetir requisição original com novo token</span>
+      headers.Authorization = `Bearer ${data.access_token}`;
+      response = await fetch(url, { ...options, headers });
+    } else {
+      <span class="comment">// Refresh falhou, fazer logout</span>
+      localStorage.clear();
+      navigate('/login');
+      throw new Error('Session expired');
+    }
+  }
+
+  return response;
+};
+                    </div>
+                </div>
+            </div>
+
+            <!-- Boas Práticas de Segurança -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🔒</span>
+                    Boas Práticas de Segurança
+                </h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Prática</th>
+                            <th>Implementação</th>
+                            <th>Benefício</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Senhas com bcrypt</td>
+                            <td>
+                                Hash com salt automático<br>
+                                Custo computacional alto (10-12 rounds)
+                            </td>
+                            <td>Proteção contra rainbow tables e brute force</td>
+                        </tr>
+                        <tr>
+                            <td>Secret Key forte</td>
+                            <td>
+                                256+ bits de entropia<br>
+                                Armazenada em variável de ambiente<br>
+                                Nunca comitada no Git
+                            </td>
+                            <td>Previne falsificação de tokens</td>
+                        </tr>
+                        <tr>
+                            <td>Tokens de curta duração</td>
+                            <td>
+                                Access token: 30 minutos<br>
+                                Renovação via refresh token
+                            </td>
+                            <td>Reduz janela de exposição se token for roubado</td>
+                        </tr>
+                        <tr>
+                            <td>HTTPS obrigatório</td>
+                            <td>
+                                Produção sempre em HTTPS<br>
+                                Certificado SSL/TLS
+                            </td>
+                            <td>Previne interceptação de tokens (man-in-the-middle)</td>
+                        </tr>
+                        <tr>
+                            <td>Validação de tipo</td>
+                            <td>
+                                Access tokens só em requisições<br>
+                                Refresh tokens só em /refresh
+                            </td>
+                            <td>Previne uso indevido de tokens</td>
+                        </tr>
+                        <tr>
+                            <td>Verificação de usuário ativo</td>
+                            <td>
+                                Validar is_active em cada request<br>
+                                Mesmo com token válido
+                            </td>
+                            <td>Permite desativar usuários imediatamente</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Cenários de Erro -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">❌</span>
+                    Cenários de Erro e Respostas
+                </h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Cenário</th>
+                            <th>Status HTTP</th>
+                            <th>Mensagem</th>
+                            <th>Ação do Frontend</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Senha incorreta</td>
+                            <td><span class="badge badge-warning">401</span></td>
+                            <td>"Usuário ou senha incorretos"</td>
+                            <td>Exibir erro no formulário de login</td>
+                        </tr>
+                        <tr>
+                            <td>Usuário inativo</td>
+                            <td><span class="badge badge-warning">403</span></td>
+                            <td>"Usuário inativo"</td>
+                            <td>Exibir mensagem para contatar admin</td>
+                        </tr>
+                        <tr>
+                            <td>Token expirado</td>
+                            <td><span class="badge badge-warning">401</span></td>
+                            <td>"Token inválido ou expirado"</td>
+                            <td>Tentar refresh automaticamente</td>
+                        </tr>
+                        <tr>
+                            <td>Refresh token inválido</td>
+                            <td><span class="badge badge-warning">401</span></td>
+                            <td>"Refresh token inválido"</td>
+                            <td>Fazer logout e redirecionar para login</td>
+                        </tr>
+                        <tr>
+                            <td>Token ausente</td>
+                            <td><span class="badge badge-warning">401</span></td>
+                            <td>"Token não fornecido"</td>
+                            <td>Redirecionar para login</td>
+                        </tr>
+                        <tr>
+                            <td>Permissão insuficiente</td>
+                            <td><span class="badge badge-warning">403</span></td>
+                            <td>"Sem permissão para este recurso"</td>
+                            <td>Exibir mensagem de acesso negado</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="alert alert-success">
+                <div class="alert-title">✅ Vantagens da Autenticação JWT</div>
+                <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                    <strong>Stateless:</strong> Não requer armazenamento de sessão no servidor<br>
+                    <strong>Escalável:</strong> Funciona bem em arquiteturas distribuídas e microserviços<br>
+                    <strong>Cross-domain:</strong> Pode ser usado em diferentes domínios/subdomínios<br>
+                    <strong>Mobile-friendly:</strong> Ideal para aplicações mobile que não suportam cookies<br>
+                    <strong>Autocontido:</strong> O token carrega todas as informações necessárias
+                </p>
+            </div>
+        </section>
         
+        <!-- ============================================================================
+             SEÇÃO 10: SISTEMA DE IA
+             ============================================================================ -->
+        <section class="section reveal active" id="ia">
+            <div class="section-header">
+                <div class="section-number">10</div>
+                <h2 class="section-title">Sistema de IA</h2>
+                <p class="section-subtitle">Classificação automática de ingredientes com NLP 100% gratuito</p>
+            </div>
+
+            <div class="alert alert-success">
+                <div class="alert-title">✅ 100% Gratuito e Local</div>
+                <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                    O sistema de IA utiliza apenas tecnologias open-source executadas localmente.
+                    Sem APIs pagas (OpenAI, Google, etc.), sem envio de dados externos, sem custos adicionais.
+                    Processamento NLP em português com spaCy e aprendizado contínuo via feedback do usuário.
+                </p>
+            </div>
+
+            <!-- Características Principais -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🎯</span>
+                    Características Principais
+                </h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Característica</th>
+                            <th>Tecnologia</th>
+                            <th>Benefício</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>NLP em Português</td>
+                            <td>spaCy (pt_core_news_sm)</td>
+                            <td>Análise linguística precisa em português brasileiro</td>
+                        </tr>
+                        <tr>
+                            <td>Similaridade de Strings</td>
+                            <td>fuzzywuzzy + Levenshtein</td>
+                            <td>Matching inteligente mesmo com erros de digitação</td>
+                        </tr>
+                        <tr>
+                            <td>Base de Conhecimento</td>
+                            <td>400+ categorias hierárquicas</td>
+                            <td>Cobertura ampla de ingredientes gastronômicos</td>
+                        </tr>
+                        <tr>
+                            <td>Aprendizado Contínuo</td>
+                            <td>Sistema de feedback + aliases</td>
+                            <td>Melhora acurácia com uso (self-learning)</td>
+                        </tr>
+                        <tr>
+                            <td>Processamento Local</td>
+                            <td>Executado no servidor backend</td>
+                            <td>Privacidade, velocidade e sem custos de API</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Stack Tecnológica -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🛠️</span>
+                    Stack Tecnológica
+                </h3>
+                <div class="code-block">
+                    <div class="code-content">
+<span class="comment"># requirements-ia.txt</span>
+
+<span class="comment"># Processamento de Linguagem Natural</span>
+spacy>=3.6.0
+<span class="comment"># Modelo português: python -m spacy download pt_core_news_sm</span>
+
+<span class="comment"># Similaridade de Strings</span>
+fuzzywuzzy>=0.18.0
+python-levenshtein>=0.20.0
+
+<span class="comment"># Normalização de Texto</span>
+unidecode>=1.3.6
+
+<span class="comment"># Instalação</span>
+pip install -r requirements-ia.txt
+python -m spacy download pt_core_news_sm
+                    </div>
+                </div>
+            </div>
+
+            <!-- Arquitetura do Sistema -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">📐</span>
+                    Arquitetura do Sistema
+                </h3>
+                <div class="diagram-box">
+                    <div class="diagram-content">
+┌────────────────────────────────────────────────────────────────────┐
+│                    ARQUITETURA DO SISTEMA DE IA                    │
+└────────────────────────────────────────────────────────────────────┘
+
+                            FRONTEND (React)
+                                   │
+                                   │ POST /api/v1/ia/classificar
+                                   │ {nome_produto: "Filé Mignon"}
+                                   ▼
+                     ┌─────────────────────────────┐
+                     │   ENDPOINT REST (FastAPI)   │
+                     │  /api/v1/ia/classificar     │
+                     └──────────────┬──────────────┘
+                                    │
+                                    ▼
+                     ┌─────────────────────────────┐
+                     │   CLASSIFICADOR IA CORE     │
+                     │  classificador_ia.py        │
+                     └──────────────┬──────────────┘
+                                    │
+                    ┌───────────────┼───────────────┐
+                    │               │               │
+                    ▼               ▼               ▼
+        ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+        │   SISTEMA    │  │   SISTEMA    │  │  ANÁLISE NLP │
+        │  DE ALIASES  │  │ MAPEAMENTO   │  │ COMPLEMENTAR │
+        │              │  │  INTELIGENTE │  │              │
+        │ (Existente)  │  │ (Existente)  │  │   (spaCy)    │
+        └──────┬───────┘  └──────┬───────┘  └──────┬───────┘
+               │                  │                  │
+               └──────────────────┼──────────────────┘
+                                  │
+                                  ▼
+                      ┌───────────────────────┐
+                      │   SCORING E RANKING   │
+                      │   (Algoritmo Híbrido) │
+                      └───────────┬───────────┘
+                                  │
+                                  ▼
+                      ┌───────────────────────┐
+                      │  BASE DE CONHECIMENTO │
+                      │  400+ Taxonomias      │
+                      │  Hierárquica (4 níveis)│
+                      └───────────┬───────────┘
+                                  │
+                                  ▼
+                      ┌───────────────────────┐
+                      │      DATABASE         │
+                      │   PostgreSQL 15       │
+                      │  (taxonomias, aliases)│
+                      └───────────┬───────────┘
+                                  │
+                                  ▼
+                      ┌───────────────────────┐
+                      │  RETORNO AO FRONTEND  │
+                      │  {sugestao + score}   │
+                      └───────────────────────┘
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fluxo de Classificação -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🔄</span>
+                    Fluxo de Classificação
+                </h3>
+                <div class="diagram-box">
+                    <div class="diagram-content">
+ETAPA 1: ENTRADA DO USUÁRIO
+─────────────────────────────────────────────────────────────────
+  Usuário digita: "Filé Mignon Premium Resfriado"
+  ↓
+
+ETAPA 2: NORMALIZAÇÃO
+─────────────────────────────────────────────────────────────────
+  Remove acentos    → "file mignon premium resfriado"
+  Lowercase         → "file mignon premium resfriado"
+  Remove stopwords  → "file mignon premium resfriado"
+  Tokenização       → ["file", "mignon", "premium", "resfriado"]
+  ↓
+
+ETAPA 3: BUSCA NO SISTEMA DE ALIASES (PRIORIDADE 1)
+─────────────────────────────────────────────────────────────────
+  SELECT * FROM taxonomia_alias WHERE alias LIKE 'file mignon%'
+  ↓
+  ENCONTRADO! alias: "file mignon" → taxonomia_id: 45
+  Score: 100% (match exato)
+  ↓
+  Retorna: Carnes > Bovino > Filé > Premium
+  ↓
+
+ETAPA 4: BUSCA NO MAPEAMENTO INTELIGENTE (PRIORIDADE 2)
+─────────────────────────────────────────────────────────────────
+  (Se não encontrado em aliases)
+  ↓
+  Algoritmo de matching avançado com pesos
+  Busca em taxonomias por palavras-chave
+  ↓
+  Candidatos encontrados:
+  - Carnes > Bovino > Filé (score: 85%)
+  - Carnes > Bovino > Alcatra (score: 60%)
+  ↓
+
+ETAPA 5: ANÁLISE NLP COM SPACY (COMPLEMENTAR)
+─────────────────────────────────────────────────────────────────
+  (Se score anterior < 80%)
+  ↓
+  nlp = spacy.load("pt_core_news_sm")
+  doc = nlp("file mignon premium resfriado")
+  ↓
+  Extração de características:
+  - Lematização: "file" → "filé"
+  - POS tagging: NOUN, ADJ, ADJ
+  - Dependências sintáticas
+  ↓
+  Análise semântica:
+  - "mignon" → termo técnico culinário
+  - "premium" → qualidade alta
+  - "resfriado" → estado de conservação
+  ↓
+
+ETAPA 6: SCORING HÍBRIDO
+─────────────────────────────────────────────────────────────────
+  Combinar scores:
+  - Alias exato: 100%
+  - Mapeamento: 85%
+  - NLP: 75%
+  - Fuzzy matching: 90%
+  ↓
+  Score final = max(100, 85, 75, 90) = 100%
+  ↓
+
+ETAPA 7: RETORNO AO USUÁRIO
+─────────────────────────────────────────────────────────────────
+  {
+    "taxonomia_sugerida": {
+      "categoria": "Carnes",
+      "subcategoria": "Bovino",
+      "especificacao": "Filé",
+      "variante": "Premium",
+      "nome_completo": "Carnes > Bovino > Filé > Premium"
+    },
+    "score_confianca": 100,
+    "alternativas": [
+      {
+        "nome": "Carnes > Bovino > Contrafilé > Premium",
+        "score": 75
+      }
+    ],
+    "tempo_processamento_ms": 145
+  }
+  ↓
+
+ETAPA 8: FEEDBACK DO USUÁRIO (OPCIONAL)
+─────────────────────────────────────────────────────────────────
+  Usuário aceita → Salva como alias (aprendizado)
+  Usuário corrige → Salva correção como novo alias
+  ↓
+  INSERT INTO taxonomia_alias (alias, taxonomia_id, confianca)
+  VALUES ('file mignon premium', 45, 0.95)
+  ↓
+  Sistema aprendeu! Próxima vez será 100% preciso.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Implementação Core -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">💻</span>
+                    Implementação Core (Python)
+                </h3>
+                <div class="code-block">
+                    <div class="code-content">
+<span class="comment"># backend/app/ai/classificador_ia.py</span>
+
+import spacy
+from fuzzywuzzy import fuzz, process
+import unidecode
+
+class ClassificadorIA:
+    def __init__(self, db_session):
+        self.db_session = db_session
+        <span class="comment"># Carregar modelo português</span>
+        self.nlp = spacy.load("pt_core_news_sm")
+        
+    def normalizar_texto(self, texto: str) -> str:
+        """Remove acentos, lowercase, limpa texto"""
+        texto = unidecode.unidecode(texto)
+        texto = texto.lower().strip()
+        return texto
+    
+    def extrair_tokens(self, texto: str) -> list:
+        """Tokeniza e remove stopwords"""
+        doc = self.nlp(texto)
+        tokens = [
+            token.lemma_ 
+            for token in doc 
+            if not token.is_stop and not token.is_punct
+        ]
+        return tokens
+    
+    def calcular_similaridade(self, texto1: str, texto2: str) -> float:
+        """Calcula similaridade entre dois textos"""
+        ratio = fuzz.ratio(texto1, texto2)
+        partial = fuzz.partial_ratio(texto1, texto2)
+        token_sort = fuzz.token_sort_ratio(texto1, texto2)
+        token_set = fuzz.token_set_ratio(texto1, texto2)
+        
+        <span class="comment"># Retornar melhor score</span>
+        return max(ratio, partial, token_sort, token_set) / 100.0
+    
+    def classificar_produto(self, nome_produto: str) -> dict:
+        """Método principal de classificação"""
+        candidatos = []
+        
+        <span class="comment"># 1. Buscar em aliases (prioridade máxima)</span>
+        alias_result = self._buscar_em_aliases(nome_produto)
+        if alias_result and alias_result['score'] >= 0.95:
+            return alias_result
+        
+        <span class="comment"># 2. Buscar em mapeamento inteligente</span>
+        mapeamento_results = self._buscar_mapeamento(nome_produto)
+        candidatos.extend(mapeamento_results)
+        
+        <span class="comment"># 3. Análise NLP complementar</span>
+        nlp_results = self._analisar_nlp(nome_produto)
+        candidatos.extend(nlp_results)
+        
+        <span class="comment"># 4. Ordenar por score e retornar melhor</span>
+        candidatos.sort(key=lambda x: x['score'], reverse=True)
+        
+        return {
+            'taxonomia_sugerida': candidatos[0] if candidatos else None,
+            'score_confianca': candidatos[0]['score'] if candidatos else 0,
+            'alternativas': candidatos[1:4] if len(candidatos) > 1 else []
+        }
+    
+    def registrar_feedback(self, produto: str, taxonomia_correta_id: int):
+        """Salva feedback para aprendizado contínuo"""
+        <span class="comment"># Criar novo alias</span>
+        alias = TaxonomiaAlias(
+            alias=self.normalizar_texto(produto),
+            taxonomia_id=taxonomia_correta_id,
+            confianca=0.95
+        )
+        self.db_session.add(alias)
+        self.db_session.commit()
+        
+        <span class="comment"># Log para análise</span>
+        logger.info(f"Feedback registrado: {produto} → {taxonomia_correta_id}")
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sistema de Scoring -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">📊</span>
+                    Sistema de Scoring
+                </h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Tipo de Match</th>
+                            <th>Score</th>
+                            <th>Confiança</th>
+                            <th>Exemplo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-success">Alias Exato</span></td>
+                            <td>100%</td>
+                            <td>Muito Alta</td>
+                            <td>"file mignon" → encontrado em aliases</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-success">Fuzzy 95+%</span></td>
+                            <td>95-99%</td>
+                            <td>Alta</td>
+                            <td>"salamão" → "salmão" (typo)</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-info">Palavras-chave</span></td>
+                            <td>80-95%</td>
+                            <td>Média-Alta</td>
+                            <td>"peito frango" → "Frango > Peito"</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-warning">Parcial</span></td>
+                            <td>60-80%</td>
+                            <td>Média</td>
+                            <td>"tomate especial" → "Tomate > Italiano"</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-warning">NLP Análise</span></td>
+                            <td>40-60%</td>
+                            <td>Baixa</td>
+                            <td>Inferência por contexto semântico</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-pink">Sem Match</span></td>
+                            <td>&lt; 40%</td>
+                            <td>Muito Baixa</td>
+                            <td>Produto desconhecido ou muito específico</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <div class="alert alert-info" style="margin-top: 1rem;">
+                    <div class="alert-title">💡 Decisão Automática vs Manual</div>
+                    <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                        <strong>Score ≥ 90%:</strong> Classificação aplicada automaticamente<br>
+                        <strong>Score 60-89%:</strong> Sugestão para aprovação do usuário<br>
+                        <strong>Score &lt; 60%:</strong> Usuário deve classificar manualmente
+                    </p>
+                </div>
+            </div>
+
+            <!-- Endpoints da API -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🔌</span>
+                    Endpoints da API IA
+                </h3>
+                <div class="code-block">
+                    <div class="code-content">
+<span class="comment"># 1. Classificar Produto Individual</span>
+POST /api/v1/ia/classificar
+{
+  "nome_produto": "Salmão Atlântico Filé Fresco",
+  "confianca_minima": 0.6
+}
+
+<span class="comment"># Resposta</span>
+{
+  "nome_original": "Salmão Atlântico Filé Fresco",
+  "taxonomia_sugerida": {
+    "id": 78,
+    "categoria": "Peixes",
+    "subcategoria": "Salmão",
+    "especificacao": "Filé",
+    "variante": "Fresco",
+    "nome_completo": "Peixes > Salmão > Filé > Fresco"
+  },
+  "score_confianca": 92,
+  "alternativas": [
+    {
+      "taxonomia_id": 79,
+      "nome": "Peixes > Salmão > Filé > Congelado",
+      "score": 75
+    }
+  ],
+  "tempo_processamento_ms": 145
+}
+
+<span class="comment"># 2. Classificação em Lote</span>
+POST /api/v1/ia/classificar-lote
+{
+  "produtos": [
+    "Alcatra Bovina",
+    "Tomate Italiano",
+    "Queijo Mussarela"
+  ],
+  "confianca_minima": 0.5
+}
+
+<span class="comment"># 3. Registrar Feedback (Aprendizado)</span>
+POST /api/v1/ia/feedback
+{
+  "produto_original": "File Minhon",
+  "acao": "corrigir",
+  "taxonomia_correta_id": 45,
+  "comentario": "Typo no nome"
+}
+
+<span class="comment"># 4. Histórico de Classificações</span>
+GET /api/v1/ia/historico?limit=50&offset=0
+
+<span class="comment"># 5. Estatísticas da IA</span>
+GET /api/v1/ia/estatisticas
+{
+  "total_classificacoes": 1250,
+  "acuracia_geral": 87.5,
+  "confianca_media": 82.3,
+  "feedbacks_positivos": 1089,
+  "feedbacks_correcoes": 161,
+  "categorias_mais_usadas": [
+    {"categoria": "Carnes", "count": 450},
+    {"categoria": "Hortaliças", "count": 320}
+  ]
+}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sistema de Aprendizado -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">🧠</span>
+                    Sistema de Aprendizado Contínuo
+                </h3>
+                <div class="diagram-box">
+                    <div class="diagram-content">
+┌────────────────────────────────────────────────────────────────┐
+│              CICLO DE APRENDIZADO CONTÍNUO                     │
+└────────────────────────────────────────────────────────────────┘
+
+1. IA CLASSIFICA
+   Produto: "Salamão grelhado"
+   Sugestão: Peixes > Salmão > Filé
+   Score: 75% (fuzzy match: "salamão" → "salmão")
+   ↓
+
+2. USUÁRIO CORRIGE
+   Ação: "Aceitar mas ajustar variante"
+   Correção: Peixes > Salmão > Grelhado (não Filé)
+   ↓
+
+3. SISTEMA APRENDE
+   INSERT INTO taxonomia_alias:
+   - alias: "salamao grelhado"
+   - taxonomia_id: 89 (Peixes > Salmão > Grelhado)
+   - confianca: 0.95
+   - created_at: NOW()
+   ↓
+
+4. PRÓXIMA VEZ
+   Produto: "salamao grelhado"
+   Match em alias → Score: 100%
+   Classificação automática instantânea!
+   ↓
+
+5. ANÁLISE PERIÓDICA
+   Sistema identifica padrões:
+   - "grelhado" aparece 50x → criar regra geral
+   - "premium" sempre na variante → ajustar algoritmo
+   - Erros comuns: "salamao", "file", "tomates"
+   ↓
+
+6. OTIMIZAÇÃO
+   Atualizar pesos do scoring
+   Criar novos aliases preventivos
+   Melhorar normalização de texto
+                    </div>
+                </div>
+            </div>
+
+            <!-- Base de Conhecimento -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">📚</span>
+                    Base de Conhecimento (400+ Categorias)
+                </h3>
+                <div class="code-block">
+                    <div class="code-content">
+<span class="comment"># Estrutura Hierárquica (4 níveis)</span>
+
+NÍVEL 1: CATEGORIA (14 principais)
+├── Carnes
+├── Peixes
+├── Aves
+├── Hortaliças
+├── Frutas
+├── Laticínios
+├── Grãos e Cereais
+├── Óleos e Gorduras
+├── Temperos
+├── Massas
+├── Bebidas
+├── Doces e Sobremesas
+├── Industrializados
+└── Outros
+
+NÍVEL 2: SUBCATEGORIA (80+)
+Carnes
+├── Bovino
+├── Suíno
+├── Caprino
+├── Cordeiro
+└── Vísceras
+
+Peixes
+├── Salmão
+├── Tilápia
+├── Bacalhau
+├── Atum
+└── Outros Peixes
+
+NÍVEL 3: ESPECIFICACAO (200+)
+Carnes > Bovino
+├── Alcatra
+├── Picanha
+├── Filé Mignon
+├── Contrafilé
+├── Fraldinha
+└── Moído
+
+NÍVEL 4: VARIANTE (400+)
+Carnes > Bovino > Filé Mignon
+├── Premium
+├── Orgânico
+├── Resfriado
+├── Congelado
+├── Maturado
+└── Importado
+
+<span class="comment"># Exemplo de Registro Completo</span>
+{
+  "id": 45,
+  "categoria": "Carnes",
+  "subcategoria": "Bovino",
+  "especificacao": "Filé Mignon",
+  "variante": "Premium",
+  "nome_completo": "Carnes > Bovino > Filé Mignon > Premium",
+  "codigo_taxonomia": "CAR-BOV-FIL-PRE",
+  "aliases": [
+    "file mignon premium",
+    "file mingnon",
+    "mignon premium",
+    "file de mignon"
+  ]
+}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Métricas e Performance -->
+            <div class="content-card">
+                <h3 class="card-title">
+                    <span class="card-icon">📈</span>
+                    Métricas e Performance
+                </h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Métrica</th>
+                            <th>Valor Atual</th>
+                            <th>Meta</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Acurácia Geral</td>
+                            <td>~85%</td>
+                            <td>90%</td>
+                            <td><span class="badge badge-success">Boa</span></td>
+                        </tr>
+                        <tr>
+                            <td>Tempo Médio de Classificação</td>
+                            <td>&lt; 200ms</td>
+                            <td>&lt; 300ms</td>
+                            <td><span class="badge badge-success">Ótimo</span></td>
+                        </tr>
+                        <tr>
+                            <td>Taxa de Feedback Positivo</td>
+                            <td>87%</td>
+                            <td>85%</td>
+                            <td><span class="badge badge-success">Ótimo</span></td>
+                        </tr>
+                        <tr>
+                            <td>Cobertura de Categorias</td>
+                            <td>400+ taxonomias</td>
+                            <td>500+</td>
+                            <td><span class="badge badge-info">Crescendo</span></td>
+                        </tr>
+                        <tr>
+                            <td>Classificações Automáticas (≥90%)</td>
+                            <td>65%</td>
+                            <td>75%</td>
+                            <td><span class="badge badge-warning">Melhorando</span></td>
+                        </tr>
+                        <tr>
+                            <td>Aliases Aprendidos</td>
+                            <td>1200+</td>
+                            <td>Crescimento contínuo</td>
+                            <td><span class="badge badge-success">Ativo</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="alert alert-success">
+                <div class="alert-title">✅ Benefícios do Sistema de IA</div>
+                <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                    <strong>Economia:</strong> Zero custos com APIs pagas (OpenAI custaria ~$50-200/mês)<br>
+                    <strong>Privacidade:</strong> Dados não saem do servidor, 100% local<br>
+                    <strong>Performance:</strong> Resposta instantânea sem latência de rede<br>
+                    <strong>Escalabilidade:</strong> Suporta milhares de classificações sem custo adicional<br>
+                    <strong>Personalização:</strong> Aprende especificamente com seus dados<br>
+                    <strong>Disponibilidade:</strong> Funciona offline, sem dependências externas
+                </p>
+            </div>
+        </section>
+
         <!-- SEÇÃO 12: INSTALAÇÃO -->
         <section class="section reveal" id="instalacao">
             <div class="section-header">

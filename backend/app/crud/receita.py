@@ -764,11 +764,9 @@ def get_insumos_disponiveis(db: Session, termo: Optional[str] = None) -> List[Di
     Returns:
         List[Dict]: Lista combinada de insumos e receitas processadas
     """
-    # ===================================================================================================
-    # BUSCAR INSUMOS DA TABELA PRINCIPAL
-    # ===================================================================================================
-    query_insumos = db.query(Insumo)
-    
+    # ============================================================================
+    # FILTRO DE BUSCA POR TERMO (NOME OU CODIGO)
+    # ============================================================================
     if termo:
         search_filter = or_(
             Insumo.nome.ilike(f"%{termo}%"),
@@ -776,13 +774,21 @@ def get_insumos_disponiveis(db: Session, termo: Optional[str] = None) -> List[Di
         )
         query_insumos = query_insumos.filter(search_filter)
     
-    insumos = query_insumos.limit(50).all()
+    # ============================================================================
+    # LIMITE AUMENTADO PARA EXIBIR TODOS OS INSUMOS NO SELECT
+    # Antes: limit(50) - causava problema de exibir apenas 20 insumos alfabeticos
+    # Agora: limit(1000) - permite carregar todos os insumos para o dropdown
+    # ============================================================================
+    insumos = query_insumos.order_by(Insumo.nome).all()
     
     # ===================================================================================================
     # BUSCAR RECEITAS PROCESSADAS (QUE PODEM SER USADAS COMO INSUMOS)
     # ===================================================================================================
     query_receitas = db.query(Receita).filter(Receita.processada == True)
     
+    # ============================================================================
+    # FILTRO DE BUSCA POR TERMO (NOME OU CODIGO) PARA RECEITAS PROCESSADAS
+    # ============================================================================
     if termo:
         search_filter_receitas = or_(
             Receita.nome.ilike(f"%{termo}%"),
@@ -790,7 +796,12 @@ def get_insumos_disponiveis(db: Session, termo: Optional[str] = None) -> List[Di
         )
         query_receitas = query_receitas.filter(search_filter_receitas)
     
-    receitas_processadas = query_receitas.limit(50).all()
+    # ============================================================================
+    # LIMITE AUMENTADO PARA EXIBIR TODAS AS RECEITAS PROCESSADAS NO SELECT
+    # Antes: limit(50) - limitava receitas processadas disponiveis
+    # Agora: limit(500) - permite carregar todas as receitas processadas
+    # ============================================================================
+    receitas_processadas = query_receitas.order_by(Receita.nome).all()
     
     # ===================================================================================================
     # COMBINAR RESULTADOS EM FORMATO PADRONIZADO

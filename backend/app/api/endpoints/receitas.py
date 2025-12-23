@@ -176,7 +176,8 @@ def list_receitas(
                     'receita_processada': {
                         'id': ri.receita_processada.id,
                         'nome': ri.receita_processada.nome,
-                        'unidade': ri.receita_processada.unidade
+                        'unidade': ri.receita_processada.unidade,
+                        'cmv_real': (ri.receita_processada.cmv / 100) if ri.receita_processada.cmv else 0
                     } if ri.receita_processada else None
                 }
                 for ri in (receita.receita_insumos or [])
@@ -499,12 +500,22 @@ def create_receita_endpoint(
                             # É uma receita processada
                             print(f"  - Salvando Receita Processada {insumo_id}: {quantidade} {unidade_medida}")
                             
+                            # ============================================================================
+                            # CALCULAR CUSTO DA RECEITA PROCESSADA
+                            # Usa o cmv da receita processada (em centavos) convertido para reais
+                            # ============================================================================
+                            cmv_receita_processada = (receita_processada.cmv / 100) if receita_processada.cmv else 0
+                            custo_calculado = float(quantidade) * cmv_receita_processada
+                            print(f"    CMV da receita processada: R$ {cmv_receita_processada:.2f}")
+                            print(f"    Custo calculado: {quantidade} x {cmv_receita_processada:.2f} = R$ {custo_calculado:.2f}")
+                            
                             receita_insumo = ReceitaInsumo(
-                                receita_id=receita_id,  # ← Usar receita_id no modo edição
+                                receita_id=receita_id,
                                 receita_processada_id=int(insumo_id),
                                 insumo_id=None,
                                 quantidade_necessaria=float(quantidade),
-                                unidade_medida=unidade_medida
+                                unidade_medida=unidade_medida,
+                                custo_calculado=custo_calculado
                             )
                             print(f"  🔍 DEBUG - Objeto ReceitaInsumo criado:")
                             print(f"    - receita_id: {receita_insumo.receita_id}")
@@ -537,6 +548,15 @@ def create_receita_endpoint(
                 print(f"  📊 Total de insumos salvos para esta receita: {len(insumo_salvo)}")
                 for ri in insumo_salvo:
                     print(f"    - ID: {ri.id}, insumo_id: {ri.insumo_id}, receita_processada_id: {ri.receita_processada_id}")
+                
+                # ============================================================================
+                # CALCULAR CMV DA RECEITA APOS PROCESSAR TODOS OS INSUMOS
+                # ============================================================================
+                try:
+                    cmv_calculado = crud_receita.calcular_cmv_receita(db, receita_id)
+                    print(f"  ✅ CMV calculado para receita {receita_id}: R$ {cmv_calculado:.2f}")
+                except Exception as e:
+                    print(f"  ⚠️ Erro ao calcular CMV (nao critico): {e}")
             
             # Retornar receita atualizada
             resposta = {
@@ -666,12 +686,22 @@ def create_receita_endpoint(
                                 # É uma receita processada
                                 print(f"  - Salvando Receita Processada {insumo_id}: {quantidade} {unidade_medida}")
                                 
+                                # ============================================================================
+                                # CALCULAR CUSTO DA RECEITA PROCESSADA
+                                # Usa o cmv da receita processada (em centavos) convertido para reais
+                                # ============================================================================
+                                cmv_receita_processada = (receita_processada.cmv / 100) if receita_processada.cmv else 0
+                                custo_calculado = float(quantidade) * cmv_receita_processada
+                                print(f"    CMV da receita processada: R$ {cmv_receita_processada:.2f}")
+                                print(f"    Custo calculado: {quantidade} x {cmv_receita_processada:.2f} = R$ {custo_calculado:.2f}")
+                                
                                 receita_insumo = ReceitaInsumo(
-                                    receita_id=nova_receita.id,  # ← Usar nova_receita.id no modo criação
+                                    receita_id=nova_receita.id,
                                     receita_processada_id=int(insumo_id),
                                     insumo_id=None,
                                     quantidade_necessaria=float(quantidade),
-                                    unidade_medida=unidade_medida
+                                    unidade_medida=unidade_medida,
+                                    custo_calculado=custo_calculado
                                 )
                             else:
                                 # É um insumo normal
@@ -690,6 +720,15 @@ def create_receita_endpoint(
                     # COMMIT das alterações
                     db.commit()
                     print(f"✅ {len(insumos_data)} insumos salvos com sucesso!")
+                    
+                    # ============================================================================
+                    # CALCULAR CMV DA RECEITA APOS PROCESSAR TODOS OS INSUMOS
+                    # ============================================================================
+                    try:
+                        cmv_calculado = crud_receita.calcular_cmv_receita(db, nova_receita.id)
+                        print(f"✅ CMV calculado para receita {nova_receita.id}: R$ {cmv_calculado:.2f}")
+                    except Exception as e:
+                        print(f"⚠️ Erro ao calcular CMV (nao critico): {e}")
                     
                 except Exception as e:
                     print(f"❌ Erro ao salvar insumos: {e}")

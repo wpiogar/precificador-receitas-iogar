@@ -166,7 +166,7 @@ def contar_insumos(
 def listar_insumos_paginado(
     # Parâmetros de paginação
     page: int = Query(1, ge=1, description="Número da página (começa em 1)"),
-    per_page: int = Query(20, ge=1, le=100, description="Registros por página (1-100)"),
+    per_page: int = Query(500, ge=1, le=1000, description="Registros por página (1-1000)"),
     
     # Filtros opcionais
     grupo: Optional[str] = Query(None, description="Filtrar por grupo"),

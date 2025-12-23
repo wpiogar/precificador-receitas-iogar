@@ -729,10 +729,10 @@ const calcularCustoPorPorcao = () => {
       
       // Somar custo das receitas processadas
       receitasProcessadas.forEach(item => {
-        // IMPORTANTE: O preco_compra_real está no campo 'insumo', não em 'receita_processada'
-        const precoPorUnidade = item.insumo?.preco_compra_real || 
-                                item.receita_processada?.preco_compra_real || 
-                                0;
+        // ============================================================================
+        // CORRECAO: Para receitas processadas, usar cmv_real como preco por unidade
+        // ============================================================================
+        const precoPorUnidade = item.receita_processada?.cmv_real || item.insumo?.preco_compra_real || 0;
         const custoReceitaProcessada = (item.quantidade_necessaria || 0) * precoPorUnidade;
         custoTotal += custoReceitaProcessada;
       });
@@ -807,17 +807,19 @@ const calcularCustoPorPorcao = () => {
                 // CALCULAR CUSTO DA RECEITA PROCESSADA
                 // ===================================================================================================
                 const custoReceitaProcessada = (() => {
-                  // IMPORTANTE: O preco_compra_real está no campo 'insumo', não em 'receita_processada'
-                  const precoPorUnidade = item.insumo?.preco_compra_real || 
-                                        item.receita_processada?.preco_compra_real || 
-                                        0;
+                  // ============================================================================
+                  // DEBUG E CORRECAO: Para receitas processadas, usar cmv_real
+                  // ============================================================================
+                  const precoPorUnidade = item.receita_processada?.cmv_real || 0;
+                  const quantidade = item.quantidade_necessaria || 0;
+                  const custoTotal = quantidade * precoPorUnidade;
                   
-                  // Calcular custo baseado na quantidade necessária
-                  const custoTotal = (item.quantidade_necessaria || 0) * precoPorUnidade;
-                  console.log('🔍 Cálculo receita processada:');
-                  console.log('  - quantidade_necessaria:', item.quantidade_necessaria);
-                  console.log('  - precoPorUnidade:', precoPorUnidade);
-                  console.log('  - custoTotal:', custoTotal);
+                  console.log('Calculo receita processada no relatorio:', {
+                    nome: item.receita_processada?.nome,
+                    cmv_real: item.receita_processada?.cmv_real,
+                    quantidade: quantidade,
+                    custoTotal: custoTotal
+                  });
                   
                   return custoTotal;
                 })();
@@ -837,7 +839,7 @@ const calcularCustoPorPorcao = () => {
                         {(item.quantidade_necessaria || 0).toFixed(2)} {item.unidade_medida || 'un'}
                       </span>
                       <span>
-                        {formatarPreco(item.insumo?.preco_compra_real || item.receita_processada?.preco_compra_real || 0)} / {item.insumo?.unidade || item.receita_processada?.unidade || 'un'}
+                        {formatarPreco(item.receita_processada?.cmv_real || item.insumo?.preco_compra_real || 0)} / {item.receita_processada?.unidade || item.insumo?.unidade || 'un'}
                       </span>
                     </div>
                     <div className="mt-2 pt-2 border-t border-purple-200">

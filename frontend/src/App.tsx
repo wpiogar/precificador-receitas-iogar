@@ -4144,8 +4144,60 @@ const fetchInsumos = async (searchTerm?: string) => {
       setNovoInsumo(prev => ({ ...prev, [field]: value }));
     }, []);
 
-    // Componente isolado para formulário de receita
-  const FormularioReceita = ({ selectedRestaurante, editingReceita, onClose, onSave, loading, insumos }) => {
+  const FormularioReceita = ({ selectedRestaurante, editingReceita, onClose, onSave, loading, insumos, receitas }) => {
+
+      // ============================================================================
+      // ESTADO PARA TODOS OS INSUMOS DISPONIVEIS (SEM PAGINACAO)
+      // ============================================================================
+      // Carrega todos os insumos do backend para o dropdown de selecao
+      // Diferente do estado 'insumos' que vem paginado da listagem
+      // ============================================================================
+      const [insumosDisponiveis, setInsumosDisponiveis] = useState<any[]>([]);
+      const [carregandoInsumos, setCarregandoInsumos] = useState(false);
+
+      // ============================================================================
+      // CARREGAR TODOS OS INSUMOS AO ABRIR O FORMULARIO
+      // ============================================================================
+      useEffect(() => {
+        const carregarTodosInsumos = async () => {
+          if (!selectedRestaurante?.id) return;
+          
+          setCarregandoInsumos(true);
+          try {
+            const token = localStorage.getItem('foodcost_access_token');
+            // ============================================================================
+            // BUSCAR TODOS OS INSUMOS DO RESTAURANTE SELECIONADO
+            // Usa endpoint paginado com per_page alto para trazer todos os insumos
+            // ============================================================================
+            const response = await fetch(
+              `${API_BASE}/api/v1/insumos/paginado?restaurante_id=${selectedRestaurante.id}&per_page=1000&page=1`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+            
+            if (response.ok) {
+              const data = await response.json();
+              // Endpoint paginado retorna { data: [...], total: X, ... }
+              console.log('Insumos disponiveis carregados:', data.data?.length || 0, 'de', data.total);
+              setInsumosDisponiveis(data.data || []);
+            } else {
+              console.error('Erro ao carregar insumos disponiveis');
+              setInsumosDisponiveis([]);
+            }
+          } catch (error) {
+            console.error('Erro ao carregar insumos:', error);
+            setInsumosDisponiveis([]);
+          } finally {
+            setCarregandoInsumos(false);
+          }
+        };
+        
+        carregarTodosInsumos();
+      }, [selectedRestaurante?.id]);
 
       // ============================================================================
       // VERIFICAÇÃO DE SEGURANÇA PARA INSUMOS - CORRIGIDO
@@ -4195,7 +4247,8 @@ const fetchInsumos = async (searchTerm?: string) => {
           // Campos existentes mantidos para compatibilidade
           categoria: editingReceita?.grupo || editingReceita?.categoria || '',
           descricao: editingReceita?.descricao || '',
-          tempo_preparo: editingReceita?.tempo_preparo || editingReceita?.tempo_preparo_minutos || 0
+          tempo_preparo: editingReceita?.tempo_preparo || editingReceita?.tempo_preparo_minutos || 0,
+          responsavel: editingReceita?.responsavel || ''
         };
       });
 
@@ -4238,7 +4291,8 @@ const fetchInsumos = async (searchTerm?: string) => {
             restaurante_id: selectedRestaurante?.id || editingReceita.restaurante_id || null,
             categoria: editingReceita.grupo || editingReceita.categoria || '',
             descricao: editingReceita.descricao || '',
-            tempo_preparo: editingReceita.tempo_preparo || editingReceita.tempo_preparo_minutos || 0
+            tempo_preparo: editingReceita.tempo_preparo || editingReceita.tempo_preparo_minutos || 0,
+            responsavel: editingReceita.responsavel || ''
           });
         }
       }, [editingReceita, selectedRestaurante]);
@@ -4375,15 +4429,19 @@ const fetchInsumos = async (searchTerm?: string) => {
       // ===================================================================================================
       const [buscaInsumo, setBuscaInsumo] = useState('');
 
-      // Função simples sem useMemo para evitar erros
+      // ============================================================================
+      // FUNCAO: FILTRAR INSUMOS PARA BUSCA NO FORMULARIO
+      // ============================================================================
+      // Usa insumosDisponiveis (todos os insumos) ao inves de insumos (paginado)
+      // ============================================================================
       const getInsumosFiltrados = () => {
         if (!buscaInsumo.trim()) return [];
         
         const termo = buscaInsumo.toLowerCase().trim();
         
-        // Filtrar insumos normais
-        const insumosNormais = insumos.filter(insumo => 
-          insumo.nome.toLowerCase().includes(termo) ||
+        // Filtrar insumos normais - usando insumosDisponiveis (todos os insumos)
+        const insumosNormais = insumosDisponiveis.filter(insumo => 
+          insumo.nome?.toLowerCase().includes(termo) ||
           insumo.grupo?.toLowerCase().includes(termo) ||
           insumo.codigo?.toLowerCase().includes(termo)
         );
@@ -4408,8 +4466,11 @@ const fetchInsumos = async (searchTerm?: string) => {
             tipo: 'receita_processada'  // Identificador especial
           }));
         
-        // Combinar e limitar a 10 resultados
-        return [...insumosNormais, ...receitasProcessadas].slice(0, 10);
+        // ============================================================================
+        // COMBINAR RESULTADOS SEM LIMITE
+        // Retorna todos os insumos e receitas processadas encontrados
+        // ============================================================================
+        return [...insumosNormais, ...receitasProcessadas];
       };
 
       const insumosFiltrados = getInsumosFiltrados();
@@ -4487,7 +4548,10 @@ const fetchInsumos = async (searchTerm?: string) => {
           return 0;
         }
         
-        let insumoData = insumos.find(i => {
+        // ============================================================================
+        // CORRECAO: Buscar em insumosDisponiveis (todos os insumos) ao inves de insumos (paginado)
+        // ============================================================================
+        let insumoData = insumosDisponiveis.find(i => {
           // Para insumos de fornecedor, comparar com id_original
           if (i.tipo_origem === 'fornecedor') {
             return i.id_original === receitaInsumo.insumo_id;
@@ -4504,23 +4568,19 @@ const fetchInsumos = async (searchTerm?: string) => {
           );
           
           if (receitaProcessada) {
-            // Calcular custo por rendimento para receitas processadas
-            const custoTotal = receitaProcessada.cmv_real || 0;
-            const rendimento = receitaProcessada.rendimento_porcoes || 1;
-            const custoPorRendimento = custoTotal / rendimento;
-            
-            // Transformar receita processada em formato de insumo para cálculo
+            // ============================================================================
+            // CORRECAO: Usar cmv_real diretamente (ja e o custo por unidade de rendimento)
+            // O cmv_real ja vem calculado corretamente do backend
+            // ============================================================================
             insumoData = {
               id: receitaProcessada.id,
               nome: receitaProcessada.nome,
-              preco_compra_real: custoPorRendimento,  // Usar custo por rendimento
+              preco_compra_real: receitaProcessada.cmv_real || 0,
               preco_compra: receitaProcessada.preco_compra || 0
             };
-            console.log('✅ Calculando custo de receita processada:', {
+            console.log('✅ Usando receita processada como insumo:', {
               nome: insumoData.nome,
-              custoTotal,
-              rendimento,
-              custoPorRendimento
+              cmv_real: receitaProcessada.cmv_real
             });
           }
         }
@@ -5287,7 +5347,10 @@ const fetchInsumos = async (searchTerm?: string) => {
                   {/* Lista de insumos adicionados */}
                   <div className="space-y-3">
                     {receitaInsumos.map((receitaInsumo, index) => {
-                      let insumoSelecionado = insumos.find(i => {
+                      // ============================================================================
+                      // BUSCAR INSUMO EM INSUMOSDISPONIVEIS (TODOS OS INSUMOS SEM PAGINACAO)
+                      // ============================================================================
+                      let insumoSelecionado = insumosDisponiveis.find(i => {
                         // Para insumos de fornecedor, comparar com id_original
                         if (i.tipo_origem === 'fornecedor') {
                           return i.id_original === receitaInsumo.insumo_id;
@@ -5295,7 +5358,6 @@ const fetchInsumos = async (searchTerm?: string) => {
                         // Para insumos normais, comparar com id diretamente
                         return i.id === receitaInsumo.insumo_id;
                       });
-
                       // Se não encontrou nos insumos, buscar nas receitas processadas
                       if (!insumoSelecionado && receitaInsumo.insumo_id) {
                         const receitaProcessada = receitas?.find(r => 
@@ -5441,9 +5503,9 @@ const fetchInsumos = async (searchTerm?: string) => {
                                   )}
                                   
                                   {/* ============================================================================
-                                      INSUMOS NORMAIS (SISTEMA + FORNECEDORES)
+                                      INSUMOS NORMAIS - USANDO INSUMOSDISPONIVEIS (TODOS SEM PAGINACAO)
                                       ============================================================================ */}
-                                  {insumos.map(insumo => {
+                                  {insumosDisponiveis.map(insumo => {
                                     let valorOption;
                                     
                                     if (insumo.tipo_origem === 'fornecedor') {
